@@ -21,6 +21,10 @@ from .utility import utility_graph
 def _route(state: PDLCState) -> str:
     if state.get("night_shift_active"):
         return "night_shift"
+    # A utility command (/decide, /doctor, /pause, …) routes to the utility
+    # subgraph regardless of the resting phase.
+    if state.get("utility_command"):
+        return "utility"
     return {
         "Initialization": "init",
         "Inception": "brainstorm",

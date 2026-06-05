@@ -40,6 +40,13 @@ _PHASE_FOR_COMMAND: dict[str, str] = {
     "ship": "Operation",
 }
 
+# Utility commands route to the utility subgraph via the `utility_command` flag,
+# independent of the resting phase.
+_UTILITY_COMMANDS: set[str] = {
+    "decide", "whatif", "doctor", "rollback", "hotfix",
+    "abandon", "release", "override", "pause", "resume",
+}
+
 
 class InvokeCommandRequest(BaseModel):
     command: Command
@@ -77,6 +84,8 @@ def _initial_state(req: InvokeCommandRequest, thread_id: str, session_id: str) -
     )
     state.setdefault("feature", feature)
     state.setdefault("brainstorm_log", [])
+    if req.command in _UTILITY_COMMANDS:
+        state["utility_command"] = req.command
     return state
 
 
