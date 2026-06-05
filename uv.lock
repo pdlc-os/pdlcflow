@@ -1968,6 +1968,7 @@ version = "0.0.1"
 source = { editable = "tools/pdlc-migrate" }
 dependencies = [
     { name = "httpx" },
+    { name = "pdlc-event-schema" },
     { name = "rich" },
     { name = "typer" },
 ]
@@ -1981,6 +1982,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "httpx", specifier = ">=0.27" },
+    { name = "pdlc-event-schema", editable = "packages/event-schema" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0" },
     { name = "rich", specifier = ">=13.7" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.6" },
