@@ -1,24 +1,40 @@
 """Arq worker — runs graph turns enqueued by the engine.
 
-`uv run arq app.worker.arq_settings.WorkerSettings` boots a worker process
-that picks up `start_graph` jobs and drives the meta-graph forward.
+`uv run arq app.worker.arq_settings.WorkerSettings` boots a worker that picks
+up `start_graph` / `resume_graph` jobs and drives the meta-graph through the
+same GraphRunner the API uses. For cross-process resume the worker must run
+with `use_postgres_checkpointer` so it shares thread state with the API; with
+the default MemorySaver each process has its own state (single-process dev
+runs the turns inline in the API instead).
 """
 
 from __future__ import annotations
 
+from typing import ClassVar
+
+from arq.connections import RedisSettings
+
 from ..clickstream import wire_emitter
 from ..config import settings
+from ..runtime import GraphRunner, build_checkpointer, get_runner, set_runner, wire_llm_backend
 
 
-async def start_graph(ctx: dict, thread_id: str, command: str) -> dict:
-    """Phase A stub. Real impl: load checkpointed state, route by command,
-    invoke meta_graph with stream config, push tokens to Redis Pub/Sub.
-    """
-    return {"thread_id": thread_id, "command": command, "status": "stubbed"}
+async def start_graph(ctx: dict, thread_id: str, state: dict) -> dict:
+    """Invoke the meta-graph to its first pause for `thread_id`."""
+    pending = get_runner().start(thread_id, state)
+    return {"thread_id": thread_id, "pending": pending.as_dict() if pending else None}
+
+
+async def resume_graph(ctx: dict, thread_id: str, resume_value: dict) -> dict:
+    """Resume a parked thread with the human's verdict / answers."""
+    pending = get_runner().resume(thread_id, resume_value)
+    return {"thread_id": thread_id, "pending": pending.as_dict() if pending else None}
 
 
 async def startup(_ctx: dict) -> None:
     wire_emitter(settings)
+    set_runner(GraphRunner(checkpointer=build_checkpointer(settings)))
+    wire_llm_backend(settings)
 
 
 async def shutdown(_ctx: dict) -> None:
@@ -26,7 +42,7 @@ async def shutdown(_ctx: dict) -> None:
 
 
 class WorkerSettings:
-    functions = [start_graph]
+    functions: ClassVar = [start_graph, resume_graph]
     on_startup = startup
     on_shutdown = shutdown
-    redis_settings = None  # set from settings.redis_url at boot in Phase B
+    redis_settings = RedisSettings.from_dsn(settings.redis_url)

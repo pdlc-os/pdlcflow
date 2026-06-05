@@ -1,5 +1,4 @@
 from app.llm import LLMProviderFactory
-from app.llm.factory import TenantCtx
 from app.llm.tier_map import DEFAULT_TIER_MAP, resolve_model_id
 
 

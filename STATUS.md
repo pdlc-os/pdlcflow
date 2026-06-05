@@ -24,7 +24,12 @@ Phase tracker for the migration roadmap defined in
 - [x] **Plan** subgraph (steps 13–19): deterministic task decomposition → task store (`bd-NN` ids) → dependency graph → Mermaid wave tree → `render_plan` → `beads_tasklist_approve` gate → Construction handoff.
 - [x] `brainstorm_graph` composes the four sub-phases; `interrupt()` propagates through the nested subgraphs; the 4 gates resume via `Command(resume=…)`. Night-shift drives the whole chain to completion with no human turns.
 - [x] 21 new hermetic tests (no network/DB/AWS); full `pdlc-graph` suite green (31), ruff clean.
-- [ ] **Engine adapters** (overlaps Phase H): wire `/v1/commands` → Arq `start_graph`, persist `approval_gates` rows + WS push, resolve endpoint → `Command(resume=…)`, and inject the factory/S3/Postgres backends at boot. The graph layer is ready for these; today they are still Phase A stubs.
+- [x] **Engine adapters** — the Inception graph now runs end-to-end through the API:
+  - `app/runtime/`: a `GraphRunner` drives the real `meta_graph` (compiled with an injectable checkpointer) across interrupt/resume turns; injectable `GateStore` (records approval gates + question rounds) and `EventBus` (WebSocket fan-out), both with in-memory defaults.
+  - `/v1/commands` builds the initial `PDLCState` and starts the graph to its first pause; `GET /v1/approval-gates` lists open interactions (project-scoped); `POST /v1/approval-gates/{id}/resolve` resumes via `Command(resume=…)` (approvals → `{approved,…}`, question rounds → `{answers:[…]}`); the WebSocket replays + streams thread frames.
+  - Boot wiring in `main.py` lifespan + the Arq worker (`start_graph` / `resume_graph` delegate to the same runner); LLM completions route through the provider factory only when `wire_llm` is set (dev/test stay on the offline stub).
+  - 6 new hermetic engine tests drive the whole command → gate → resume loop (all four gates, in order) with no Postgres/Redis/AWS; engine suite green (14).
+- [ ] **Production swaps** (Phase H): default `MemorySaver` → `PostgresSaver` (`use_postgres_checkpointer`, needs `langgraph-checkpoint-postgres`); in-memory gate store → `approval_gates` rows; in-memory bus → Redis Pub/Sub; inline command dispatch → Arq enqueue; S3/Postgres adapters for the artifact/task ports. All are injectable seams today.
 
 Note: the Inception parties are **Progressive Thinking / Threat-Model / Design-Laws** (per upstream `skills/brainstorm/`); the plan's earlier "Wave Kickoff / Design Roundtable" are Construction-phase parties and land in Phase C.
 

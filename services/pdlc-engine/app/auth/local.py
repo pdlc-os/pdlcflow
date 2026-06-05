@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Annotated
 
 from fastapi import Depends, HTTPException, status
@@ -23,7 +23,7 @@ class Identity(BaseModel):
 
 
 def issue_token(identity: Identity) -> str:
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     claims = {
         **identity.model_dump(),
         "iat": int(now.timestamp()),

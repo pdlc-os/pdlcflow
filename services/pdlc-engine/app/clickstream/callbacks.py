@@ -6,8 +6,8 @@ from typing import Any
 
 from langchain_core.callbacks.base import BaseCallbackHandler
 
-from .emitter import get_emitter
 from ..llm.pricing import estimate_usd
+from .emitter import get_emitter
 
 
 class LLMTokenTallyCallback(BaseCallbackHandler):

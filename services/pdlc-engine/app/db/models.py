@@ -12,9 +12,6 @@ from uuid import UUID, uuid4
 
 from sqlalchemy import (
     ARRAY,
-    JSON,
-    BigInteger,
-    Boolean,
     CheckConstraint,
     DateTime,
     ForeignKey,
@@ -25,7 +22,7 @@ from sqlalchemy import (
     UniqueConstraint,
 )
 from sqlalchemy.dialects.postgresql import CITEXT, JSONB
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
 class Base(DeclarativeBase):
