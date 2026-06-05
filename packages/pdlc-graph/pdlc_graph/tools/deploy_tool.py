@@ -1,18 +1,21 @@
-"""deploy_* tools — fly / vercel / terraform / kubectl wrappers.
+"""deploy_* tools — persona-facing wrappers over the deploy port.
 
-Every deploy call is gated by the Operation-phase rule (upstream guardrail
-pdlc-guardrails.js). The wrapper checks the run state and emits deploy.blocked
-+ raises if the gate isn't satisfied. Three-layer prod-deploy ban is enforced
-here (layer 1: partition at selection; layer 2: validate at activate; layer 3:
-runtime evaluator check in sentinel).
+Delegates to `pdlc_graph.deploy_port`, the single source of truth for tier
+inference and the three-layer production-deploy ban that the Operation Ship
+sub-phase also uses.
 """
 
 from langchain_core.tools import tool
 
+from ..deploy_port import DeployBanError, assert_deploy_allowed, infer_tier
+
 
 @tool
-def deploy_run(environment: str, tier: str, command: str) -> str:
-    """Run a deploy command after gate + tier validation."""
-    if tier == "production":
-        return "blocked: production deploys never permitted under autonomous flow"
-    return "stub: deploy not yet wired"
+def deploy_run(environment: str, command: str, night_shift: bool = False) -> str:
+    """Run a deploy command after tier inference + the production-deploy ban check."""
+    tier = infer_tier(environment)
+    try:
+        assert_deploy_allowed(tier, night_shift=night_shift)
+    except DeployBanError as exc:
+        return f"blocked: {exc}"
+    return f"deploy queued: env={environment} tier={tier} cmd={command!r}"
