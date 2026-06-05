@@ -138,3 +138,18 @@ class PDLCState(TypedDict, total=False):
     episode_approved: bool  # gate #8 verdict
     metrics_ref: str | None  # artifact uri of the METRICS rollup
     operation_complete: bool
+
+    # ── Utilities (Phase E) ─────────────────────────────────────────────
+    utility_command: str | None  # set by the engine → meta routes to the utility subgraph
+    utility_args: dict  # per-command inputs (e.g. {"title","rationale","scenario","reason"})
+    utility_result: dict  # per-command summary the UI/engine surfaces
+    paused: bool  # /pause … /resume
+    abandoned: bool  # /abandon
+    decisions: list[dict]  # /decide — the Decision Registry
+    decisions_ref: str | None  # rendered DECISIONS.md artifact
+    override_log: list[dict]  # /override — Tier-1 override audit trail
+    doctor_report: dict | None  # /doctor — health-check findings
+    doctor_ref: str | None
+    whatif_ref: str | None  # /whatif — hypothetical analysis (read-only)
+    rollback_ref: str | None  # /rollback — revert record
+    hotfix_ref: str | None  # /hotfix — compressed build→ship record

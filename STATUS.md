@@ -57,9 +57,14 @@ Note: the Inception parties are **Progressive Thinking / Threat-Model / Design-L
 - [x] New hermetic tests across ship/verify/reflect (renderers, gate pause/resume, prod-candidate drop, night-shift) + 2 integration + 1 engine REST test; full repo suite green (79 — graph 57, engine 16, event-schema 4, migrate 2).
 - [ ] **Real integrations** (Phase H / tools pass): subprocess-backed deploy + actual `git`/`gh` merge; S3/Postgres adapters for the deploy register + artifacts.
 
-## Phase E — Utilities (☐)
+## Phase E — Utilities (✅ graph engine + REST)
 
-`/decide`, `/whatif`, `/doctor`, `/rollback`, `/hotfix`, `/abandon`, `/release`, `/override`, `/pause`, `/resume` — all wired to the utility subgraph.
+- [x] `pdlc_graph/graphs/utility/` — all 10 commands as per-command node modules, dispatched by `state["utility_command"]` (built by an agent team, integrated solo). `meta._route` sends any utility command to the subgraph; the commands route sets the flag for the 10 utilities.
+- [x] **Lifecycle** (pure): `/pause`, `/resume`, `/abandon`, `/release` — state transitions + roadmap-claim release.
+- [x] **Decisions & safety**: `/decide` (appends to the Decision Registry + renders DECISIONS.md), `/doctor` (health-check report + render), `/whatif` (read-only hypothetical — asserted not to mutate state), `/override` (Tier-1 double-RED confirmation via interrupt; human-only, refused under night-shift).
+- [x] **Recovery**: `/rollback` (revert record + deploy register), `/hotfix` (compressed build→ship with one confirmation; honors the production-deploy ban).
+- [x] Reachable through the live API: `POST /v1/commands {command:"doctor"|"pause"|"override"|…}` — pure utilities complete in one call; interrupting ones (`/override`, `/hotfix`) resume via the resolve endpoint. (Override accepts the engine's `{answers:[…]}` resume shape.)
+- [x] 30 utility unit tests + 7 integration + 3 engine REST; full repo suite green (123 — graph 98, engine 19, event-schema 4, migrate 2). ruff clean.
 
 ## Phase F — Night Shift (☐)
 
