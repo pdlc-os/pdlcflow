@@ -7,6 +7,7 @@ const ROUTES = [
   { to: 'domains',     label: 'Domains' },
   { to: 'squads',      label: 'Squads' },
   { to: 'agents',      label: 'Agents' },
+  { to: 'features',    label: 'Features' },
   { to: 'exports',     label: 'Exports' },
   { to: 'models',      label: 'Models' },
 ];

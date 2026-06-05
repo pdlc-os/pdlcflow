@@ -1,4 +1,4 @@
-"""PDLC clickstream event schema — envelope + 35 typed payloads.
+"""PDLC clickstream event schema — envelope + 37 typed payloads.
 
 Public API is the EventEnvelope plus the typed payload classes per event type.
 The taxonomy and rationale live in registry.md.

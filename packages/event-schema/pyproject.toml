@@ -1,7 +1,7 @@
 [project]
 name = "pdlc-event-schema"
 version = "0.0.1"
-description = "Pydantic envelope + 35 typed payloads for the PDLC clickstream"
+description = "Pydantic envelope + 37 typed payloads for the PDLC clickstream"
 requires-python = ">=3.12"
 license = { text = "MIT" }
 dependencies = [
