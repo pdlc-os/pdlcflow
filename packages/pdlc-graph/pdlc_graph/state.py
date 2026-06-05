@@ -107,3 +107,15 @@ class PDLCState(TypedDict, total=False):
     visual: bool  # feature has a visual/UI surface — gates UX Discovery (Step 4.5)
     threat_signals: list[bool]  # Design threat-model triage checklist (skip/lite/full)
     ux_signals: list[bool]  # Design design-laws triage checklist (skip/lite/full)
+
+    # ── Construction (Phase C) working state ────────────────────────────
+    current_wave: int  # 1-based wave index being executed
+    current_task_id: str | None  # external_id of the task in flight
+    test_loop: dict  # {task_external_id: fix_attempts} — drives 3-Strike
+    strike_history: list[dict]  # one record per Strike Panel convened
+    build_log: list[dict]  # per-task build record (red/green/refactor + outcome)
+    review_ref: str | None  # artifact uri of the rendered REVIEW.md
+    review_approved: bool  # End-of-Review gate verdict (gate #5)
+    construction_test_results: dict  # {layer: {"passed": bool, "report": str}}
+    construction_complete: bool
+    simulate_failing_layers: list[str]  # test hook: force these Test layers to fail
