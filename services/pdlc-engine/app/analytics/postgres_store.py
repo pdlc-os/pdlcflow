@@ -14,6 +14,7 @@ import logging
 
 from sqlalchemy import text
 
+from ..db.rls import set_org_context
 from ..db.session import get_sync_engine
 from .store import _require_org  # reuse the cross-org guard
 
@@ -68,6 +69,7 @@ class PostgresAnalyticsStore:
             f"order by events desc"
         )
         with self._engine.begin() as conn:
+            set_org_context(conn, org_id)
             rows = conn.execute(sql, params).mappings().all()
         return [
             {"key": r["key"], "events": int(r["events"]),
@@ -82,6 +84,7 @@ class PostgresAnalyticsStore:
             "where org_id = :org and roadmap_id = :rid order by ts asc"
         )
         with self._engine.begin() as conn:
+            set_org_context(conn, org_id)
             rows = conn.execute(sql, {"org": org_id, "rid": roadmap_id}).mappings().all()
         return [dict(r) for r in rows]
 
@@ -92,6 +95,7 @@ class PostgresAnalyticsStore:
             "where org_id = :org order by ts desc limit :lim"
         )
         with self._engine.begin() as conn:
+            set_org_context(conn, org_id)
             rows = conn.execute(sql, {"org": org_id, "lim": limit}).mappings().all()
         return [dict(r) for r in rows]
 
@@ -102,6 +106,7 @@ class PostgresAnalyticsStore:
             f"from events where org_id = :org"
         )
         with self._engine.begin() as conn:
+            set_org_context(conn, org_id)
             r = conn.execute(sql, {"org": org_id}).mappings().one()
         return {"events": int(r["events"] or 0), "tokens": int(r["tokens"] or 0),
                 "usd": round(float(r["usd"] or 0), 6)}

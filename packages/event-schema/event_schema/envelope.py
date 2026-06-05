@@ -55,6 +55,8 @@ EVENT_TYPES: set[str] = {
     "llm.tokens_spent",
     # Context / UI / error
     "context.warning", "ui.viewed", "error",
+    # Admin / audit
+    "admin.access.denied",
 }
 
 

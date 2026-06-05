@@ -17,6 +17,7 @@ from sqlalchemy import func, insert, select, update
 from sqlalchemy.exc import IntegrityError
 
 from ..db.models import Task
+from ..db.rls import set_org_context
 from ..db.session import get_sync_engine
 
 log = logging.getLogger("pdlc.persistence.tasks")
@@ -31,6 +32,7 @@ class PostgresTaskStore:
         external_id: str | None = None,
     ) -> str:
         with self._engine.begin() as conn:
+            set_org_context(conn, org_id)  # RLS: admit this org's rows
             if external_id is None:
                 n = conn.execute(
                     select(func.count()).select_from(Task).where(Task.project_id == project_id)

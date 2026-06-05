@@ -234,6 +234,7 @@ def test_exports_rollup_csv():
         "/v1/admin/exports/rollup.csv?dimension=initiative",
     ],
 )
-def test_data_route_without_org_id_is_422(path):
+def test_data_route_without_org_id_is_403(path):
+    # Cross-org ban: missing org_id -> 403 + an admin.access.denied audit event.
     r = client.get(path)
-    assert r.status_code == 422
+    assert r.status_code == 403
