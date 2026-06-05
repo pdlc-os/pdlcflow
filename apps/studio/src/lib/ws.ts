@@ -5,7 +5,7 @@ import type { Pending } from './api';
 export type Frame =
   | { type: 'hello'; thread_id: string }
   | { type: 'interaction.opened'; interaction: Pending }
-  | { type: 'thread.completed'; thread_id: string }
+  | { type: 'thread.completed'; thread_id: string; summary?: Record<string, unknown> }
   // forward-compatible: token streaming / status frames (Phase H)
   | { type: 'token'; thread_id: string; chunk: string }
   | { type: 'status'; phase: string; sub_phase: string | null };

@@ -89,7 +89,20 @@ class GraphRunner:
         if intr is None:
             # Thread reached a terminal state for this turn.
             store.close_open_for_thread(thread_id)
-            bus.publish(_channel(thread_id), {"type": "thread.completed", "thread_id": thread_id})
+            values = self._graph.get_state(cfg).values
+            summary = {
+                k: values.get(k)
+                for k in (
+                    "phase", "night_shift_outcome", "night_shift_abort_reason",
+                    "night_shift_run_id", "version", "deploy_tier", "deploy_url",
+                    "operation_complete",
+                )
+                if values.get(k) is not None
+            }
+            bus.publish(
+                _channel(thread_id),
+                {"type": "thread.completed", "thread_id": thread_id, "summary": summary},
+            )
             return None
 
         values = self._graph.get_state(cfg).values

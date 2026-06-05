@@ -19,11 +19,13 @@ interface ThreadStore {
   pending: Pending | null;
   status: Status;
   transcript: TranscriptItem[];
+  result: Record<string, unknown> | null;  // completion summary (night-shift outcome, etc.)
 
   start: (command: string, opts?: { feature?: string; mode?: 'sketch' | 'socratic' }) => Promise<void>;
   answer: (answers: string[]) => Promise<void>;
   resolveApproval: (approved: boolean, comment?: string) => Promise<void>;
   setPending: (p: Pending | null) => void;
+  setResult: (r: Record<string, unknown> | null) => void;
   reset: () => void;
 }
 
@@ -40,14 +42,17 @@ export const useThread = create<ThreadStore>((set, get) => ({
   pending: null,
   status: 'idle',
   transcript: [],
+  result: null,
 
   setPending: (p) => set({ pending: p, status: p ? 'awaiting' : get().status }),
+  setResult: (r) => set({ result: r }),
 
   start: async (command, opts) => {
     const { orgId, projectId } = get();
     set({
       status: 'running',
       pending: null,
+      result: null,
       transcript: [say('user', `/${command}${opts?.feature ? ` ${opts.feature}` : ''}`)],
     });
     try {
@@ -88,7 +93,7 @@ export const useThread = create<ThreadStore>((set, get) => ({
     await advance(set, get, p.id, { approved, comment }, say('user', approved ? 'Approved' : 'Rejected'));
   },
 
-  reset: () => set({ threadId: null, pending: null, status: 'idle', transcript: [] }),
+  reset: () => set({ threadId: null, pending: null, status: 'idle', transcript: [], result: null }),
 }));
 
 async function advance(
