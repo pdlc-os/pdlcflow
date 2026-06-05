@@ -19,6 +19,7 @@ from .runtime import (
     build_checkpointer,
     set_runner,
     wire_dispatcher,
+    wire_event_bus,
     wire_llm_backend,
 )
 from .websocket.handler import ws_router
@@ -26,6 +27,8 @@ from .websocket.handler import ws_router
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
+    # Event bus first: the emitter fans night-shift frames out through it.
+    wire_event_bus(settings)
     wire_emitter(settings)
     # Graph runtime: one runner owns the checkpointer that makes interrupt()
     # sites resumable across turns. MemorySaver in dev; PostgresSaver (durable,

@@ -5,7 +5,7 @@ import { ChatPanel } from '@/components/ChatPanel';
 import { MemoryFileViewer } from '@/components/MemoryFileViewer';
 import { NightShiftMissionControl } from '@/components/NightShiftMissionControl';
 import { QuestionCard } from '@/components/QuestionCard';
-import { connect } from '@/lib/ws';
+import { connect, type NightShiftFrame } from '@/lib/ws';
 import { useThread } from '@/store/useThread';
 
 export function ProjectView() {
@@ -13,8 +13,10 @@ export function ProjectView() {
   const pending = useThread((s) => s.pending);
   const status = useThread((s) => s.status);
   const result = useThread((s) => s.result);
+  const verdicts = useThread((s) => s.verdicts);
   const setPending = useThread((s) => s.setPending);
   const setResult = useThread((s) => s.setResult);
+  const appendVerdict = useThread((s) => s.appendVerdict);
   const answer = useThread((s) => s.answer);
   const resolveApproval = useThread((s) => s.resolveApproval);
 
@@ -26,13 +28,15 @@ export function ProjectView() {
       threadId,
       onFrame: (f) => {
         if (f.type === 'interaction.opened') setPending(f.interaction);
-        if (f.type === 'thread.completed') {
+        else if (f.type === 'thread.completed') {
           setPending(null);
           if (f.summary) setResult(f.summary);
+        } else if (f.type.startsWith('night_shift.')) {
+          appendVerdict(f as NightShiftFrame);
         }
       },
     });
-  }, [threadId, setPending, setResult]);
+  }, [threadId, setPending, setResult, appendVerdict]);
 
   const busy = status === 'running';
   const question = pending?.kind === 'user_input_required' ? pending : null;
@@ -41,7 +45,9 @@ export function ProjectView() {
   // Night-shift mission control: shown while the contract gate is open or once
   // a run has produced an outcome.
   const isNightShift =
-    pending?.gate_kind === 'night_shift_contract' || result?.night_shift_outcome != null;
+    pending?.gate_kind === 'night_shift_contract' ||
+    result?.night_shift_outcome != null ||
+    verdicts.length > 0;
   const nsPhase = pending?.gate_kind === 'night_shift_contract'
     ? 'awaiting-contract'
     : ((result?.night_shift_outcome as string) ?? 'running');
@@ -55,6 +61,7 @@ export function ProjectView() {
           <NightShiftMissionControl
             phase={nsPhase as 'awaiting-contract' | 'running' | 'completed' | 'aborted' | 'declined'}
             result={result}
+            verdicts={verdicts}
           />
         )}
         {question && (

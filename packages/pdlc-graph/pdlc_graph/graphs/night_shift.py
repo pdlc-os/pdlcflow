@@ -23,7 +23,7 @@ from langgraph.graph import END, START, StateGraph
 from langgraph.types import interrupt
 
 from ..deploy_port import infer_tier
-from ..instrumentation import instrumented_node
+from ..instrumentation import emit_event, instrumented_node
 from ..sentinel.evaluator import evaluate
 from ..state import PDLCState
 from .build import build_graph
@@ -85,14 +85,19 @@ def activate(state: PDLCState) -> dict:
     }
 
 
-@instrumented_node("night_shift.verdict")
+@instrumented_node("step.completed")
 def sentinel_after_build(state: PDLCState) -> dict:
-    return {"night_shift_last_verdict": evaluate(state, _state_md(state))}
+    verdict = evaluate(state, _state_md(state))
+    # Stream the actual verdict (the decorator can't see the return value).
+    emit_event("night_shift.verdict", state, {"stage": "build", **verdict})
+    return {"night_shift_last_verdict": verdict}
 
 
-@instrumented_node("night_shift.verdict")
+@instrumented_node("step.completed")
 def sentinel_after_ship(state: PDLCState) -> dict:
-    return {"night_shift_last_verdict": evaluate(state, _state_md(state))}
+    verdict = evaluate(state, _state_md(state))
+    emit_event("night_shift.verdict", state, {"stage": "ship", **verdict})
+    return {"night_shift_last_verdict": verdict}
 
 
 @instrumented_node("night_shift.completed")

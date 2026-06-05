@@ -94,42 +94,43 @@ class InMemoryGateStore:
 class EventBus(Protocol):
     def publish(self, channel: str, frame: dict) -> None: ...
     def history(self, channel: str) -> list[dict]: ...
+    # async iterator: replay recent history, then stream live frames.
+    def listen(self, channel: str): ...
 
 
 class InMemoryEventBus:
-    """Records frames per channel and notifies in-process async subscribers.
-
-    Production swaps this for a Redis Pub/Sub adapter; the WebSocket handler
-    only depends on `subscribe()` / `history()`.
+    """Records frames per channel; the WebSocket handler streams them via
+    `listen()`. Production swaps this for the Redis-backed bus (same interface).
     """
+
+    _POLL_S = 0.1
 
     def __init__(self) -> None:
         self._history: dict[str, list[dict]] = {}
-        self._subscribers: dict[str, list] = {}
         self._lock = threading.Lock()
 
     def publish(self, channel: str, frame: dict) -> None:
         with self._lock:
             self._history.setdefault(channel, []).append(frame)
-            subs = list(self._subscribers.get(channel, []))
-        for q in subs:
-            try:
-                q.put_nowait(frame)
-            except Exception:
-                pass
 
     def history(self, channel: str) -> list[dict]:
-        return list(self._history.get(channel, []))
-
-    def subscribe(self, channel: str, q) -> None:
         with self._lock:
-            self._subscribers.setdefault(channel, []).append(q)
+            return list(self._history.get(channel, []))
 
-    def unsubscribe(self, channel: str, q) -> None:
-        with self._lock:
-            subs = self._subscribers.get(channel)
-            if subs and q in subs:
-                subs.remove(q)
+    async def listen(self, channel: str):
+        """Replay existing frames, then yield new ones as they're published.
+
+        Runs until the consumer (the WS task) is cancelled on disconnect.
+        """
+        import asyncio
+
+        cursor = 0
+        while True:
+            frames = self.history(channel)
+            while cursor < len(frames):
+                yield frames[cursor]
+                cursor += 1
+            await asyncio.sleep(self._POLL_S)
 
 
 # --------------------------------------------------------------------------- #

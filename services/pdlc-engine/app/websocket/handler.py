@@ -1,23 +1,23 @@
 """WebSocket — per-thread fan-out from the EventBus.
 
-On connect the handler replays the thread's frame history (so a client that
-attaches after a gate opened still sees it), then streams new frames as the
-GraphRunner publishes them. The in-memory bus is polled by cursor (robust
-whether frames are published from the request threadpool or a worker); the
-production Redis adapter swaps polling for a real subscription.
+On connect the handler sends a hello, then streams frames from
+`bus.listen(channel)` — an async iterator that replays the thread's recent
+history (so a client attaching after a gate opened still sees it) and then
+yields live frames. This is transport-agnostic: the in-memory bus polls its
+history; the Redis bus replays a bounded list then subscribes to pub/sub, so a
+frame published by the Arq worker reaches a socket held open by the API.
 """
 
 from __future__ import annotations
 
 import asyncio
+import contextlib
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from ..runtime import get_event_bus
 
 ws_router = APIRouter()
-
-_POLL_INTERVAL_S = 0.1
 
 
 @ws_router.websocket("/ws/threads/{thread_id}")
@@ -28,17 +28,19 @@ async def thread_socket(socket: WebSocket, thread_id: str) -> None:
 
     await socket.send_json({"type": "hello", "thread_id": thread_id})
 
-    cursor = 0
+    # Drain client messages concurrently so a disconnect cancels the pump.
+    async def _drain_client() -> None:
+        with contextlib.suppress(Exception):
+            while True:
+                await socket.receive_text()
+
+    drain = asyncio.create_task(_drain_client())
     try:
-        while True:
-            frames = bus.history(channel)
-            while cursor < len(frames):
-                await socket.send_json(frames[cursor])
-                cursor += 1
-            # Interleave client liveness without blocking the frame pump.
-            try:
-                await asyncio.wait_for(socket.receive_text(), timeout=_POLL_INTERVAL_S)
-            except TimeoutError:
-                pass
+        async for frame in bus.listen(channel):
+            await socket.send_json(frame)
     except WebSocketDisconnect:
         return
+    finally:
+        drain.cancel()
+        with contextlib.suppress(Exception):
+            await drain

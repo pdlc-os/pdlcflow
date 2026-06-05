@@ -3,6 +3,7 @@
 // this panel tracks the run lifecycle and the final outcome. (Live per-verdict
 // streaming arrives with the Arq/Redis pipeline in Phase H.)
 
+import type { NightShiftFrame } from '@/lib/ws';
 import { cn } from '@/lib/utils';
 
 type Phase = 'awaiting-contract' | 'running' | 'completed' | 'aborted' | 'declined';
@@ -10,6 +11,7 @@ type Phase = 'awaiting-contract' | 'running' | 'completed' | 'aborted' | 'declin
 interface Props {
   phase: Phase;
   result?: Record<string, unknown> | null;
+  verdicts?: NightShiftFrame[];
 }
 
 const LABEL: Record<Phase, string> = {
@@ -28,7 +30,7 @@ const TONE: Record<Phase, string> = {
   declined: 'bg-border/60 text-muted-fg',
 };
 
-export function NightShiftMissionControl({ phase, result }: Props) {
+export function NightShiftMissionControl({ phase, result, verdicts = [] }: Props) {
   const outcome = (result?.night_shift_outcome as string) ?? null;
   const reason = (result?.night_shift_abort_reason as string) ?? null;
 
@@ -48,6 +50,21 @@ export function NightShiftMissionControl({ phase, result }: Props) {
         {reason && <li>▸ reason: {reason}</li>}
         {result?.version != null && <li>▸ shipped {String(result.version)} → {String(result.deploy_tier)}</li>}
       </ul>
+
+      {verdicts.length > 0 && (
+        <div className="mt-3 border-t border-border pt-2">
+          <div className="mb-1 text-xs uppercase tracking-wide text-muted-fg">Sentinel verdicts</div>
+          <ul className="space-y-0.5 font-mono text-xs">
+            {verdicts.map((v, i) => (
+              <li key={i} className={cn(v.verdict === 'abort' ? 'text-red-500' : 'text-muted-fg')}>
+                {v.stage ? `${v.stage}: ` : ''}
+                <span className="text-fg">{v.verdict ?? v.type.replace('night_shift.', '')}</span>
+                {v.reason ? ` · ${v.reason}` : ''}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </div>
   );
 }

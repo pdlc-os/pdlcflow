@@ -44,6 +44,9 @@ class Settings(BaseSettings):
     # use_arq_dispatch: enqueue graph turns to the Arq worker instead of running
     # them inline in the API (needs Redis + the Redis bus for pending delivery).
     use_arq_dispatch: bool = False
+    # use_redis_bus: cross-process WebSocket fan-out via Redis pub/sub (also the
+    # transport for live night-shift verdicts). Off => in-process in-memory bus.
+    use_redis_bus: bool = False
 
     # Clickstream
     clickstream_sink: Literal["jsonl", "postgres", "firehose"] = "jsonl"
