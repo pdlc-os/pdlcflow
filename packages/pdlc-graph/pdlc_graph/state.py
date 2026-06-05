@@ -71,6 +71,13 @@ class PDLCState(TypedDict, total=False):
     # Night-shift overlay
     night_shift_active: bool
     night_shift_run_id: str | None
+    # Night-shift runtime (Phase F)
+    target_environment: str | None  # contracted deploy target (must be non-prod)
+    night_shift_contract_accepted: bool  # the one human gate
+    night_shift_last_verdict: dict  # latest Sentinel verdict (drives loop routing)
+    night_shift_outcome: str | None  # "completed" | "aborted" | "declined"
+    night_shift_abort_reason: str | None
+    ns_markers: list[str]  # test hook: inject ns-progress:/ns-abort: markers
 
     # Interaction mode (Constitution §8)
     interaction_mode: Literal["sketch", "socratic"]

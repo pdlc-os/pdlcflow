@@ -66,9 +66,16 @@ Note: the Inception parties are **Progressive Thinking / Threat-Model / Design-L
 - [x] Reachable through the live API: `POST /v1/commands {command:"doctor"|"pause"|"override"|…}` — pure utilities complete in one call; interrupting ones (`/override`, `/hotfix`) resume via the resolve endpoint. (Override accepts the engine's `{answers:[…]}` resume shape.)
 - [x] 30 utility unit tests + 7 integration + 3 engine REST; full repo suite green (123 — graph 98, engine 19, event-schema 4, migrate 2). ruff clean.
 
-## Phase F — Night Shift (☐)
+## Phase F — Night Shift (✅ runtime + REST + mission-control panel)
 
-Full night-shift state machine (preflight → contract_party → activate → loop → complete | abort); auto-decision matrix per gate; three-layer prod-deploy ban end-to-end; mission control UI subscribed to Redis verdicts.
+- [x] `pdlc_graph/graphs/night_shift.py` — the full state machine: `preflight → contract_party → activate → build → sentinel → ship → sentinel → completed | aborted | declined`. Wraps the real `build_graph`/`ship_graph` (which already auto-approve every gate under `night_shift_active`) with Sentinel checks between phases.
+- [x] **Contract Party** is the one human gate — a raw `interrupt()` (not `gates.approval_gate`, so it never auto-approves); everything downstream runs autonomously.
+- [x] **Sentinel** fires on the internal edges via the Phase-A evaluator, reading `ns-progress:`/`ns-abort:` markers synthesized from run state; routes continue / complete / abort.
+- [x] **Auto-decision matrix**: every inner gate (the 8) auto-resolves under night-shift — already wired in `gates.approval_gate` (B–D) and exercised here end-to-end.
+- [x] **Three-layer prod-deploy ban** holds: Ship pre-filters candidates, the contract/preflight refuses a production target, and the Sentinel aborts on `prod-deploy-attempted`.
+- [x] **Mission-control panel** (`NightShiftMissionControl.tsx`) wired into the Studio project view — shows the run lifecycle + outcome (the contract gate renders via the shared modal). The completion summary rides the WS `thread.completed` frame. (Live per-verdict streaming over Redis is Phase H.)
+- [x] Reachable via `POST /v1/commands {command:"night-shift", seed_state:{…}}` → contract gate → autonomous build+ship to completion.
+- [x] 5 runtime tests (happy path, decline, preflight abort, prod refusal, Sentinel abort) + 2 engine REST; full repo suite green (130 — graph 103, engine 21, event-schema 4, migrate 2). Studio tsc + build clean.
 
 ## Phase G — Admin dashboard + analytics pipeline (☐)
 
