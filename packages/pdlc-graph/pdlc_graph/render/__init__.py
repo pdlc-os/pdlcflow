@@ -16,6 +16,7 @@ from .discovery import render_discovery_summary
 from .mom import render_mom
 from .plan import render_plan
 from .prd import render_prd
+from .review import render_review
 
 __all__ = [
     "render_api_contracts",
@@ -25,6 +26,7 @@ __all__ = [
     "render_mom",
     "render_plan",
     "render_prd",
+    "render_review",
     "render_threat_model",
     "render_ux_review",
 ]

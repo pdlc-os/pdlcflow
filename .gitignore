@@ -5,6 +5,9 @@ __pycache__/
 *.so
 .Python
 build/
+# ...but the Construction subgraph is a source package literally named "build".
+!packages/pdlc-graph/pdlc_graph/graphs/build/
+!packages/pdlc-graph/pdlc_graph/graphs/build/*.py
 develop-eggs/
 dist/
 downloads/

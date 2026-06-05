@@ -48,6 +48,10 @@ class InvokeCommandRequest(BaseModel):
     args: list[str] = []
     feature: str | None = None
     interaction_mode: Literal["sketch", "socratic"] = "sketch"
+    # Optional seed for the initial graph state — lets a client start a phase
+    # mid-lifecycle (e.g. /build with a known task list). Tenancy + phase keys
+    # are always re-asserted from the command and cannot be overridden.
+    seed_state: dict | None = None
 
 
 class InvokeCommandResponse(BaseModel):
@@ -58,17 +62,22 @@ class InvokeCommandResponse(BaseModel):
 
 def _initial_state(req: InvokeCommandRequest, thread_id: str, session_id: str) -> dict:
     feature = req.feature or (req.args[0] if req.args else None)
-    return {
-        "org_id": str(req.org_id),
-        "project_id": str(req.project_id),
-        "session_id": session_id,
-        "thread_id": thread_id,
-        "phase": _PHASE_FOR_COMMAND.get(req.command, "Initialization"),
-        "night_shift_active": req.command == "night-shift",
-        "interaction_mode": req.interaction_mode,
-        "feature": feature,
-        "brainstorm_log": [],
-    }
+    state: dict = dict(req.seed_state or {})
+    # Authoritative keys win over anything in seed_state.
+    state.update(
+        {
+            "org_id": str(req.org_id),
+            "project_id": str(req.project_id),
+            "session_id": session_id,
+            "thread_id": thread_id,
+            "phase": _PHASE_FOR_COMMAND.get(req.command, "Initialization"),
+            "night_shift_active": req.command == "night-shift",
+            "interaction_mode": req.interaction_mode,
+        }
+    )
+    state.setdefault("feature", feature)
+    state.setdefault("brainstorm_log", [])
+    return state
 
 
 @router.post("", response_model=InvokeCommandResponse)

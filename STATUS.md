@@ -33,9 +33,17 @@ Phase tracker for the migration roadmap defined in
 
 Note: the Inception parties are **Progressive Thinking / Threat-Model / Design-Laws** (per upstream `skills/brainstorm/`); the plan's earlier "Wave Kickoff / Design Roundtable" are Construction-phase parties and land in Phase C.
 
-## Phase C — Construction loop (☐)
+## Phase C — Construction loop (✅ graph engine + REST; real runners pending)
 
-TDD enforcement (engine refuses code edits without a failing test first); real test runner integration across the 7 layers; 3-Strike escalation; Strike Panel party meeting; merge-commit-only enforcement at the gh tool layer.
+- [x] `pdlc_graph/graphs/build/` — the Construction subgraph (`preflight → build_loop → review_party → review_gate → test_phase → wrap_up`), composed over `PDLCState` and routed from `meta_graph`.
+- [x] **TDD enforcement** — `test_runner_port.assert_red_before_green` raises `TDDViolation` if implementation is attempted before a failing test is recorded; the build loop runs red → green → refactor per task.
+- [x] **Test-runner port** — injectable, deterministic `SimulatedTestRunner` default (offline, replay-safe); real subprocess runner injected at boot via `set_test_runner`. Drives the 7 layers (unit/integration/contract/e2e/security/perf/ux); required-layer failures pause for accept/fix/defer (auto under night-shift).
+- [x] **3-Strike → Strike Panel** — per-task auto-fix capped at 3 attempts; the 3rd convenes the Strike Panel (Neo + Echo + domain agent via the party orchestrator), surfaces 3 ranked approaches, and pauses for the human to pick (counter resets after). Night-shift auto-picks the recommended approach.
+- [x] **Construction parties** — Wave Kickoff (per wave ≥2 tasks) + Design Roundtable (per-task triage), via the generic orchestrator.
+- [x] **Review** — Party Review (Neo/Echo/Phantom/Jarvis + Muse when a UX review exists) → `render_review` REVIEW.md → the single Construction approval gate (#5, `review_md_approve`); Critical findings flag the gate as blocking so night-shift refuses.
+- [x] Reachable through the live API: `POST /v1/commands {command:"build", seed_state:{tasks:[…]}}` drives the Strike Panel + review gate via the resolve endpoint to completion.
+- [x] 6 hermetic graph tests (TDD guard, render, happy path, 3-strike resume, required-layer failure, night-shift) + 1 engine REST test; full repo suite green (58 — graph 37, engine 15).
+- [ ] **Real integrations** (Phase D / tools pass): subprocess test runner adapter; `gh`/`git` tool implementations; merge-commit-only enforcement lives at the gh layer with the actual merge in Operation/Ship (gate #6).
 
 ## Phase D — Operation loop (☐)
 
