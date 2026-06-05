@@ -16,6 +16,7 @@ from arq.connections import RedisSettings
 
 from ..clickstream import wire_emitter
 from ..config import settings
+from ..persistence import wire_persistence
 from ..runtime import (
     GraphRunner,
     build_checkpointer,
@@ -42,6 +43,7 @@ async def startup(_ctx: dict) -> None:
     # Bus first so the worker publishes pending + night-shift frames to Redis,
     # where the API's WebSocket subscribers pick them up cross-process.
     wire_event_bus(settings)
+    wire_persistence(settings)
     wire_emitter(settings)
     set_runner(GraphRunner(checkpointer=build_checkpointer(settings)))
     wire_llm_backend(settings)

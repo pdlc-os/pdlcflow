@@ -9,6 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .clickstream import wire_emitter
 from .config import settings
+from .persistence import wire_persistence
 from .routes import admin as admin_routes
 from .routes import approval_gates as approval_routes
 from .routes import commands as command_routes
@@ -29,6 +30,9 @@ from .websocket.handler import ws_router
 async def lifespan(_app: FastAPI):
     # Event bus first: the emitter fans night-shift frames out through it.
     wire_event_bus(settings)
+    # Persistence before the emitter so it grabs the configured analytics store,
+    # and before any graph turn so artifact/task ports point at the real backends.
+    wire_persistence(settings)
     wire_emitter(settings)
     # Graph runtime: one runner owns the checkpointer that makes interrupt()
     # sites resumable across turns. MemorySaver in dev; PostgresSaver (durable,

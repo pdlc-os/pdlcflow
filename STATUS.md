@@ -103,7 +103,14 @@ Delivered incrementally (one PR per bundle). Auth deferred. Every adapter is fla
 - [x] **Live night-shift verdicts**: a new `instrumentation.emit_event` lets the Sentinel nodes emit the real verdict value; the emitter fans `night_shift.*` events out to `thread:{id}` (skipping node-enter noise). The mission-control panel renders the live verdict stream (build/ship stages, abort highlighted); `useThread.verdicts` + `ws.ts` `NightShiftFrame` + ProjectView wired.
 - [x] Hermetic test (`test_night_shift_stream`): a `/night-shift` run fans build+ship verdicts + completion to the thread channel, and a late-attaching WS replays them. Studio tsc + build clean; full repo suite green (175 — engine 45).
 - [ ] Redis transport verified via docker-compose (no Redis in CI).
-### Bundle 3 — Persistence (Postgres analytics, S3 artifacts, Postgres tasks) — ☐
+### Bundle 3 — Persistence (✅)
+- [x] **Artifact stores** (`app/persistence/artifacts.py`): `FilesystemArtifactStore` (self-host volume, fully tested) + `S3ArtifactStore` (boto3, MinIO endpoint-compatible, lazy client). Behind `PDLC_ARTIFACT_STORE=memory|filesystem|s3`; injected into the pdlc_graph artifact port at boot.
+- [x] **Postgres task store** (`app/persistence/tasks.py`): durable Beads replacement over the `tasks` table (sync SQLAlchemy). Preserves a supplied `external_id` (migration) else mints `bd-N`; `claim` is an atomic UPDATE guarded by the unique partial index on (project_id, branch). Behind `PDLC_TASK_STORE`.
+- [x] **Port threading**: `TaskStore.create` now takes `org_id` (tenant-correct for RLS in bundle 4); `add_dependency`/`claim` are project-scoped + a `depends_on` array column on the model. In-memory store + the Plan sub-phase updated; graph suite green.
+- [x] **Postgres analytics** (`app/analytics/postgres_store.py`): the rollup/timeline/live/totals interface answered from SQL over `events` (token/USD from payload jsonb), org-scoped. `PostgresSink` now actually inserts event rows (incl. the Phase G traceability columns). Behind `PDLC_ANALYTICS_BACKEND`.
+- [x] **db/session.py** (cached sync psycopg engine); `wire_persistence` injects all three with in-memory fallback so boot never crashes; wired in lifespan + worker. Compose gains **MinIO** + an `artifacts` volume; `.env.example` documents the flags.
+- [x] 4 persistence tests + 4 task-store tests (filesystem round-trip, wiring injection, postgres-flags-don't-crash-boot, S3 uri parsing; org_id/external_id/atomic-claim). Full repo suite green (183 — graph 109, engine 49). ruff clean.
+- [ ] Postgres/S3/MinIO paths verified via docker-compose (not in CI).
 ### Bundle 4 — Migrations + RLS (Alembic autogenerate, RLS policies, admin.access.denied) — ☐
 
 ## Phase I — Migration tooling (✅ scan/push/taxonomy/backfill + engine import)
