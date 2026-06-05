@@ -10,7 +10,6 @@ from __future__ import annotations
 import logging
 import queue
 import threading
-from typing import Any
 
 from event_schema import EventEnvelope
 
@@ -21,7 +20,7 @@ from .sinks.postgres import PostgresSink
 
 log = logging.getLogger("pdlc.clickstream")
 
-_emitter: "ClickstreamEmitter | None" = None
+_emitter: ClickstreamEmitter | None = None
 
 
 class _Sink:

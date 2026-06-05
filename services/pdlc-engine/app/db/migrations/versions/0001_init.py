@@ -10,7 +10,6 @@ indexes, and the `langgraph` schema (managed by PostgresSaver itself).
 """
 
 from alembic import op
-import sqlalchemy as sa
 
 revision = "0001_init"
 down_revision = None

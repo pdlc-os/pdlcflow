@@ -34,6 +34,13 @@ class Settings(BaseSettings):
     bedrock_region: str = "us-east-1"
     ollama_endpoint: str = "http://localhost:11434"
 
+    # Runtime adapters — off by default so dev/test stay hermetic.
+    # wire_llm: route persona completions through the provider factory (needs creds).
+    # use_postgres_checkpointer: share graph state across processes (needs Postgres
+    #   + langgraph-checkpoint-postgres); otherwise an in-process MemorySaver is used.
+    wire_llm: bool = False
+    use_postgres_checkpointer: bool = False
+
     # Clickstream
     clickstream_sink: Literal["jsonl", "postgres", "firehose"] = "jsonl"
     firehose_stream_name: str | None = None

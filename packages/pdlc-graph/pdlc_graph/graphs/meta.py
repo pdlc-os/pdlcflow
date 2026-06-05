@@ -29,7 +29,10 @@ def _route(state: PDLCState) -> str:
     }.get(state.get("phase", "Initialization"), "utility")
 
 
-def build_meta_graph():
+def build_meta_graph(checkpointer=None):
+    """Compile the meta-graph. Pass a `checkpointer` (e.g. MemorySaver or
+    PostgresSaver) to make `interrupt()` sites in the nested phase subgraphs
+    resumable; without one the graph runs straight through (routing tests)."""
     g = StateGraph(PDLCState)
     g.add_node("init", init_graph)
     g.add_node("brainstorm", brainstorm_graph)
@@ -51,4 +54,4 @@ def build_meta_graph():
     )
     for node in ("init", "brainstorm", "build", "ship", "night_shift", "utility"):
         g.add_edge(node, END)
-    return g.compile()
+    return g.compile(checkpointer=checkpointer)

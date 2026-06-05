@@ -13,14 +13,19 @@ from .routes import admin as admin_routes
 from .routes import approval_gates as approval_routes
 from .routes import commands as command_routes
 from .routes import health as health_routes
+from .runtime import GraphRunner, build_checkpointer, set_runner, wire_llm_backend
 from .websocket.handler import ws_router
 
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     wire_emitter(settings)
-    # Real lifespan also opens DB pool + Redis client; Phase A boots without
-    # them so /health works for smoke runs.
+    # Graph runtime: one runner owns the checkpointer that makes interrupt()
+    # sites resumable across REST turns. MemorySaver in dev; PostgresSaver when
+    # use_postgres_checkpointer is set. LLM completions stay on the offline stub
+    # unless wire_llm enables the provider factory.
+    set_runner(GraphRunner(checkpointer=build_checkpointer(settings)))
+    wire_llm_backend(settings)
     yield
 
 
