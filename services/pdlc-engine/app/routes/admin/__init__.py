@@ -1,0 +1,23 @@
+"""Atlas Console admin routes — live, initiatives, domains, squads, agents,
+features (time-travel), exports, models."""
+
+from fastapi import APIRouter
+
+from .agents import router as agents_router
+from .domains import router as domains_router
+from .exports import router as exports_router
+from .features import router as features_router
+from .initiatives import router as initiatives_router
+from .live import router as live_router
+from .models import router as models_router
+from .squads import router as squads_router
+
+router = APIRouter()
+router.include_router(live_router)
+router.include_router(initiatives_router)
+router.include_router(domains_router)
+router.include_router(squads_router)
+router.include_router(agents_router)
+router.include_router(features_router)
+router.include_router(exports_router)
+router.include_router(models_router)

@@ -1,0 +1,56 @@
+import { Link, Outlet } from 'react-router-dom';
+import { ChevronDown, ChevronRight, Moon, Sun } from 'lucide-react';
+
+import { useTheme } from '@/store/useTheme';
+import { StatusLine } from '@/components/StatusLine';
+import { SideDrawer } from '@/components/SideDrawer';
+
+export function AppShell() {
+  const { theme, setTheme } = useTheme();
+  return (
+    <div className="flex h-full flex-col">
+      <header className="flex h-12 items-center gap-2 border-b border-border px-4 text-sm">
+        <Link to="/" className="font-semibold tracking-tight">pdlcflow</Link>
+        <ChevronRight className="h-3.5 w-3.5 text-muted-fg" />
+        <Switcher label="Org" />
+        <ChevronRight className="h-3.5 w-3.5 text-muted-fg" />
+        <Switcher label="Squad" />
+        <ChevronRight className="h-3.5 w-3.5 text-muted-fg" />
+        <Switcher label="Initiative" />
+        <ChevronRight className="h-3.5 w-3.5 text-muted-fg" />
+        <Switcher label="Project" />
+        <span className="ml-3 rounded-full bg-accent/10 px-2 py-0.5 text-xs text-accent">
+          Inception · Discover
+        </span>
+        <div className="ml-auto flex items-center gap-3 text-muted-fg">
+          <Link to="/admin/live" className="hover:text-fg">Atlas Console</Link>
+          <button
+            aria-label="Toggle theme"
+            onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+            className="rounded-md p-1 hover:bg-border/60"
+          >
+            {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+          </button>
+        </div>
+      </header>
+
+      <div className="flex flex-1 overflow-hidden">
+        <SideDrawer />
+        <main className="flex-1 overflow-auto px-6 py-4">
+          <Outlet />
+        </main>
+      </div>
+
+      <StatusLine />
+    </div>
+  );
+}
+
+function Switcher({ label }: { label: string }) {
+  return (
+    <button className="flex items-center gap-1 rounded-md px-2 py-0.5 text-muted-fg hover:bg-border/60 hover:text-fg">
+      {label}
+      <ChevronDown className="h-3.5 w-3.5" />
+    </button>
+  );
+}

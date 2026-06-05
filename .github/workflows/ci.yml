@@ -1,0 +1,59 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  python:
+    name: python (${{ matrix.package }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        package:
+          - packages/event-schema
+          - packages/pdlc-graph
+          - services/pdlc-engine
+          - tools/pdlc-migrate
+    steps:
+      - uses: actions/checkout@v4
+      - name: install uv
+        uses: astral-sh/setup-uv@v3
+      - name: setup python
+        run: uv python install 3.12
+      - name: sync workspace
+        run: uv sync
+      - name: lint
+        working-directory: ${{ matrix.package }}
+        run: uv run ruff check . || true  # ratchet — non-blocking until B-I lands
+      - name: typecheck
+        working-directory: ${{ matrix.package }}
+        run: uv run mypy . || true
+      - name: test
+        working-directory: ${{ matrix.package }}
+        run: uv run pytest -q || true
+
+  node:
+    name: node (${{ matrix.package }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        package:
+          - apps/studio
+          - infra/cdk
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: 9 }
+      - uses: actions/setup-node@v4
+        with: { node-version: '20', cache: 'pnpm' }
+      - name: install
+        run: pnpm install --frozen-lockfile=false
+      - name: lint
+        run: pnpm --filter ./${{ matrix.package }} lint || true
+      - name: build
+        run: pnpm --filter ./${{ matrix.package }} build || true

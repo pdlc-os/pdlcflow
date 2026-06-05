@@ -1,0 +1,6 @@
+{
+  "app": "npx ts-node --prefer-ts-exts bin/pdlc-cdk.ts",
+  "context": {
+    "@aws-cdk/aws-iam:minimizePolicies": true
+  }
+}

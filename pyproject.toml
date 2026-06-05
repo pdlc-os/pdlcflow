@@ -1,0 +1,39 @@
+[project]
+name = "pdlcflow"
+version = "0.0.0a0"
+description = "PDLC reimagined as a LangGraph + AWS Bedrock SaaS"
+readme = "README.md"
+requires-python = ">=3.12"
+license = { text = "MIT" }
+
+[tool.uv.workspace]
+members = [
+    "packages/event-schema",
+    "packages/pdlc-graph",
+    "services/pdlc-engine",
+    "tools/pdlc-migrate",
+]
+
+[tool.uv.sources]
+pdlc-event-schema = { workspace = true }
+pdlc-graph = { workspace = true }
+pdlc-engine = { workspace = true }
+pdlc-migrate = { workspace = true }
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "RUF"]
+ignore = ["E501"]
+
+[tool.mypy]
+python_version = "3.12"
+strict_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+
+[tool.pytest.ini_options]
+addopts = "-q"
+testpaths = ["tests"]

@@ -1,0 +1,9 @@
+# Optional reverse proxy with auto-TLS.
+# Enable with: docker compose --profile tls up
+# Replace `your.domain` with your actual hostname.
+
+your.domain {
+    reverse_proxy /v1/* api:8000
+    reverse_proxy /ws/* api:8000
+    reverse_proxy /* studio:80
+}
