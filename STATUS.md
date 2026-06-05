@@ -91,9 +91,18 @@ Note: the Inception parties are **Progressive Thinking / Threat-Model / Design-L
 
 Cognito + SSO; RLS policies in real migrations; rate limiting active; multi-AZ failover; per-tenant KMS CMK; SOC2-grade audit trail; backup + restore drill.
 
-## Phase I — Migration tooling (☐)
+## Phase I — Migration tooling (✅ scan/push/taxonomy/backfill + engine import)
 
-Real `scan` / `push` / `taxonomy` / `backfill`; historical event synthesis from upstream episodes + decision logs.
+- [x] **scan** — parses an upstream `docs/pdlc/memory/` project: memory files, decisions (DECISIONS.md), tasks (`.beads/tasks.json`, `bd-NN` preserved), deployments (DEPLOYMENTS.md), phase history (STATE.md), roadmap (F-NNN). Existing `Manifest`/`.summary` contract kept.
+- [x] **backfill** — synthesizes deterministic, idempotent `synthetic:true` events from the phase history + decision log (uuid5 ids from content); every event has a valid `event_type` and the feature's `roadmap_id`.
+- [x] **taxonomy** — pure `assign_taxonomy_core` (initiative/application/domains, derives domains from `domain:*` labels) + an interactive Typer wrapper.
+- [x] **push** — `build_import_payload` (pure) + `push_payload` (httpx; injectable ASGI transport for hermetic tests) → the new engine endpoint.
+- [x] **engine `POST /v1/migrate/import`** — ingests events → analytics store (dedup on `event_id` ⇒ idempotent re-import) and memory bodies → artifact store; returns per-kind counts.
+- [x] Verified live: `scan → push (9 memory/4 tasks/2 decisions/1 deploy) → backfill (8 events) → re-push (0 new, idempotent) → /v1/admin/live` shows the imported history. **Backfill makes Atlas Console non-empty on day one** (plan §12), via the live feed + roadmap/domain drill-downs.
+- [x] 18 new migrate tests + 3 engine import tests; full repo suite green (170 — graph 105, engine 40, event-schema 5, migrate 20). ruff clean.
+- [ ] **Entity resolution** (Phase H): `initiative`/`application` rollups need taxonomy names resolved to entity UUIDs (the events carry string `roadmap_id`/`domains`, which work today; `initiative_id`/`application_id` are UUID dimensions). Real S3/Postgres targets for the import.
+
+## Studio — live wiring + visual companion (✅ Inception path; full chat WS streaming pending)
 
 ## Studio — live wiring + visual companion (✅ Inception path; full chat WS streaming pending)
 

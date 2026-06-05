@@ -13,6 +13,7 @@ from .routes import admin as admin_routes
 from .routes import approval_gates as approval_routes
 from .routes import commands as command_routes
 from .routes import health as health_routes
+from .routes import migrate as migrate_routes
 from .runtime import GraphRunner, build_checkpointer, set_runner, wire_llm_backend
 from .websocket.handler import ws_router
 
@@ -48,4 +49,5 @@ app.include_router(health_routes.router)
 app.include_router(command_routes.router, prefix="/v1")
 app.include_router(approval_routes.router, prefix="/v1")
 app.include_router(admin_routes.router, prefix="/v1/admin")
+app.include_router(migrate_routes.router, prefix="/v1")
 app.include_router(ws_router)

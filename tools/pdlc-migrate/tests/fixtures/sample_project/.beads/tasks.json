@@ -1,0 +1,6 @@
+{"tasks": [
+  {"id": "bd-1", "title": "Theme token CSS variables", "labels": ["epic:dark-mode", "domain:frontend"], "status": "done"},
+  {"id": "bd-2", "title": "Theme toggle component", "labels": ["epic:dark-mode", "domain:frontend"], "status": "done"},
+  {"id": "bd-3", "title": "Persist choice in localStorage", "labels": ["epic:dark-mode", "domain:frontend"], "status": "done"},
+  {"id": "bd-4", "title": "Theme integration tests", "labels": ["epic:dark-mode", "domain:devops"], "status": "done"}
+]}

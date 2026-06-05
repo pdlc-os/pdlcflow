@@ -72,13 +72,20 @@ class AnalyticsStore(Protocol):
 class InMemoryAnalyticsStore:
     def __init__(self) -> None:
         self._events: list[dict] = []
+        self._seen: set[str] = set()
 
     # write(batch) so the store doubles as a clickstream sink.
     def write(self, batch: list[EventEnvelope]) -> None:
         self.ingest(batch)
 
     def ingest(self, batch: list[EventEnvelope]) -> None:
+        # Dedup on event_id so migration backfill (deterministic ids) is
+        # idempotent — re-running writes nothing new (plan §12).
         for e in batch:
+            eid = str(e.event_id)
+            if eid in self._seen:
+                continue
+            self._seen.add(eid)
             self._events.append(_flatten(e))
 
     def _scope(self, org_id: str, frm: str | None, to: str | None) -> list[dict]:
