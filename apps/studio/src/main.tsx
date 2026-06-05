@@ -15,6 +15,7 @@ import { AdminInitiatives } from './routes/admin/initiatives';
 import { AdminDomains } from './routes/admin/domains';
 import { AdminSquads } from './routes/admin/squads';
 import { AdminAgents } from './routes/admin/agents';
+import { AdminFeatures } from './routes/admin/features';
 import { AdminExports } from './routes/admin/exports';
 import { AdminModels } from './routes/admin/models';
 
@@ -37,6 +38,8 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
               <Route path="domains" element={<AdminDomains />} />
               <Route path="squads" element={<AdminSquads />} />
               <Route path="agents" element={<AdminAgents />} />
+              <Route path="features" element={<AdminFeatures />} />
+              <Route path="features/:f" element={<AdminFeatures />} />
               <Route path="exports" element={<AdminExports />} />
               <Route path="models" element={<AdminModels />} />
             </Route>

@@ -2,7 +2,7 @@
 
 PDLC reimagined as a **LangGraph + AWS Bedrock SaaS** with a browser UI, Chainlit-inspired design system, pluggable LLM providers (7), and clickstream telemetry feeding an admin dashboard.
 
-> **Status:** Phase A — Foundations. See [`STATUS.md`](./STATUS.md) for the per-phase checklist and [`docs/.research/.langgraph-bedrock-saas-migration-2026-06-05.md`](./docs/.research/.langgraph-bedrock-saas-migration-2026-06-05.md) for the full architecture proposal (15 sections, 5 mermaid diagrams, 35-event taxonomy, 25-table Postgres schema, 7-provider LLM factory, 8-stack CDK topology).
+> **Status:** Phase A — Foundations. See [`STATUS.md`](./STATUS.md) for the per-phase checklist and [`docs/.research/.langgraph-bedrock-saas-migration-2026-06-05.md`](./docs/.research/.langgraph-bedrock-saas-migration-2026-06-05.md) for the full architecture proposal (15 sections, 5 mermaid diagrams, 37-event taxonomy, 25-table Postgres schema, 7-provider LLM factory, 8-stack CDK topology).
 
 ## Relationship to upstream `pdlc`
 
@@ -20,7 +20,7 @@ pdlcflow/
 ├── apps/
 │   └── studio/                # React + Vite + Tailwind + shadcn/ui + Chainlit-inspired tokens
 ├── packages/
-│   ├── event-schema/          # Pydantic envelope + 35 typed payloads + registry doc
+│   ├── event-schema/          # Pydantic envelope + 37 typed payloads + registry doc
 │   └── pdlc-graph/            # LangGraph engine: meta-graph, phase subgraphs, party meetings, personas, Sentinel evaluator
 ├── services/
 │   └── pdlc-engine/           # FastAPI: routes, WS, clickstream, DB models, 7-provider LLM factory, Alembic
