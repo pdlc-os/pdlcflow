@@ -8,7 +8,6 @@ rather than content. See registry.md for the per-event semantics.
 from __future__ import annotations
 
 from typing import Literal
-from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict
 

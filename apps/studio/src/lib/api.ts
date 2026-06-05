@@ -79,6 +79,79 @@ export interface ResolveBody {
   answers?: string[];
 }
 
+// ── Atlas Console (admin analytics) ───────────────────────────────────────
+// Mirrors the REST contract under /v1/admin. Every data route requires org_id
+// (a missing org_id is a 422 — the cross-org ban, plan §5.3).
+export interface RollupRow {
+  key: string;
+  events: number;
+  tokens: number;
+  usd: number;
+}
+
+export interface AdminEvent {
+  event_type: string;
+  ts: string;
+  roadmap_id?: string | null;
+  actor?: string | null;
+  [k: string]: unknown;
+}
+
+export interface LiveResponse {
+  events: AdminEvent[];
+}
+
+export interface RollupResponse {
+  rows: RollupRow[];
+}
+
+export interface AgentsHeatmap {
+  personas: string[];
+  cells: RollupRow[];
+}
+
+export interface FeatureTimeline {
+  roadmap_id: string;
+  events: AdminEvent[];
+}
+
+export type RollupDimension =
+  | 'initiative'
+  | 'application'
+  | 'squad'
+  | 'domain'
+  | 'roadmap'
+  | 'user_story'
+  | 'agent';
+
+export const admin = {
+  live: (orgId: string, limit = 50) =>
+    json<LiveResponse>(`/admin/live?org_id=${encodeURIComponent(orgId)}&limit=${limit}`),
+
+  initiativesRollup: (orgId: string) =>
+    json<RollupResponse>(`/admin/initiatives/rollup?org_id=${encodeURIComponent(orgId)}`),
+
+  domainsRollup: (orgId: string) =>
+    json<RollupResponse>(`/admin/domains/rollup?org_id=${encodeURIComponent(orgId)}`),
+
+  squadsScoreboard: (orgId: string) =>
+    json<RollupResponse>(`/admin/squads/scoreboard?org_id=${encodeURIComponent(orgId)}`),
+
+  // org_id is optional here: the persona list needs no org; cells require one.
+  agentsHeatmap: (orgId?: string) =>
+    json<AgentsHeatmap>(
+      `/admin/agents/heatmap${orgId ? `?org_id=${encodeURIComponent(orgId)}` : ''}`,
+    ),
+
+  featureTimeline: (orgId: string, roadmapId: string) =>
+    json<FeatureTimeline>(
+      `/admin/features/${encodeURIComponent(roadmapId)}/timeline?org_id=${encodeURIComponent(orgId)}`,
+    ),
+
+  exportsCsvUrl: (orgId: string, dimension: RollupDimension) =>
+    `${BASE}/admin/exports/rollup.csv?org_id=${encodeURIComponent(orgId)}&dimension=${dimension}`,
+};
+
 export const api = {
   health: () => json<{ status: string }>('/../health'),
 
