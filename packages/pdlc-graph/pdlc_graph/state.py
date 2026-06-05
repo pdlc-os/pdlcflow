@@ -119,3 +119,22 @@ class PDLCState(TypedDict, total=False):
     construction_test_results: dict  # {layer: {"passed": bool, "report": str}}
     construction_complete: bool
     simulate_failing_layers: list[str]  # test hook: force these Test layers to fail
+
+    # ── Operation (Phase D) working state ───────────────────────────────
+    commits: list[str]  # conventional-commit subjects driving the semver bump
+    version: str | None  # semver tag chosen at Ship (e.g. "v1.3.0")
+    changelog_ref: str | None  # artifact uri of the rendered CHANGELOG entry
+    deploy_candidates: list[str]  # candidate environment names (prod filtered out)
+    deploy_target: str | None  # selected environment name
+    deploy_tier: str | None  # dev | test | staging | pre-production | production
+    deploy_url: str | None
+    merged: bool  # merge-to-main executed (--no-ff)
+    merge_and_deploy_approved: bool  # gate #6 verdict
+    deployments_ref: str | None  # artifact uri of the DEPLOYMENTS.md record
+    smoke_results: dict  # {check: {"passed": bool, "report": str}}
+    smoke_signed_off: bool  # gate #7 verdict
+    simulate_failing_smoke: list[str]  # test hook: force these smoke checks to fail
+    episode_ref: str | None  # artifact uri of the episode file
+    episode_approved: bool  # gate #8 verdict
+    metrics_ref: str | None  # artifact uri of the METRICS rollup
+    operation_complete: bool

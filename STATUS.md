@@ -45,9 +45,17 @@ Note: the Inception parties are **Progressive Thinking / Threat-Model / Design-L
 - [x] 6 hermetic graph tests (TDD guard, render, happy path, 3-strike resume, required-layer failure, night-shift) + 1 engine REST test; full repo suite green (58 — graph 37, engine 15).
 - [ ] **Real integrations** (Phase D / tools pass): subprocess test runner adapter; `gh`/`git` tool implementations; merge-commit-only enforcement lives at the gh layer with the actual merge in Operation/Ship (gate #6).
 
-## Phase D — Operation loop (☐)
+## Phase D — Operation loop (✅ graph engine + REST; real deploy/git pending)
 
-Real ship subgraph; smoke runner; deploy register integration; reflect / episode generation; metrics rollup write-back.
+- [x] `pdlc_graph/graphs/ship/` — the Operation subgraph (`ship → verify → reflect`), composed over `PDLCState` and routed from `meta_graph` (built by an agent team, integrated solo).
+- [x] **Ship** (`merge_and_deploy_approve`, gate #6): semver bump from conventional commits (`versioning.next_version`), CHANGELOG render, deploy-target selection, the gate, then merge (`vcs_port`, **merge-commit-only enforced**) + deploy + DEPLOYMENTS record.
+- [x] **Verify** (`smoke_signoff`, gate #7): security checks + smoke tests (via the test-runner port) + conditional UX verify; failed required checks flag the gate blocking so night-shift refuses.
+- [x] **Reflect** (`episode_approve`, gate #8): retro + episode render, the gate, metrics rollup, roadmap-claim release, and `operation_complete` (Idle handoff).
+- [x] **Three-layer production-deploy ban** (`deploy_port`): filter-at-selection (`select_deploy_targets`), refuse-at-activate (`assert_deploy_allowed`), + the existing Sentinel `prod-deploy-attempted` runtime check. Tier inference is token-boundary-matched.
+- [x] Ports wired: `deploy_port` (register + tier + ban), `vcs_port` (merge enforcement), `versioning`; `deploy_tool`/`gh_tool` now delegate to them.
+- [x] Reachable through the live API: `POST /v1/commands {command:"ship", seed_state:{…}}` walks all three Operation gates via the resolve endpoint to completion.
+- [x] New hermetic tests across ship/verify/reflect (renderers, gate pause/resume, prod-candidate drop, night-shift) + 2 integration + 1 engine REST test; full repo suite green (79 — graph 57, engine 16, event-schema 4, migrate 2).
+- [ ] **Real integrations** (Phase H / tools pass): subprocess-backed deploy + actual `git`/`gh` merge; S3/Postgres adapters for the deploy register + artifacts.
 
 ## Phase E — Utilities (☐)
 
