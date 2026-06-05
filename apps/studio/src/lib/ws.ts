@@ -2,11 +2,22 @@
 
 import type { Pending } from './api';
 
+export interface NightShiftFrame {
+  type: 'night_shift.started' | 'night_shift.verdict' | 'night_shift.completed' | 'night_shift.aborted';
+  ts?: string;
+  stage?: string;
+  verdict?: string;
+  reason?: string;
+  ok?: boolean;
+  [k: string]: unknown;
+}
+
 export type Frame =
   | { type: 'hello'; thread_id: string }
   | { type: 'interaction.opened'; interaction: Pending }
   | { type: 'thread.completed'; thread_id: string; summary?: Record<string, unknown> }
-  // forward-compatible: token streaming / status frames (Phase H)
+  | NightShiftFrame
+  // forward-compatible: token streaming / status frames
   | { type: 'token'; thread_id: string; chunk: string }
   | { type: 'status'; phase: string; sub_phase: string | null };
 

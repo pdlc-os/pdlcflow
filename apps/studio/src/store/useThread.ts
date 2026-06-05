@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 
 import { api, type Pending } from '@/lib/api';
+import type { NightShiftFrame } from '@/lib/ws';
 
 export interface TranscriptItem {
   id: string;
@@ -20,12 +21,14 @@ interface ThreadStore {
   status: Status;
   transcript: TranscriptItem[];
   result: Record<string, unknown> | null;  // completion summary (night-shift outcome, etc.)
+  verdicts: NightShiftFrame[];  // live night-shift Sentinel verdict stream
 
   start: (command: string, opts?: { feature?: string; mode?: 'sketch' | 'socratic' }) => Promise<void>;
   answer: (answers: string[]) => Promise<void>;
   resolveApproval: (approved: boolean, comment?: string) => Promise<void>;
   setPending: (p: Pending | null) => void;
   setResult: (r: Record<string, unknown> | null) => void;
+  appendVerdict: (v: NightShiftFrame) => void;
   reset: () => void;
 }
 
@@ -43,9 +46,11 @@ export const useThread = create<ThreadStore>((set, get) => ({
   status: 'idle',
   transcript: [],
   result: null,
+  verdicts: [],
 
   setPending: (p) => set({ pending: p, status: p ? 'awaiting' : get().status }),
   setResult: (r) => set({ result: r }),
+  appendVerdict: (v) => set((s) => ({ verdicts: [...s.verdicts, v] })),
 
   start: async (command, opts) => {
     const { orgId, projectId } = get();
@@ -53,6 +58,7 @@ export const useThread = create<ThreadStore>((set, get) => ({
       status: 'running',
       pending: null,
       result: null,
+      verdicts: [],
       transcript: [say('user', `/${command}${opts?.feature ? ` ${opts.feature}` : ''}`)],
     });
     try {
@@ -93,7 +99,8 @@ export const useThread = create<ThreadStore>((set, get) => ({
     await advance(set, get, p.id, { approved, comment }, say('user', approved ? 'Approved' : 'Rejected'));
   },
 
-  reset: () => set({ threadId: null, pending: null, status: 'idle', transcript: [], result: null }),
+  reset: () =>
+    set({ threadId: null, pending: null, status: 'idle', transcript: [], result: null, verdicts: [] }),
 }));
 
 async function advance(

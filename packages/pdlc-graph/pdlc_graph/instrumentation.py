@@ -38,6 +38,17 @@ def set_emitter(emitter: _EmitterProto) -> None:
     _emitter = emitter
 
 
+def emit_event(event_type: str, state: dict, payload: dict, correlation_id: str | None = None) -> None:
+    """Emit a typed event with an explicit payload from inside a node.
+
+    The `@instrumented_node` decorator only emits node enter/exit; use this when
+    a node needs to publish a value (e.g. a Sentinel verdict) the decorator
+    can't see in the input state.
+    """
+    corr = correlation_id or state.get("correlation_id") or str(uuid.uuid4())
+    _emitter.emit(event_type, state, payload, corr)
+
+
 def instrumented_node(event_type: str) -> Callable:
     def deco(fn: Callable) -> Callable:
         @functools.wraps(fn)

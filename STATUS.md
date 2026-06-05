@@ -97,7 +97,12 @@ Delivered incrementally (one PR per bundle). Auth deferred. Every adapter is fla
 - [x] 4 durability unit tests (conn-string conversion, MemorySaver fallback, dispatcher selection); full repo suite green (153 — engine 44). `.env.example` documents the flags.
 - [ ] Cross-process pending delivery for the Arq path needs the Redis bus (bundle 2).
 
-### Bundle 2 — Live streaming (Redis pub/sub bus) — ☐
+### Bundle 2 — Live streaming (Redis pub/sub bus) (✅)
+- [x] **RedisEventBus** (`app/runtime/redis_bus.py`): `publish` (sync) appends to a capped per-channel Redis list (reconnect replay) + PUBLISHes the frame; `listen` (async, used by the WS) replays the bounded list then subscribes to pub/sub — so a frame published by the Arq worker reaches a socket held open by the API. Behind `PDLC_USE_REDIS_BUS`; in-memory bus stays the default.
+- [x] **EventBus unified `listen()`**: both buses expose an async `listen(channel)` iterator (in-memory polls history; Redis replays + subscribes). The WS handler is now transport-agnostic (`async for frame in bus.listen(...)`) with a concurrent client-drain task.
+- [x] **Live night-shift verdicts**: a new `instrumentation.emit_event` lets the Sentinel nodes emit the real verdict value; the emitter fans `night_shift.*` events out to `thread:{id}` (skipping node-enter noise). The mission-control panel renders the live verdict stream (build/ship stages, abort highlighted); `useThread.verdicts` + `ws.ts` `NightShiftFrame` + ProjectView wired.
+- [x] Hermetic test (`test_night_shift_stream`): a `/night-shift` run fans build+ship verdicts + completion to the thread channel, and a late-attaching WS replays them. Studio tsc + build clean; full repo suite green (175 — engine 45).
+- [ ] Redis transport verified via docker-compose (no Redis in CI).
 ### Bundle 3 — Persistence (Postgres analytics, S3 artifacts, Postgres tasks) — ☐
 ### Bundle 4 — Migrations + RLS (Alembic autogenerate, RLS policies, admin.access.denied) — ☐
 

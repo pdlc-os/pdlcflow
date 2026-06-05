@@ -16,7 +16,14 @@ from arq.connections import RedisSettings
 
 from ..clickstream import wire_emitter
 from ..config import settings
-from ..runtime import GraphRunner, build_checkpointer, get_runner, set_runner, wire_llm_backend
+from ..runtime import (
+    GraphRunner,
+    build_checkpointer,
+    get_runner,
+    set_runner,
+    wire_event_bus,
+    wire_llm_backend,
+)
 
 
 async def start_graph(ctx: dict, thread_id: str, state: dict) -> dict:
@@ -32,6 +39,9 @@ async def resume_graph(ctx: dict, thread_id: str, resume_value: dict) -> dict:
 
 
 async def startup(_ctx: dict) -> None:
+    # Bus first so the worker publishes pending + night-shift frames to Redis,
+    # where the API's WebSocket subscribers pick them up cross-process.
+    wire_event_bus(settings)
     wire_emitter(settings)
     set_runner(GraphRunner(checkpointer=build_checkpointer(settings)))
     wire_llm_backend(settings)

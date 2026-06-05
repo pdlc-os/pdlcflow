@@ -10,6 +10,7 @@ from __future__ import annotations
 import logging
 import queue
 import threading
+from datetime import UTC, datetime
 
 from event_schema import EventEnvelope
 
@@ -21,6 +22,32 @@ from .sinks.postgres import PostgresSink
 log = logging.getLogger("pdlc.clickstream")
 
 _emitter: ClickstreamEmitter | None = None
+
+# Night-shift lifecycle events are mirrored to the thread's WebSocket channel so
+# the mission-control panel streams verdicts live (plan §8.7).
+_NS_STREAM = {
+    "night_shift.started",
+    "night_shift.verdict",
+    "night_shift.completed",
+    "night_shift.aborted",
+}
+
+
+def _fan_out_night_shift(event_type: str, state: dict, payload: dict) -> None:
+    """Publish a night-shift frame to thread:{id} (skips node-enter noise)."""
+    if event_type not in _NS_STREAM or payload.get("phase") == "enter":
+        return
+    thread_id = state.get("thread_id")
+    if not thread_id:
+        return
+    try:
+        from ..runtime.ports import get_event_bus
+
+        frame = {k: v for k, v in payload.items() if k != "phase"}
+        frame.update({"type": event_type, "ts": datetime.now(UTC).isoformat()})
+        get_event_bus().publish(f"thread:{thread_id}", frame)
+    except Exception as exc:  # never raise on telemetry fan-out
+        log.warning("night-shift fan-out failed: %s", exc)
 
 
 class _Sink:
@@ -70,6 +97,7 @@ class ClickstreamEmitter:
                 payload=payload,
             )
             self.emit_envelope(envelope)
+            _fan_out_night_shift(event_type, state, payload)
         except Exception as exc:  # never raise on instrumentation
             log.warning("emit failed: %s", exc)
 

@@ -25,6 +25,7 @@ from .ports import (
     set_event_bus,
     set_gate_store,
 )
+from .redis_bus import RedisEventBus, wire_event_bus
 
 __all__ = [
     "ArqDispatcher",
@@ -33,6 +34,7 @@ __all__ = [
     "InMemoryGateStore",
     "InlineDispatcher",
     "PendingInteraction",
+    "RedisEventBus",
     "build_checkpointer",
     "get_dispatcher",
     "get_event_bus",
@@ -46,5 +48,6 @@ __all__ = [
     "set_gate_store",
     "set_runner",
     "wire_dispatcher",
+    "wire_event_bus",
     "wire_llm_backend",
 ]
