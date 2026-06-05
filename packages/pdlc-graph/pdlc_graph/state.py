@@ -49,6 +49,11 @@ class PDLCState(TypedDict, total=False):
     project_id: str
     repository: str | None
     domains: list[str]
+    # Feature-level traceability — ride on every event for admin drill-down.
+    roadmap_id: str | None  # F-NNN
+    prd_id: str | None
+    user_story_id: str | None  # US-001
+    plan_step: str | None
 
     # Session
     session_id: str

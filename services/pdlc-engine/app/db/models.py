@@ -226,6 +226,11 @@ class Event(Base):
     project_id: Mapped[UUID | None]
     repository: Mapped[str | None] = mapped_column(Text)
     domains: Mapped[list[str]] = mapped_column(ARRAY(String), default=list)
+    # Feature-level traceability dimensions (admin drill-down).
+    roadmap_id: Mapped[str | None] = mapped_column(Text)
+    prd_id: Mapped[str | None] = mapped_column(Text)
+    user_story_id: Mapped[str | None] = mapped_column(Text)
+    plan_step: Mapped[str | None] = mapped_column(Text)
     session_id: Mapped[str | None] = mapped_column(Text)
     correlation_id: Mapped[UUID | None]
     causation_id: Mapped[UUID | None]

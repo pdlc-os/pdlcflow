@@ -1,10 +1,17 @@
 """Time-travel view of one feature — every event in chronological order, replayable."""
 
-from fastapi import APIRouter
+from __future__ import annotations
+
+from fastapi import APIRouter, Query
+
+from ...analytics import get_analytics_store
 
 router = APIRouter(prefix="/features", tags=["admin", "features"])
 
 
-@router.get("/{feature_id}/timeline")
-def timeline(feature_id: str) -> dict:
-    return {"feature_id": feature_id, "events": [], "phase": "A stub"}
+@router.get("/{roadmap_id}/timeline")
+def timeline(roadmap_id: str, org_id: str = Query(...)) -> dict:
+    events = get_analytics_store().feature_timeline(
+        org_id=org_id, roadmap_id=roadmap_id
+    )
+    return {"roadmap_id": roadmap_id, "events": events}

@@ -28,9 +28,10 @@ class _Sink:
 
 
 class ClickstreamEmitter:
-    def __init__(self, sink: _Sink, max_queue: int = 10_000):
+    def __init__(self, sink: _Sink, analytics=None, max_queue: int = 10_000):
         self._q: queue.Queue[EventEnvelope] = queue.Queue(maxsize=max_queue)
         self._sink = sink
+        self._analytics = analytics  # read-store fan-out for Atlas Console
         threading.Thread(target=self._drain, daemon=True).start()
 
     def emit_envelope(self, e: EventEnvelope) -> None:
@@ -58,6 +59,10 @@ class ClickstreamEmitter:
                 application_id=state.get("application_id"),
                 repository=state.get("repository"),
                 domains=state.get("domains", []),
+                roadmap_id=state.get("roadmap_id"),
+                prd_id=state.get("prd_id"),
+                user_story_id=state.get("user_story_id"),
+                plan_step=state.get("plan_step"),
                 session_id=state.get("session_id"),
                 thread_id=state.get("thread_id"),
                 actor=state.get("actor"),
@@ -80,6 +85,11 @@ class ClickstreamEmitter:
                 self._sink.write(batch)
             except Exception as exc:
                 log.warning("sink write failed: %s", exc)
+            if self._analytics is not None:
+                try:
+                    self._analytics.ingest(batch)
+                except Exception as exc:
+                    log.warning("analytics ingest failed: %s", exc)
 
 
 def _build_sink(settings: Settings) -> _Sink:
@@ -92,7 +102,9 @@ def _build_sink(settings: Settings) -> _Sink:
 
 def wire_emitter(settings: Settings) -> ClickstreamEmitter:
     global _emitter
-    _emitter = ClickstreamEmitter(_build_sink(settings))
+    from ..analytics import get_analytics_store
+
+    _emitter = ClickstreamEmitter(_build_sink(settings), analytics=get_analytics_store())
 
     # Push into pdlc-graph's instrumentation hook so decorated nodes emit.
     try:

@@ -7,7 +7,7 @@ to entity tables for every query.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID, uuid4
 
@@ -59,7 +59,7 @@ EVENT_TYPES: set[str] = {
 
 
 def _utcnow() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 class EventEnvelope(BaseModel):
@@ -84,6 +84,14 @@ class EventEnvelope(BaseModel):
     project_id: UUID
     repository: str | None = None
     domains: list[str] = Field(default_factory=list)
+
+    # Feature-level traceability — drill-down dimensions for rollups, so spend
+    # and cycle time can be pivoted down to a roadmap item, PRD, user story, or
+    # plan step (not just the application). Human-facing ids (F-NNN, US-001, …).
+    roadmap_id: str | None = None
+    prd_id: str | None = None
+    user_story_id: str | None = None
+    plan_step: str | None = None
 
     # Correlation
     session_id: str | None = None

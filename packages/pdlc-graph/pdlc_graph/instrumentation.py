@@ -14,6 +14,12 @@ import uuid
 from collections.abc import Callable
 from typing import Any, Protocol
 
+try:  # langgraph control-flow signals (interrupt(), Command bubbling) — NOT errors
+    from langgraph.errors import GraphBubbleUp as _ControlFlow
+except Exception:  # pragma: no cover - older/newer langgraph
+    class _ControlFlow(Exception):  # type: ignore[no-redef]
+        ...
+
 
 class _EmitterProto(Protocol):
     def emit(self, event_type: str, state: dict, payload: dict, correlation_id: str) -> None: ...
@@ -41,6 +47,10 @@ def instrumented_node(event_type: str) -> Callable:
             _emitter.emit(event_type, state, {"node": fn.__name__, "phase": "enter"}, corr)
             try:
                 out = fn(state)
+            except _ControlFlow:
+                # interrupt() / Command bubbling pauses the graph — control flow,
+                # not a failure. Re-raise without emitting a spurious error event.
+                raise
             except Exception as exc:
                 _emitter.emit(
                     "error", state,

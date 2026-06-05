@@ -77,9 +77,15 @@ Note: the Inception parties are **Progressive Thinking / Threat-Model / Design-L
 - [x] Reachable via `POST /v1/commands {command:"night-shift", seed_state:{…}}` → contract gate → autonomous build+ship to completion.
 - [x] 5 runtime tests (happy path, decline, preflight abort, prod refusal, Sentinel abort) + 2 engine REST; full repo suite green (130 — graph 103, engine 21, event-schema 4, migrate 2). Studio tsc + build clean.
 
-## Phase G — Admin dashboard + analytics pipeline (☐)
+## Phase G — Admin dashboard + analytics pipeline (✅ in-memory analytics + REST + SPA)
 
-All 7 admin routes with live data; ClickHouse provisioning + rollup queries; cost-pivot by provider × agent × initiative × domain; CSV / DDL export; cross-org analytics ban enforced at the engine.
+- [x] **Telemetry enrichment**: feature-level traceability dimensions — `roadmap_id` (F-NNN), `prd_id`, `user_story_id` (US-001), `plan_step` (plus the existing `application_id`) — now ride on every event (`event_schema` envelope, `PDLCState`, events DB model, emitter). Rollups can pivot down to a roadmap item / PRD / user story / plan step, not just the application.
+- [x] **Analytics read store** (`app/analytics`): in-memory, fed by the emitter (a second fan-out alongside the durable sink); `rollup(dimension, …)` over initiative/application/squad/domain/roadmap/user_story/agent with events + tokens + USD, plus `feature_timeline`, `live`, `totals`. ClickHouse/Postgres injected at boot (Phase H).
+- [x] **7 admin routes** wired to real rollups: `/admin/{live, initiatives/rollup, domains/rollup, squads/scoreboard, agents/heatmap, features/{roadmap_id}/timeline, exports/rollup.csv}` (+ models). **Cross-org ban** enforced — data routes require `org_id` (missing → 422).
+- [x] **Atlas Console SPA**: all 7 pages render the rollups (tables + Recharts bar charts; CSV export link; live feed auto-refresh), org-scoped via the session store.
+- [x] **Telemetry correctness fix**: `@instrumented_node` no longer treats langgraph's `GraphInterrupt`/`GraphBubbleUp` (control flow) as an error — previously every gate/question emitted a spurious `error` event. Verified live: a brainstorm run now emits 0 error events.
+- [x] Verified live over HTTP: a real run → emitter → analytics → admin routes (events surfaced, 10-persona heatmap, cross-org 422). 16 engine admin tests + 2 instrumentation + 1 envelope traceability test; full repo suite green (149 — graph 105, engine 37, event-schema 5, migrate 2). Studio tsc + build clean.
+- [ ] **Production swaps** (Phase H): ClickHouse/Postgres-backed analytics store (the in-memory one is per-process); Firehose→S3→Glue pipeline; the `admin.access.denied` event + audit.
 
 ## Phase H — SaaS hardening (☐)
 
