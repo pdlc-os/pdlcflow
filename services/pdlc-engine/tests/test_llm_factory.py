@@ -5,7 +5,7 @@ from app.llm.tier_map import DEFAULT_TIER_MAP, resolve_model_id
 def test_tier_map_covers_all_providers():
     expected = {"bedrock", "anthropic", "vertex", "azure", "openai", "gemini", "ollama"}
     assert set(DEFAULT_TIER_MAP.keys()) == expected
-    for provider, m in DEFAULT_TIER_MAP.items():
+    for m in DEFAULT_TIER_MAP.values():
         assert set(m.keys()) == {"opus", "sonnet", "haiku"}
 
 
