@@ -87,9 +87,19 @@ Note: the Inception parties are **Progressive Thinking / Threat-Model / Design-L
 - [x] Verified live over HTTP: a real run → emitter → analytics → admin routes (events surfaced, 10-persona heatmap, cross-org 422). 16 engine admin tests + 2 instrumentation + 1 envelope traceability test; full repo suite green (149 — graph 105, engine 37, event-schema 5, migrate 2). Studio tsc + build clean.
 - [ ] **Production swaps** (Phase H): ClickHouse/Postgres-backed analytics store (the in-memory one is per-process); Firehose→S3→Glue pipeline; the `admin.access.denied` event + audit.
 
-## Phase H — SaaS hardening (☐)
+## Phase H — SaaS hardening (in progress — real adapters behind seams; verified via docker-compose, not in CI)
 
-Cognito + SSO; RLS policies in real migrations; rate limiting active; multi-AZ failover; per-tenant KMS CMK; SOC2-grade audit trail; backup + restore drill.
+Delivered incrementally (one PR per bundle). Auth deferred. Every adapter is flag-gated and falls back to the in-memory default, so the hermetic suite + dev stay green; the real paths are verified by `docker compose up` (no Docker/Postgres/Redis in CI).
+
+### Bundle 1 — Durability core (✅)
+- [x] **PostgresSaver checkpointer** (`build_checkpointer`): pooled `psycopg` connection (conn-string converted from the SQLAlchemy `+asyncpg` URL), `setup()` on boot, behind `PDLC_USE_POSTGRES_CHECKPOINTER`. Robust fallback to `MemorySaver` if Postgres is unreachable — the engine always boots. Deps added: `langgraph-checkpoint-postgres`, `psycopg[binary]`, `psycopg-pool` (langgraph core stays 0.2.76 — no breaking bump).
+- [x] **Arq opt-in dispatch** (`app/runtime/dispatch.py`): `InlineDispatcher` (default — synchronous, unchanged REST contract) vs `ArqDispatcher` (enqueues `start_graph`/`resume_graph` for the worker, which shares Postgres state; pending arrives over the bus). Behind `PDLC_USE_ARQ_DISPATCH`. Command + resolve routes now go through the dispatcher.
+- [x] 4 durability unit tests (conn-string conversion, MemorySaver fallback, dispatcher selection); full repo suite green (153 — engine 44). `.env.example` documents the flags.
+- [ ] Cross-process pending delivery for the Arq path needs the Redis bus (bundle 2).
+
+### Bundle 2 — Live streaming (Redis pub/sub bus) — ☐
+### Bundle 3 — Persistence (Postgres analytics, S3 artifacts, Postgres tasks) — ☐
+### Bundle 4 — Migrations + RLS (Alembic autogenerate, RLS policies, admin.access.denied) — ☐
 
 ## Phase I — Migration tooling (✅ scan/push/taxonomy/backfill + engine import)
 

@@ -9,11 +9,12 @@ import pytest
 
 @pytest.fixture(autouse=True)
 def _reset_runtime():
-    from app.runtime import reset_runner, reset_runtime_ports
+    from app.runtime import reset_dispatcher, reset_runner, reset_runtime_ports
     from pdlc_graph.ports import reset_artifact_store, reset_task_store
 
     reset_runtime_ports()
     reset_runner()
+    reset_dispatcher()
     reset_artifact_store()
     reset_task_store()
     yield
