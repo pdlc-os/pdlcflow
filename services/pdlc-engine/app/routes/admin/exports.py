@@ -9,17 +9,19 @@ from fastapi import APIRouter, Query
 from fastapi.responses import Response
 
 from ...analytics import get_analytics_store
+from ._guard import require_org
 
 router = APIRouter(prefix="/exports", tags=["admin", "exports"])
 
 
 @router.get("/rollup.csv")
 def export_rollup_csv(
-    org_id: str = Query(...),
+    org_id: str | None = Query(None),
     dimension: str = Query(...),
     frm: str | None = Query(None, alias="from"),
     to: str | None = Query(None),
 ) -> Response:
+    org_id = require_org(org_id, "/admin/exports/rollup.csv")
     rows = get_analytics_store().rollup(
         org_id=org_id, dimension=dimension, frm=frm, to=to
     )

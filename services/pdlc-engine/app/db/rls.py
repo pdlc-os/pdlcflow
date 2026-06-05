@@ -21,3 +21,10 @@ async def with_org_scope(session: AsyncSession, org_id: UUID) -> AsyncIterator[N
     """Bind app.org_id on the current connection for the duration of the block."""
     await session.execute(text("SET LOCAL app.org_id = :v"), {"v": str(org_id)})
     yield
+
+
+def set_org_context(conn, org_id: str) -> None:
+    """Sync equivalent — bind app.org_id on a sync connection inside a
+    transaction so the RLS policies admit this org's rows. Called by the sync
+    Postgres adapters (task store, analytics) at the start of each `begin()`."""
+    conn.execute(text("SET LOCAL app.org_id = :v"), {"v": str(org_id)})

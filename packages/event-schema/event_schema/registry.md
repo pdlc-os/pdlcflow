@@ -1,4 +1,4 @@
-# Event registry — source of truth for the 37-event taxonomy
+# Event registry — source of truth for the 38-event taxonomy
 
 Every event the PDLC clickstream emits is listed here. Adding a new event type requires:
 
@@ -130,8 +130,14 @@ PII rule: payloads carry **references** (S3 keys, UUIDs, route names), never raw
 | `ui.viewed` | User opens a route or component | `UIViewedPayload` | Adoption analytics |
 | `error` | An exception is caught in a node | `ErrorPayload` | Error budget |
 
+## Admin / audit (1)
+
+| Event | When | Payload | Consumed by |
+|---|---|---|---|
+| `admin.access.denied` | An admin query is attempted without an org filter (cross-org ban) | generic dict (`path`, `reason`) | Security audit |
+
 ---
 
-**Total: 37 event types in 15 categories.**
+**Total: 38 event types in 16 categories.**
 
 Coverage map (every numbered step in every upstream skill emits at least one of: `step.completed`, `subphase.entered/exited`, `agent.invoked/responded`, `tool.invoked`, plus phase events at boundaries). See §15 verification in `docs/.research/.langgraph-bedrock-saas-migration-2026-06-05.md`.

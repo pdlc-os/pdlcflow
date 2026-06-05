@@ -87,7 +87,7 @@ Note: the Inception parties are **Progressive Thinking / Threat-Model / Design-L
 - [x] Verified live over HTTP: a real run → emitter → analytics → admin routes (events surfaced, 10-persona heatmap, cross-org 422). 16 engine admin tests + 2 instrumentation + 1 envelope traceability test; full repo suite green (149 — graph 105, engine 37, event-schema 5, migrate 2). Studio tsc + build clean.
 - [ ] **Production swaps** (Phase H): ClickHouse/Postgres-backed analytics store (the in-memory one is per-process); Firehose→S3→Glue pipeline; the `admin.access.denied` event + audit.
 
-## Phase H — SaaS hardening (in progress — real adapters behind seams; verified via docker-compose, not in CI)
+## Phase H — SaaS hardening (✅ self-host stack — real adapters behind seams; verified via docker-compose, not in CI)
 
 Delivered incrementally (one PR per bundle). Auth deferred. Every adapter is flag-gated and falls back to the in-memory default, so the hermetic suite + dev stay green; the real paths are verified by `docker compose up` (no Docker/Postgres/Redis in CI).
 
@@ -111,7 +111,14 @@ Delivered incrementally (one PR per bundle). Auth deferred. Every adapter is fla
 - [x] **db/session.py** (cached sync psycopg engine); `wire_persistence` injects all three with in-memory fallback so boot never crashes; wired in lifespan + worker. Compose gains **MinIO** + an `artifacts` volume; `.env.example` documents the flags.
 - [x] 4 persistence tests + 4 task-store tests (filesystem round-trip, wiring injection, postgres-flags-don't-crash-boot, S3 uri parsing; org_id/external_id/atomic-claim). Full repo suite green (183 — graph 109, engine 49). ruff clean.
 - [ ] Postgres/S3/MinIO paths verified via docker-compose (not in CI).
-### Bundle 4 — Migrations + RLS (Alembic autogenerate, RLS policies, admin.access.denied) — ☐
+### Bundle 4 — Migrations + RLS (✅)
+- [x] **Real schema migration**: `0001_init` now builds the full 25-table schema from the SQLAlchemy models (`Base.metadata.create_all` + the `pgcrypto`/`citext` extensions); `env.py` already sets `target_metadata`. Runs via `alembic upgrade head` in compose. (`alembic revision --autogenerate` against a live DB can later refine indexes.)
+- [x] **RLS policies**: `0002_rls` enables row-level security + an `org_id = current_setting('app.org_id')` isolation policy on every org-scoped table. `db.rls.set_org_context` (sync) binds `app.org_id` per transaction; applied on the Postgres task-store write + all analytics queries.
+- [x] **admin.access.denied**: added to the taxonomy (**38 events**; registry + envelope updated). Admin data routes now take an optional `org_id`, emit the audit event, and return **403** when it's missing (was 422) — the cross-org ban with an audit trail.
+- [x] 5 migration/RLS/guard tests (metadata tables, `depends_on` column, `SET LOCAL` SQL, 403 guard, valid audit event) + the admin 422→403 update. App boots; `GET /v1/admin/live` without org → 403. Full repo suite green (188 — engine 54, graph 109, event-schema 5, migrate 20). ruff clean.
+- [ ] **Enforcement hardening** (documented follow-on): RLS is ENABLED but not FORCEd (the app connects as table owner, so non-forced RLS is bypassed). Full enforcement needs a dedicated non-owner DB role + `force row level security` + threading `org_id` through the project-scoped read methods (`list`/`claim`).
+
+**Phase H summary:** all four bundles landed (durability, live streaming, persistence, migrations+RLS) as real, flag-gated adapters with in-memory fallback — the hermetic suite + dev stay green; the Postgres/Redis/S3/MinIO paths are exercised via `docker compose up`. Auth enforcement remains deferred (open API). The architecture is now production-shaped for self-host; remaining SaaS-only items (Cognito/SSO, per-tenant KMS, ClickHouse, multi-AZ, RLS FORCE) are scaffolded/documented.
 
 ## Phase I — Migration tooling (✅ scan/push/taxonomy/backfill + engine import)
 

@@ -2,7 +2,7 @@
 
 PDLC reimagined as a **LangGraph + AWS Bedrock SaaS** with a browser UI, Chainlit-inspired design system, pluggable LLM providers (7), and clickstream telemetry feeding an admin dashboard.
 
-> **Status:** Phase A — Foundations. See [`STATUS.md`](./STATUS.md) for the per-phase checklist and [`docs/.research/.langgraph-bedrock-saas-migration-2026-06-05.md`](./docs/.research/.langgraph-bedrock-saas-migration-2026-06-05.md) for the full architecture proposal (15 sections, 5 mermaid diagrams, 37-event taxonomy, 25-table Postgres schema, 7-provider LLM factory, 8-stack CDK topology).
+> **Status:** Phase A — Foundations. See [`STATUS.md`](./STATUS.md) for the per-phase checklist and [`docs/.research/.langgraph-bedrock-saas-migration-2026-06-05.md`](./docs/.research/.langgraph-bedrock-saas-migration-2026-06-05.md) for the full architecture proposal (15 sections, 5 mermaid diagrams, 38-event taxonomy, 25-table Postgres schema, 7-provider LLM factory, 8-stack CDK topology).
 
 ## Relationship to upstream `pdlc`
 
