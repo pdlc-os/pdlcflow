@@ -17,7 +17,7 @@ from uuid import UUID
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from ..runtime import get_gate_store, get_runner
+from ..runtime import get_dispatcher, get_gate_store
 
 router = APIRouter(prefix="/approval-gates", tags=["approval-gates"])
 
@@ -83,7 +83,7 @@ def resolve(gate_id: UUID, req: ResolveRequest) -> ResolveResponse:
         raise HTTPException(status_code=409, detail=f"gate already {rec.status}")
 
     store.resolve(gate_id, status="resolved")
-    next_pending = get_runner().resume(rec.thread_id, _resume_value(rec, req))
+    next_pending = get_dispatcher().resume(rec.thread_id, _resume_value(rec, req))
     return ResolveResponse(
         ok=True,
         thread_id=rec.thread_id,

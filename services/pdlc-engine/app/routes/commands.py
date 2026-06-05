@@ -19,7 +19,7 @@ from uuid import UUID, uuid4
 from fastapi import APIRouter
 from pydantic import BaseModel
 
-from ..runtime import get_runner
+from ..runtime import get_dispatcher
 
 router = APIRouter(prefix="/commands", tags=["commands"])
 
@@ -95,7 +95,7 @@ def invoke(req: InvokeCommandRequest) -> InvokeCommandResponse:
     thread_id = f"{req.org_id}:{req.project_id}:{session_id}"
     state = _initial_state(req, thread_id, session_id)
 
-    pending = get_runner().start(thread_id, state)
+    pending = get_dispatcher().start(thread_id, state)
     return InvokeCommandResponse(
         thread_id=thread_id,
         started=True,

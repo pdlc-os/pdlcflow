@@ -34,15 +34,35 @@ from .ports import (
 log = logging.getLogger("pdlc.runtime")
 
 
-def build_checkpointer(settings=None):
-    """Return a checkpointer. PostgresSaver if installed + a DB is configured;
-    otherwise MemorySaver (the default in dev/test and single-process runs)."""
-    if settings is not None and getattr(settings, "use_postgres_checkpointer", False):
-        try:  # optional dep — install langgraph-checkpoint-postgres for prod
-            from langgraph.checkpoint.postgres import PostgresSaver
+def _psycopg_conninfo(db_url: str) -> str:
+    """Convert a SQLAlchemy URL (postgresql+asyncpg://…) to a psycopg conninfo
+    (postgresql://…) for the PostgresSaver connection pool."""
+    return db_url.replace("+asyncpg", "").replace("+psycopg", "")
 
-            saver = PostgresSaver.from_conn_string(settings.db_url)
-            saver.setup()
+
+def build_checkpointer(settings=None):
+    """Return a checkpointer.
+
+    With `use_postgres_checkpointer`, a pooled `PostgresSaver` so graph state is
+    durable and shared across the API + Arq worker processes; otherwise a
+    `MemorySaver` (dev/test and single-process runs). Any failure to reach
+    Postgres falls back to MemorySaver so the engine still boots.
+    """
+    if settings is not None and getattr(settings, "use_postgres_checkpointer", False):
+        try:  # prod-only path — requires a reachable Postgres (verified via docker compose)
+            from langgraph.checkpoint.postgres import PostgresSaver
+            from psycopg.rows import dict_row
+            from psycopg_pool import ConnectionPool
+
+            pool = ConnectionPool(
+                conninfo=_psycopg_conninfo(settings.db_url),
+                max_size=getattr(settings, "pg_pool_max_size", 20),
+                open=True,
+                kwargs={"autocommit": True, "row_factory": dict_row},
+            )
+            saver = PostgresSaver(pool)
+            saver.setup()  # idempotent — creates the langgraph checkpoint tables
+            log.info("PostgresSaver checkpointer active (durable, multi-process)")
             return saver
         except Exception as exc:  # pragma: no cover - prod-only path
             log.warning("PostgresSaver unavailable (%s); falling back to MemorySaver", exc)

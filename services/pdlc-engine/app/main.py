@@ -14,7 +14,13 @@ from .routes import approval_gates as approval_routes
 from .routes import commands as command_routes
 from .routes import health as health_routes
 from .routes import migrate as migrate_routes
-from .runtime import GraphRunner, build_checkpointer, set_runner, wire_llm_backend
+from .runtime import (
+    GraphRunner,
+    build_checkpointer,
+    set_runner,
+    wire_dispatcher,
+    wire_llm_backend,
+)
 from .websocket.handler import ws_router
 
 
@@ -22,10 +28,12 @@ from .websocket.handler import ws_router
 async def lifespan(_app: FastAPI):
     wire_emitter(settings)
     # Graph runtime: one runner owns the checkpointer that makes interrupt()
-    # sites resumable across REST turns. MemorySaver in dev; PostgresSaver when
-    # use_postgres_checkpointer is set. LLM completions stay on the offline stub
-    # unless wire_llm enables the provider factory.
+    # sites resumable across turns. MemorySaver in dev; PostgresSaver (durable,
+    # multi-process) when use_postgres_checkpointer is set. The dispatcher runs
+    # turns inline by default, or enqueues to the Arq worker when use_arq_dispatch
+    # is set. LLM completions stay on the offline stub unless wire_llm is set.
     set_runner(GraphRunner(checkpointer=build_checkpointer(settings)))
+    wire_dispatcher(settings)
     wire_llm_backend(settings)
     yield
 
