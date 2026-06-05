@@ -28,6 +28,7 @@ from ...llm_port import complete
 from ...ports import get_task_store, put_artifact
 from ...render import render_plan
 from ...state import PDLCState
+from ...visual import mermaid_screen, visual
 
 GATE_KIND = "beads_tasklist_approve"
 
@@ -223,6 +224,16 @@ def plan_gate(state: PDLCState) -> dict:
         "task_count": len(tasks),
         "wave_count": len(waves),
         "summary": f"{len(tasks)} tasks in {len(waves)} waves ready for review.",
+        # Visual companion: render the wave dependency tree beside the gate.
+        "visual": visual(
+            [
+                mermaid_screen(
+                    f"Task dependency graph — {state.get('feature') or 'feature'}",
+                    _mermaid_tree(tasks),
+                    subtitle="Wave-based execution order; same-wave tasks run in parallel.",
+                )
+            ]
+        ),
     }
     verdict = gates.approval_gate(state, GATE_KIND, payload)
     return {"plan_approved": bool(verdict.get("approved"))}

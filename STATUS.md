@@ -76,3 +76,11 @@ Cognito + SSO; RLS policies in real migrations; rate limiting active; multi-AZ f
 ## Phase I — Migration tooling (☐)
 
 Real `scan` / `push` / `taxonomy` / `backfill`; historical event synthesis from upstream episodes + decision logs.
+
+## Studio — live wiring + visual companion (✅ Inception path; full chat WS streaming pending)
+
+- [x] **Visual companion** (`apps/studio/src/components/BrainstormVisualCompanion.tsx`) — rendered as a panel in the **same browser view** as the chat (no separate localhost:7352 server; plan §14.13). Backend rides the existing interrupt payload: `pdlc_graph/visual.py` builds render-agnostic screen specs that flow through `pending.payload.visual` → gate store → WS, with zero new engine endpoints.
+- [x] UX Discovery emits clickable **option screens** (choosing a card answers the question); the Plan gate emits the **dependency-tree** screen. Wired via `interaction.ask(visual=…)` and the plan gate payload.
+- [x] Studio wired to the live engine: `lib/api.ts` + `lib/ws.ts` match the adapter surface; `useThread` drives command → pending → resolve; `ChatPanel` starts commands; `QuestionCard` + `ApprovalGateModal` render question rounds + gates with the companion alongside; `ProjectView` orchestrates + subscribes to the thread WS channel.
+- [x] Verified: `tsc --noEmit` clean, `vite build` succeeds, and the full `/brainstorm` → Socratic rounds → UX Discovery (companion) → gate flow served end-to-end through the Vite dev proxy (the browser's exact path). 4 backend visual tests; full repo suite green (83).
+- [ ] Remaining Studio work: live token streaming into the transcript (WS `token` frames), the night-shift mission-control panel, and the admin console data wiring. ESLint v9 flat-config is a pre-existing scaffold gap (CI lint is non-blocking).

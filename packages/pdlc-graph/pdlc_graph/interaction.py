@@ -30,12 +30,15 @@ def ask(
     *,
     drafts: list[str] | None = None,
     context: str | None = None,
+    visual: dict | None = None,
 ) -> dict:
     """Ask the human a round of questions. Returns {"answers": [...], ...}.
 
     In Sketch mode `drafts` (agent-proposed answers, one per question) are
-    surfaced for edit. Under night-shift the drafts are auto-accepted with no
-    human turn (falls back to empty strings when no drafts were supplied).
+    surfaced for edit. `visual` is an optional companion spec (see
+    `pdlc_graph.visual`) the Studio panel renders beside the question. Under
+    night-shift the drafts are auto-accepted with no human turn (falls back to
+    empty strings when no drafts were supplied).
     """
     mode = current_mode(state)
     payload = {
@@ -44,6 +47,7 @@ def ask(
         "questions": questions,
         "drafts": drafts if (mode == "sketch" and drafts) else None,
         "context": context,
+        "visual": visual,
     }
 
     if state.get("night_shift_active"):

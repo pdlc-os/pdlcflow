@@ -37,6 +37,7 @@ from ...llm_port import complete
 from ...ports import put_artifact
 from ...render import render_discovery_summary
 from ...state import PDLCState
+from ...visual import options_screen, visual
 from ..parties import run_party
 
 GATE_KIND = "discover_summary"
@@ -266,11 +267,44 @@ def ux_discovery(state: PDLCState) -> dict:
         ).strip()
         for q in questions
     ]
+    # Visual companion: one option-screen per question, drawn beside the chat.
+    companion = visual(
+        [
+            options_screen(
+                "Look & feel",
+                [
+                    {"title": "Sidebar + card grid", "description": "Reuses the /dashboard shell"},
+                    {"title": "Full-width + top nav", "description": "Reuses the /settings shell"},
+                ],
+                subtitle="Which layout fits this feature?",
+                key="q0",
+            ),
+            options_screen(
+                "User flow",
+                [
+                    {"title": "Single screen", "description": "No navigation between steps"},
+                    {"title": "Wizard / multi-step", "description": "Guided across screens"},
+                ],
+                subtitle="How should the user move through it?",
+                key="q1",
+            ),
+            options_screen(
+                "State coverage",
+                [
+                    {"title": "All four states", "description": "empty / loading / error / success"},
+                    {"title": "Happy path only", "description": "success state for now"},
+                ],
+                subtitle="Which UI states must we cover?",
+                key="q2",
+            ),
+        ]
+    )
     result = interaction.ask(
         state,
         questions,
         drafts=drafts,
         context="UX Discovery — Muse leads, visual-first, grounded in the UI inventory.",
+        visual=companion,
     )
     answers = result.get("answers") or []
     parts = ["**Lead:** Muse (UX Designer)"]

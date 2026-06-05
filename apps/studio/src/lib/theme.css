@@ -1,0 +1,41 @@
+/* Chainlit-inspired token system — shared with Atlas Console.
+ * Tenant overrides come in via inline <style> injected after this file at
+ * /v1/tenants/{id}/theme.css when a custom theme is configured. */
+
+:root {
+  /* Light */
+  --bg: #ffffff;
+  --fg: #0a0a0a;
+  --muted-fg: #525252;
+  --accent: #2563eb;
+  --accent-fg: #ffffff;
+  --border: #e5e5e5;
+  --ring: rgba(37, 99, 235, 0.25);
+
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 12px;
+  --radius-2xl: 16px;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
+
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.10);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.10);
+}
+
+.dark {
+  --bg: #0a0a0a;
+  --fg: #fafafa;
+  --muted-fg: #a3a3a3;
+  --accent: #3b82f6;
+  --accent-fg: #0a0a0a;
+  --border: #27272a;
+  --ring: rgba(59, 130, 246, 0.25);
+}
