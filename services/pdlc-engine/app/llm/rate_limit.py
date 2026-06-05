@@ -7,8 +7,6 @@ Atlas Console "Quotas" page exposes the knobs (Phase H).
 
 from __future__ import annotations
 
-import time
-
 
 class RateLimit:
     def __init__(self, redis_client, rpm: int = 60):
@@ -16,8 +14,7 @@ class RateLimit:
         self._rpm = rpm
 
     async def acquire(self, org_id: str, provider: str, tier: str) -> bool:
-        key = f"llm:{org_id}:{provider}:{tier}:rpm"
-        window = int(time.time() // 60)
-        slot = f"{key}:{window}"
-        # Phase A stub: always allow. Real impl uses Redis INCR + EXPIRE 60.
+        # Phase A stub: always allow. Real impl INCRs the per-minute slot key
+        # `llm:{org_id}:{provider}:{tier}:rpm:{epoch_minute}` in Redis with
+        # EXPIRE 60 and compares the count against `self._rpm`.
         return True
