@@ -1,48 +1,37 @@
-"""Brainstorm subgraph — Discover → Define → Design → Plan.
+"""Brainstorm subgraph — Discover → Define → Design → Plan (Inception, Phase B).
 
-Phase A stub: chains four placeholder nodes, one per sub-phase. The real
-nodes (with party meetings, Socratic Q&A, threat modeling, Bloom's
-Taxonomy, etc. from upstream skills/brainstorm/) land in Phase B.
+Composes the four sub-phase subgraphs into one Inception graph. Each
+sub-phase is a compiled StateGraph(PDLCState) whose terminal node is its
+approval gate; this parent chains them in order. The sub-phases are added as
+compiled subgraphs (no inner checkpointer) so `interrupt()` sites in any of
+them propagate to whatever checkpointer the top-level graph is compiled with
+(MemorySaver in tests, PostgresSaver in the engine).
 """
 
 from langgraph.graph import END, START, StateGraph
 
-from ..instrumentation import instrumented_node
-from ..state import PDLCState
+from ...state import PDLCState
+from .define import define_graph
+from .design import design_graph
+from .discover import discover_graph
+from .plan import plan_graph
+
+__all__ = ["brainstorm_graph", "build_brainstorm"]
 
 
-@instrumented_node("subphase.entered")
-def _discover(state: PDLCState) -> dict:
-    return {"sub_phase": "Discover"}
-
-
-@instrumented_node("subphase.entered")
-def _define(state: PDLCState) -> dict:
-    return {"sub_phase": "Define"}
-
-
-@instrumented_node("subphase.entered")
-def _design(state: PDLCState) -> dict:
-    return {"sub_phase": "Design"}
-
-
-@instrumented_node("subphase.entered")
-def _plan(state: PDLCState) -> dict:
-    return {"sub_phase": "Plan"}
-
-
-def _build():
+def build_brainstorm() -> StateGraph:
+    """Uncompiled Inception graph: discover → define → design → plan."""
     g = StateGraph(PDLCState)
-    g.add_node("discover", _discover)
-    g.add_node("define", _define)
-    g.add_node("design", _design)
-    g.add_node("plan", _plan)
+    g.add_node("discover", discover_graph)
+    g.add_node("define", define_graph)
+    g.add_node("design", design_graph)
+    g.add_node("plan", plan_graph)
     g.add_edge(START, "discover")
     g.add_edge("discover", "define")
     g.add_edge("define", "design")
     g.add_edge("design", "plan")
     g.add_edge("plan", END)
-    return g.compile()
+    return g
 
 
-brainstorm_graph = _build()
+brainstorm_graph = build_brainstorm().compile()

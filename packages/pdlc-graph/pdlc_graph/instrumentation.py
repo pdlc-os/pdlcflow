@@ -11,7 +11,8 @@ from __future__ import annotations
 import functools
 import time
 import uuid
-from typing import Any, Callable, Protocol
+from collections.abc import Callable
+from typing import Any, Protocol
 
 
 class _EmitterProto(Protocol):

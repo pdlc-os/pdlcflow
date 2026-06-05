@@ -80,3 +80,30 @@ class PDLCState(TypedDict, total=False):
 
     # Correlation for instrumentation
     correlation_id: str | None
+
+    # ── Inception (Phase B) working state ───────────────────────────────
+    # The brainstorm log accumulates one section per Discover/Design step.
+    brainstorm_log: list[dict]  # [{"section": str, "body": str, "step": str}]
+    discovery_summary: str | None
+    # Define
+    prd_ref: str | None  # artifact uri of the rendered PRD
+    prd_approved: bool
+    # Design
+    design_dir: str | None
+    design_docs: dict  # {"architecture": uri, "data_model": uri, "api_contracts": uri, ...}
+    threat_model_ref: str | None
+    ux_review_ref: str | None
+    design_approved: bool
+    # Plan
+    plan_ref: str | None
+    tasks: list[dict]  # [{"external_id": "bd-1", "title": ..., "labels": [...], "depends_on": [...]}]
+    plan_approved: bool
+    # Party-meeting results keyed by topic slug ("progressive-thinking", "threat-model", "design-laws")
+    party_results: dict
+
+    # ── Inception inputs / triage signals ──────────────────────────────
+    # Declared so the StateGraph retains them (undeclared keys are dropped).
+    enable_divergent_ideation: bool  # opt into Discover Step 0 (node name avoids key clash)
+    visual: bool  # feature has a visual/UI surface — gates UX Discovery (Step 4.5)
+    threat_signals: list[bool]  # Design threat-model triage checklist (skip/lite/full)
+    ux_signals: list[bool]  # Design design-laws triage checklist (skip/lite/full)
