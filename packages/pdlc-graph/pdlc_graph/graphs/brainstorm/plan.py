@@ -142,6 +142,7 @@ def decompose(state: PDLCState) -> dict:
 @instrumented_node("step.completed")
 def create_tasks(state: PDLCState) -> dict:
     """Step 14 — create each task, capturing bd-NN external ids."""
+    org_id = state.get("org_id") or "self-host"
     project_id = state.get("project_id") or "proj"
     store = get_task_store()
     specs = state.get("tasks") or []
@@ -149,7 +150,7 @@ def create_tasks(state: PDLCState) -> dict:
     ext_by_idx: dict[int, str] = {}
     for i, spec in enumerate(specs):
         ext_by_idx[i] = store.create(
-            project_id, spec["title"], spec.get("body", ""), spec.get("labels", [])
+            org_id, project_id, spec["title"], spec.get("body", ""), spec.get("labels", [])
         )
 
     created: list[dict] = []
@@ -169,11 +170,12 @@ def create_tasks(state: PDLCState) -> dict:
 @instrumented_node("step.completed")
 def declare_deps(state: PDLCState) -> dict:
     """Step 15 — declare each dependency (blocker -> blocked) on the store."""
+    project_id = state.get("project_id") or "proj"
     store = get_task_store()
     tasks = state.get("tasks") or []
     for t in tasks:
         for blocker in t.get("depends_on") or []:
-            store.add_dependency(blocker, t["external_id"])
+            store.add_dependency(project_id, blocker, t["external_id"])
     return {"tasks": tasks}
 
 

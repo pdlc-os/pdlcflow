@@ -48,6 +48,13 @@ class Settings(BaseSettings):
     # transport for live night-shift verdicts). Off => in-process in-memory bus.
     use_redis_bus: bool = False
 
+    # Persistence backends (Phase H bundle 3). Off => in-memory (test/dev default).
+    artifact_store: Literal["memory", "filesystem", "s3"] = "memory"
+    artifact_dir: str = "/var/lib/pdlcflow/artifacts"  # filesystem store base
+    s3_endpoint_url: str | None = None  # set for MinIO (e.g. http://minio:9000)
+    task_store: Literal["memory", "postgres"] = "memory"
+    analytics_backend: Literal["memory", "postgres"] = "memory"
+
     # Clickstream
     clickstream_sink: Literal["jsonl", "postgres", "firehose"] = "jsonl"
     firehose_stream_name: str | None = None

@@ -128,7 +128,8 @@ class Task(Base):
     body: Mapped[str | None] = mapped_column(Text)
     status: Mapped[str] = mapped_column(Text, nullable=False)
     labels: Mapped[list[str]] = mapped_column(ARRAY(String), default=list)
-    claimed_by: Mapped[UUID | None] = mapped_column(ForeignKey("users.id"))
+    depends_on: Mapped[list[str]] = mapped_column(ARRAY(String), default=list)  # blocker external_ids
+    claimed_by: Mapped[str | None] = mapped_column(Text)
     claimed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     branch: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)

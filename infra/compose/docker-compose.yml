@@ -24,6 +24,22 @@ services:
       timeout: 3s
       retries: 10
 
+  # S3-compatible object store for the artifact store (PDLC_ARTIFACT_STORE=s3,
+  # PDLC_S3_ENDPOINT_URL=http://minio:9000). Self-host default uses filesystem.
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    ports: ["9000:9000", "9001:9001"]
+    volumes: ["miniodata:/data"]
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
   api:
     build:
       context: ../../
@@ -33,6 +49,7 @@ services:
       postgres: { condition: service_healthy }
       redis:    { condition: service_healthy }
     ports: ["8000:8000"]
+    volumes: ["artifacts:/var/lib/pdlcflow/artifacts"]
 
   worker:
     build:
@@ -43,6 +60,7 @@ services:
     depends_on:
       postgres: { condition: service_healthy }
       redis:    { condition: service_healthy }
+    volumes: ["artifacts:/var/lib/pdlcflow/artifacts"]
 
   studio:
     build:
@@ -63,5 +81,7 @@ services:
 
 volumes:
   pgdata:
+  miniodata:
+  artifacts:
   caddy-data:
   caddy-config:

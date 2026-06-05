@@ -9,6 +9,7 @@ import pytest
 
 @pytest.fixture(autouse=True)
 def _reset_runtime():
+    from app.analytics import reset_analytics_store
     from app.runtime import reset_dispatcher, reset_runner, reset_runtime_ports
     from pdlc_graph.ports import reset_artifact_store, reset_task_store
 
@@ -17,4 +18,5 @@ def _reset_runtime():
     reset_dispatcher()
     reset_artifact_store()
     reset_task_store()
+    reset_analytics_store()
     yield
