@@ -1,53 +1,121 @@
 import { create } from 'zustand';
 
-interface Message {
+import { api, type Pending } from '@/lib/api';
+
+export interface TranscriptItem {
   id: string;
   role: 'user' | 'agent' | 'system';
-  persona?: string;
   text: string;
-  steps?: Array<{ kind: 'tool' | 'llm' | 'verdict' | 'pitch'; summary: string }>;
 }
+
+type Status = 'idle' | 'running' | 'awaiting' | 'complete' | 'error';
 
 interface ThreadStore {
+  // Demo tenancy — a real session would source these from auth.
+  orgId: string;
+  projectId: string;
+
   threadId: string | null;
-  messages: Message[];
-  open: (threadId: string) => void;
-  appendToken: (chunk: string) => void;
-  appendStep: (step: Message['steps'][number]) => void;
-  appendMessage: (m: Message) => void;
-  close: () => void;
+  pending: Pending | null;
+  status: Status;
+  transcript: TranscriptItem[];
+
+  start: (command: string, opts?: { feature?: string; mode?: 'sketch' | 'socratic' }) => Promise<void>;
+  answer: (answers: string[]) => Promise<void>;
+  resolveApproval: (approved: boolean, comment?: string) => Promise<void>;
+  setPending: (p: Pending | null) => void;
+  reset: () => void;
 }
 
-export const useThread = create<ThreadStore>((set) => ({
+const COMMANDS_WITH_VISUAL_SEED = new Set(['brainstorm']);
+
+function say(role: TranscriptItem['role'], text: string): TranscriptItem {
+  return { id: crypto.randomUUID(), role, text };
+}
+
+export const useThread = create<ThreadStore>((set, get) => ({
+  orgId: crypto.randomUUID(),
+  projectId: crypto.randomUUID(),
   threadId: null,
-  messages: [],
-  open: (threadId) => set({ threadId, messages: [] }),
-  appendToken: (chunk) =>
-    set((s) => {
-      const last = s.messages[s.messages.length - 1];
-      if (!last || last.role !== 'agent') {
-        return {
-          messages: [...s.messages, { id: crypto.randomUUID(), role: 'agent', text: chunk }],
-        };
-      }
-      return {
-        messages: [
-          ...s.messages.slice(0, -1),
-          { ...last, text: last.text + chunk },
+  pending: null,
+  status: 'idle',
+  transcript: [],
+
+  setPending: (p) => set({ pending: p, status: p ? 'awaiting' : get().status }),
+
+  start: async (command, opts) => {
+    const { orgId, projectId } = get();
+    set({
+      status: 'running',
+      pending: null,
+      transcript: [say('user', `/${command}${opts?.feature ? ` ${opts.feature}` : ''}`)],
+    });
+    try {
+      const res = await api.invokeCommand({
+        command,
+        org_id: orgId,
+        project_id: projectId,
+        feature: opts?.feature,
+        interaction_mode: opts?.mode ?? 'socratic',
+        // Seed the visual flag so UX Discovery (and its companion) fires.
+        seed_state: COMMANDS_WITH_VISUAL_SEED.has(command) ? { visual: true } : undefined,
+      });
+      set((s) => ({
+        threadId: res.thread_id,
+        pending: res.pending,
+        status: res.pending ? 'awaiting' : 'complete',
+        transcript: [
+          ...s.transcript,
+          say('system', res.pending ? describe(res.pending) : 'Thread completed.'),
         ],
-      };
-    }),
-  appendStep: (step) =>
-    set((s) => {
-      const last = s.messages[s.messages.length - 1];
-      if (!last) return s;
-      return {
-        messages: [
-          ...s.messages.slice(0, -1),
-          { ...last, steps: [...(last.steps ?? []), step] },
-        ],
-      };
-    }),
-  appendMessage: (m) => set((s) => ({ messages: [...s.messages, m] })),
-  close: () => set({ threadId: null, messages: [] }),
+      }));
+    } catch (e) {
+      set((s) => ({ status: 'error', transcript: [...s.transcript, say('system', String(e))] }));
+    }
+  },
+
+  answer: async (answers) => {
+    const p = get().pending;
+    if (!p) return;
+    set({ status: 'running' });
+    await advance(set, get, p.id, { answers }, say('user', answers.filter(Boolean).join(' · ')));
+  },
+
+  resolveApproval: async (approved, comment) => {
+    const p = get().pending;
+    if (!p) return;
+    set({ status: 'running' });
+    await advance(set, get, p.id, { approved, comment }, say('user', approved ? 'Approved' : 'Rejected'));
+  },
+
+  reset: () => set({ threadId: null, pending: null, status: 'idle', transcript: [] }),
 }));
+
+async function advance(
+  set: (partial: Partial<ThreadStore> | ((s: ThreadStore) => Partial<ThreadStore>)) => void,
+  get: () => ThreadStore,
+  gateId: string,
+  body: { approved?: boolean; comment?: string; answers?: string[] },
+  echo: TranscriptItem,
+) {
+  try {
+    const res = await api.resolveGate(gateId, body);
+    set((s) => ({
+      pending: res.pending,
+      status: res.pending ? 'awaiting' : 'complete',
+      transcript: [
+        ...s.transcript,
+        echo,
+        say('system', res.pending ? describe(res.pending) : 'Operation lifecycle complete. 🎉'),
+      ],
+    }));
+  } catch (e) {
+    set((s) => ({ status: 'error', transcript: [...s.transcript, say('system', String(e))] }));
+  }
+}
+
+function describe(p: Pending): string {
+  if (p.kind === 'approval') return `Approval gate: ${p.gate_kind}`;
+  const ctx = p.payload.context ? ` — ${p.payload.context}` : '';
+  return `Question round${ctx}`;
+}
