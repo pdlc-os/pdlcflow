@@ -131,5 +131,8 @@ uv run pytest        # hermetic suite — no network/DB/AWS required
 
 
 ---
+
+
+---
 <!-- nav:bottom -->
-⏮ [First: Overview](01-overview.md) · ◀ [Prev: Overview](01-overview.md) · [🏠 Home](README.md) · [Next: Configuration](03-configuration.md) ▶ · [Last: API Reference](16-api-reference.md) ⏭
+⏮ [First: Overview](01-overview.md) · ◀ [Prev: Overview](01-overview.md) · [🏠 Home](README.md) · [Next: Configuration](03-configuration.md) ▶ · [Last: Evals Framework](17-evals.md) ⏭

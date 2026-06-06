@@ -30,7 +30,7 @@ from __future__ import annotations
 from langgraph.graph import END, START, StateGraph
 
 from ... import gates
-from ...instrumentation import instrumented_node
+from ...instrumentation import evaluate, instrumented_node
 from ...interaction import ask
 from ...llm_port import complete
 from ...ports import put_artifact
@@ -199,6 +199,13 @@ def generate_docs(state: PDLCState) -> dict:
         ],
     )
     api_uri = put_artifact(project_id, f"{design_dir}/api-contracts.md", api_contracts)
+
+    # Phase J: score the design output (no-op unless evals enabled). Grounded in
+    # the architecture doc, which the data-model + API contracts derive from.
+    evaluate(
+        "design_docs", state, "\n".join([architecture, data_model, api_contracts]),
+        target="neo", sources={"architecture": architecture, "feature": feature},
+    )
 
     return {
         "design_docs": {

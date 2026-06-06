@@ -162,5 +162,8 @@ night-shift (Sketch drafts are auto-accepted).
 
 
 ---
+
+
+---
 <!-- nav:bottom -->
-⏮ [First: Overview](01-overview.md) · ◀ [Prev: Launching & Operating](04-launching.md) · [🏠 Home](README.md) · [Next: Agents](06-agents.md) ▶ · [Last: API Reference](16-api-reference.md) ⏭
+⏮ [First: Overview](01-overview.md) · ◀ [Prev: Launching & Operating](04-launching.md) · [🏠 Home](README.md) · [Next: Agents](06-agents.md) ▶ · [Last: Evals Framework](17-evals.md) ⏭

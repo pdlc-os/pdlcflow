@@ -48,4 +48,5 @@ packages = ["app"]
 [tool.pytest.ini_options]
 markers = [
     "integration: requires live Postgres/Redis/MinIO (run with PDLC_RUN_INTEGRATION=1)",
+    "eval: pdlcflow eval-harness tests (hermetic, deterministic stub judge)",
 ]

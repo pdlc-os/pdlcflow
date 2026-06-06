@@ -11,7 +11,7 @@ from __future__ import annotations
 from datetime import date as _date
 
 from ... import gates
-from ...instrumentation import instrumented_node
+from ...instrumentation import evaluate, instrumented_node
 from ...llm_port import complete
 from ...ports import put_artifact
 from ...render import render_review
@@ -80,6 +80,9 @@ def review_party(state: PDLCState) -> dict:
     )
     path = f"docs/pdlc/reviews/REVIEW_{_slug(feature)}_{today}.md"
     review_ref = put_artifact(project_id, path, review_md)
+
+    # Phase J: score the review output (no-op unless evals enabled).
+    evaluate("review", state, review_md, target="neo", sources={"feature": feature})
 
     party_results = dict(state.get("party_results") or {})
     party_results["party-review"] = {**party, "critical": 0}

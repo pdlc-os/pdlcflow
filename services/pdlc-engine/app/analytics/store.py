@@ -50,7 +50,31 @@ def _flatten(e: EventEnvelope) -> dict:
         "agent_persona": p.get("agent_persona"),
         "tokens": int(p.get("tokens_in", 0) or 0) + int(p.get("tokens_out", 0) or 0),
         "usd": float(p.get("usd_estimate", 0) or 0),
+        # Eval fields (present only on eval.scored events; None otherwise).
+        "eval_id": p.get("eval_id"),
+        "eval_dimension": p.get("dimension") if e.event_type == "eval.scored" else None,
+        "eval_target": p.get("target") if e.event_type == "eval.scored" else None,
+        "eval_score": float(p["score"]) if e.event_type == "eval.scored" and "score" in p else None,
+        "eval_passed": bool(p["passed"]) if e.event_type == "eval.scored" and "passed" in p else None,
     }
+
+
+def _agg_evals(rows: list[dict], key: str) -> dict:
+    """Group eval.scored rows by `key` -> {n, avg_score, pass_rate}."""
+    groups: dict[str, dict] = {}
+    for r in rows:
+        k = r.get(key)
+        if k is None:
+            continue
+        g = groups.setdefault(k, {"n": 0, "_sum": 0.0, "_passed": 0})
+        g["n"] += 1
+        g["_sum"] += float(r["eval_score"])
+        g["_passed"] += 1 if r.get("eval_passed") else 0
+    out = {}
+    for k, g in groups.items():
+        n = g["n"]
+        out[k] = {"n": n, "avg_score": round(g["_sum"] / n, 4), "pass_rate": round(g["_passed"] / n, 4)}
+    return out
 
 
 def _require_org(org_id: str | None) -> str:
@@ -67,6 +91,7 @@ class AnalyticsStore(Protocol):
     def feature_timeline(self, *, org_id, roadmap_id) -> list[dict]: ...
     def live(self, *, org_id, limit=50) -> list[dict]: ...
     def totals(self, *, org_id) -> dict: ...
+    def eval_summary(self, *, org_id) -> dict: ...
 
 
 class InMemoryAnalyticsStore:
@@ -121,6 +146,12 @@ class InMemoryAnalyticsStore:
     def live(self, *, org_id, limit=50) -> list[dict]:
         org_id = _require_org(org_id)
         return self._scope(org_id, None, None)[-limit:][::-1]
+
+    def eval_summary(self, *, org_id) -> dict:
+        org_id = _require_org(org_id)
+        rows = [e for e in self._scope(org_id, None, None)
+                if e["event_type"] == "eval.scored" and e.get("eval_score") is not None]
+        return {"by_eval": _agg_evals(rows, "eval_id"), "by_agent": _agg_evals(rows, "eval_target")}
 
     def totals(self, *, org_id) -> dict:
         org_id = _require_org(org_id)

@@ -145,5 +145,8 @@ each renders.
 
 
 ---
+
+
+---
 <!-- nav:bottom -->
-⏮ [First: Overview](01-overview.md) · ◀ [Prev: Utility Commands](12-utilities.md) · [🏠 Home](README.md) · [Next: Monitoring & Analytics](14-monitoring.md) ▶ · [Last: API Reference](16-api-reference.md) ⏭
+⏮ [First: Overview](01-overview.md) · ◀ [Prev: Utility Commands](12-utilities.md) · [🏠 Home](README.md) · [Next: Monitoring & Analytics](14-monitoring.md) ▶ · [Last: Evals Framework](17-evals.md) ⏭

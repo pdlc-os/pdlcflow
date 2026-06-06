@@ -41,6 +41,7 @@ graph LR
 | 14 | [Monitoring & Analytics](14-monitoring.md) | Telemetry, the Atlas Console rollups, the cross-org ban |
 | 15 | [Migrating an upstream project](15-migration.md) | scan / push / taxonomy / backfill |
 | 16 | [API & WebSocket Reference](16-api-reference.md) | Every REST endpoint + the thread WebSocket |
+| 17 | [Evals Framework](17-evals.md) | Per-agent scoring, groundedness/hallucination, drift, LLM-as-judge, eval CI |
 
 ---
 

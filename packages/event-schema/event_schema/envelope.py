@@ -57,6 +57,8 @@ EVENT_TYPES: set[str] = {
     "context.warning", "ui.viewed", "error",
     # Admin / audit
     "admin.access.denied",
+    # Evaluation (Phase J)
+    "eval.scored", "eval.blocked",
 }
 
 

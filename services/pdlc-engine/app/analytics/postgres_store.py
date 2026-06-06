@@ -99,6 +99,28 @@ class PostgresAnalyticsStore:
             rows = conn.execute(sql, {"org": org_id, "lim": limit}).mappings().all()
         return [dict(r) for r in rows]
 
+    def eval_summary(self, *, org_id) -> dict:
+        org_id = _require_org(org_id)
+
+        def _agg(group_expr: str) -> dict:
+            sql = text(
+                f"select {group_expr} as k, count(*) as n, "
+                f"avg((payload->>'score')::float) as avg_score, "
+                f"avg(case when (payload->>'passed')::boolean then 1.0 else 0.0 end) as pass_rate "
+                f"from events where org_id = :org and event_type = 'eval.scored' "
+                f"and {group_expr} is not null group by 1"
+            )
+            with self._engine.begin() as conn:
+                set_org_context(conn, org_id)
+                rows = conn.execute(sql, {"org": org_id}).mappings().all()
+            return {
+                r["k"]: {"n": int(r["n"]), "avg_score": round(float(r["avg_score"] or 0), 4),
+                         "pass_rate": round(float(r["pass_rate"] or 0), 4)}
+                for r in rows
+            }
+
+        return {"by_eval": _agg("payload->>'eval_id'"), "by_agent": _agg("payload->>'target'")}
+
     def totals(self, *, org_id) -> dict:
         org_id = _require_org(org_id)
         sql = text(

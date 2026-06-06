@@ -187,5 +187,8 @@ verdict must be mechanical. See [Night Shift](11-night-shift.md).
 
 
 ---
+
+
+---
 <!-- nav:bottom -->
-⏮ [First: Overview](01-overview.md) · ◀ [Prev: Core PDLC Flow](05-core-flow.md) · [🏠 Home](README.md) · [Next: Party Mode](07-party-mode.md) ▶ · [Last: API Reference](16-api-reference.md) ⏭
+⏮ [First: Overview](01-overview.md) · ◀ [Prev: Core PDLC Flow](05-core-flow.md) · [🏠 Home](README.md) · [Next: Party Mode](07-party-mode.md) ▶ · [Last: Evals Framework](17-evals.md) ⏭

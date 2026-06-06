@@ -246,3 +246,26 @@ class UIViewedPayload(_P):
 class ErrorPayload(_P):
     exc_type: str
     where: str  # node / route name; never a stack trace with paths
+
+
+# ---------------- Evaluation (Phase J) ----------------
+class EvalScoredPayload(_P):
+    eval_id: str
+    kind: Literal["llm_judge", "deterministic"]
+    dimension: str  # quality | groundedness | citation | faithful_relay | drift
+    target: str  # agent persona or step id being evaluated
+    trigger: str  # the step that produced the output (prd, design_docs, plan, review, ...)
+    score: float  # 0.0–1.0
+    passed: bool
+    threshold: float
+    blocking: bool
+    rationale: str = ""
+
+
+class EvalBlockedPayload(_P):
+    eval_id: str
+    gate: str  # the approval gate that was blocked
+    dimension: str
+    score: float
+    threshold: float
+    reason: str = ""
