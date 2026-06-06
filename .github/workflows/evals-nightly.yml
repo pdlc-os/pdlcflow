@@ -25,7 +25,10 @@ jobs:
       - name: sync workspace
         run: uv sync
       - name: score suite + fail on regression
-        run: uv run python scripts/run_eval_suite.py --fail-on-regress 0.0 --out eval-report-stub.json
+        # Run from a package dir so pdlc_graph is importable (the root workspace
+        # doesn't install members into its own env).
+        working-directory: packages/pdlc-graph
+        run: uv run python ../../scripts/run_eval_suite.py --fail-on-regress 0.0 --out ../../eval-report-stub.json
       - name: upload report
         if: always()
         uses: actions/upload-artifact@v4
