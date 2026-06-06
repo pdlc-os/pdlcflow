@@ -2,15 +2,14 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Depends
 
 from ...analytics import get_analytics_store
-from ._guard import require_org
+from ._guard import admin_org
 
 router = APIRouter(prefix="/evals", tags=["admin", "evals"])
 
 
 @router.get("/summary")
-def summary(org_id: str | None = Query(None)) -> dict:
-    org_id = require_org(org_id, "/admin/evals/summary")
+def summary(org_id: str = Depends(admin_org("/admin/evals/summary"))) -> dict:
     return get_analytics_store().eval_summary(org_id=org_id)

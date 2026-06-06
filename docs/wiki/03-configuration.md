@@ -59,6 +59,23 @@ Each seam is independently switchable. The left column is the dev/test default; 
 - **Dev / hermetic** — leave the flags off: every seam is in-memory, no external infra, `PDLC_WIRE_LLM=false`. This is what the test suite and `uvicorn --reload` use.
 - **SaaS** — `auth_mode=cognito`, `clickstream_sink=firehose`, S3 artifacts/events buckets, Bedrock provider, and the CDK-provisioned multi-tenant infrastructure (`infra/cdk/`). The same flags select the cloud-backed adapters.
 
+## Authentication (Phase 1 — flag-gated)
+
+Auth is **enforced only when `PDLC_AUTH_REQUIRED=true`** (default off = open API). When on:
+
+- Protected routes (`/v1/commands`, `/v1/approval-gates`, `/v1/admin/*`, `/v1/migrate/import`) and the thread WebSocket require a **Bearer JWT** (`?token=` for the WS); missing/invalid → **401**.
+- **`org_id` is derived from the token**, not the request — a mismatched `org_id` is rejected (**403**), and admin/analytics routes require the **admin**/**owner** role.
+- **First user**: set `PDLC_BOOTSTRAP_ADMIN_EMAIL` + `PDLC_BOOTSTRAP_ADMIN_PASSWORD` — on boot, if no users exist, an org + admin user are created. Then:
+
+  ```bash
+  curl -X POST localhost:8000/v1/auth/login -d '{"email":"...","password":"..."}' -H 'content-type: application/json'
+  # → {"access_token":"…","identity":{…}}   then send  Authorization: Bearer <token>
+  ```
+
+  Create more users via the admin-only `POST /v1/auth/users`. Accounts live in the user store (in-memory in dev/test; Postgres `users`/`org_members` when `PDLC_TASK_STORE=postgres`). `PDLC_AUTH_MODE=cognito` (SSO) is scaffolded for a later phase.
+
+> Auth asserts the principal at the app layer; **RLS FORCE** (a future phase) makes Postgres enforce the same org boundary at the wire. They compose — auth is the trustworthy source of `org_id` that RLS keys on.
+
 ## The "always falls back to in-memory" safety note
 
 Wiring is defensive: `wire_persistence`, `build_checkpointer`, `wire_event_bus`, and `wire_dispatcher` each try to construct the configured real backend and **fall back to the in-memory default if its infrastructure is unreachable** — logging a warning rather than crashing. So:

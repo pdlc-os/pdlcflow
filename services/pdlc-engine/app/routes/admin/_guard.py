@@ -1,44 +1,29 @@
-"""Admin access guard — enforce the cross-org analytics ban with an audit event.
+"""Admin access guard — tenant + role enforcement for the Atlas Console routes.
 
-Data routes pass their `org_id` (optional query param) through `require_org`.
-A missing/blank org_id emits an `admin.access.denied` audit event and raises
-403 — cross-org analytics are banned by design (plan §5.3).
+`admin_org(label)` returns a FastAPI dependency that resolves the effective org
+for an admin data route:
+
+- **auth off** → behaves like the original cross-org ban: an `org_id` query param
+  is required (missing → 403 + `admin.access.denied`).
+- **auth on**  → the org comes from the JWT (a mismatched `org_id` query is
+  rejected), and the caller must hold the `admin`/`owner` role.
+
+Routes use it as `org_id: str = Depends(admin_org("/admin/<route>"))`, replacing
+both the raw query param and the old `require_org(...)` call.
 """
 
 from __future__ import annotations
 
-import logging
-from uuid import UUID
+from fastapi import Depends, Query
 
-from fastapi import HTTPException
-
-log = logging.getLogger("pdlc.admin.guard")
-
-_ZERO = UUID(int=0)
+from ...auth.local import Identity, get_principal, resolve_org
 
 
-def _audit_denied(label: str) -> None:
-    try:
-        from event_schema import EventEnvelope
+def admin_org(label: str):
+    def _dep(
+        org_id: str | None = Query(None),
+        principal: Identity | None = Depends(get_principal),
+    ) -> str:
+        return resolve_org(principal, org_id, label, admin=True)
 
-        from ...clickstream import get_emitter
-
-        env = EventEnvelope(
-            event_type="admin.access.denied",
-            org_id=_ZERO,
-            project_id=_ZERO,
-            payload={"path": label, "reason": "missing org_id"},
-        )
-        get_emitter().emit_envelope(env)
-    except Exception as exc:  # best-effort audit; never mask the 403
-        log.warning("admin.access.denied audit emit failed: %s", exc)
-
-
-def require_org(org_id: str | None, label: str) -> str:
-    if not org_id:
-        _audit_denied(label)
-        raise HTTPException(
-            status_code=403,
-            detail="org_id required — cross-org analytics are not permitted",
-        )
-    return org_id
+    return _dep

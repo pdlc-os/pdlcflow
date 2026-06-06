@@ -23,6 +23,8 @@ def pytest_collection_modifyitems(config, items):
 @pytest.fixture(autouse=True)
 def _reset_runtime():
     from app.analytics import reset_analytics_store
+    from app.auth.store import reset_user_store
+    from app.config import settings
     from app.runtime import reset_dispatcher, reset_runner, reset_runtime_ports
     from pdlc_graph.evals import reset_eval_config, reset_judge_backend
     from pdlc_graph.llm_port import reset_token_publisher
@@ -37,4 +39,7 @@ def _reset_runtime():
     reset_eval_config()
     reset_judge_backend()
     reset_token_publisher()
+    reset_user_store()
+    settings.auth_required = False  # default off; auth tests opt in explicitly
     yield
+    settings.auth_required = False

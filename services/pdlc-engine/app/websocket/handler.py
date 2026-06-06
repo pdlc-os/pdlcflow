@@ -15,13 +15,33 @@ import contextlib
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
+from ..config import settings
 from ..runtime import get_event_bus
 
 ws_router = APIRouter()
 
 
+def _authorize(thread_id: str, token: str | None) -> bool:
+    """When auth is enforced, the `?token=` JWT must be valid and its org must
+    match the thread's org prefix (thread_id = org:project:session). Open otherwise."""
+    if not settings.auth_required:
+        return True
+    if not token:
+        return False
+    try:
+        from ..auth.local import _decode
+
+        identity = _decode(token)
+    except Exception:
+        return False
+    return thread_id.split(":", 1)[0] == identity.org_id
+
+
 @ws_router.websocket("/ws/threads/{thread_id}")
-async def thread_socket(socket: WebSocket, thread_id: str) -> None:
+async def thread_socket(socket: WebSocket, thread_id: str, token: str | None = None) -> None:
+    if not _authorize(thread_id, token):
+        await socket.close(code=4401)  # policy violation / unauthorized
+        return
     await socket.accept()
     bus = get_event_bus()
     channel = f"thread:{thread_id}"
