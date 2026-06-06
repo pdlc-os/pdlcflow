@@ -24,11 +24,26 @@ def test_alembic_schema_present():
     assert {"events", "tasks", "approval_gates", "organizations", "projects"} <= names
 
 
+def _seed_project() -> tuple[str, str]:
+    """Insert a real org → squad → project so tasks satisfy their FK."""
+    from sqlalchemy import insert
+
+    from app.db.models import Organization, Project, Squad
+    from app.db.session import get_sync_engine
+
+    org_id, squad_id, proj_id = uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
+    with get_sync_engine(settings).begin() as c:
+        c.execute(insert(Organization).values(id=org_id, name="Acme", slug=f"acme-{org_id.hex[:8]}", settings={}))
+        c.execute(insert(Squad).values(id=squad_id, org_id=org_id, name="Core", slug=f"core-{squad_id.hex[:8]}"))
+        c.execute(insert(Project).values(id=proj_id, org_id=org_id, squad_id=squad_id, name="App", slug=f"app-{proj_id.hex[:8]}"))
+    return str(org_id), str(proj_id)
+
+
 def test_postgres_task_store_external_id_and_atomic_claim():
     from app.persistence.tasks import PostgresTaskStore
 
     store = PostgresTaskStore(settings)
-    org, proj = str(uuid.uuid4()), str(uuid.uuid4())
+    org, proj = _seed_project()
     a = store.create(org, proj, "data model", "body", ["domain:backend"], external_id="bd-1")
     b = store.create(org, proj, "api", "body", [], external_id="bd-2")
     assert a == "bd-1" and b == "bd-2"
