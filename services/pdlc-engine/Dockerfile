@@ -8,14 +8,19 @@ RUN pip install --no-cache-dir uv
 
 WORKDIR /app
 
-# Copy workspace manifest + the two upstream packages this service depends on
-COPY ../../pyproject.toml /workspace/pyproject.toml
-COPY ../../packages/event-schema /workspace/packages/event-schema
-COPY ../../packages/pdlc-graph /workspace/packages/pdlc-graph
-COPY . /workspace/services/pdlc-engine
+# Build context is the repo root (docker-compose `context: ../../`), so COPY
+# paths are repo-root-relative. uv resolves the whole workspace, so every member
+# declared in the root pyproject must be present. `scripts/` carries the eval
+# suite runner used by the `evals` one-shot service.
+COPY pyproject.toml /workspace/pyproject.toml
+COPY packages/event-schema /workspace/packages/event-schema
+COPY packages/pdlc-graph /workspace/packages/pdlc-graph
+COPY tools/pdlc-migrate /workspace/tools/pdlc-migrate
+COPY services/pdlc-engine /workspace/services/pdlc-engine
+COPY scripts /workspace/scripts
 
 WORKDIR /workspace/services/pdlc-engine
-RUN uv sync --frozen=false
+RUN uv sync
 
 EXPOSE 8000
 ENV PYTHONUNBUFFERED=1

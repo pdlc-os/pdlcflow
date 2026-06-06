@@ -14,6 +14,47 @@ Then open <http://localhost:8080> for Studio.
 
 The engine listens on <http://localhost:8000> with `/health` available for smoke checks.
 
+## Validate live token streaming + real evals (with credentials)
+
+The streaming + eval paths default to the offline stub. To exercise them against a
+real model locally, in `.env`:
+
+```bash
+PDLC_WIRE_LLM=true          # route completions + the eval judge through the provider factory
+PDLC_STREAM_TOKENS=true     # live "drafting" preview (already on in .env.example)
+PDLC_RUN_EVALS=true         # score agent output at major steps
+PDLC_DEFAULT_LLM_PROVIDER=bedrock
+AWS_ACCESS_KEY_ID=AKIA...   # the active provider's creds (reach api+worker via env_file)
+AWS_SECRET_ACCESS_KEY=...
+AWS_REGION=us-east-1
+# (or ANTHROPIC_API_KEY / OPENAI_API_KEY / GOOGLE_API_KEY + the matching provider)
+```
+
+Then:
+
+```bash
+docker compose up --build
+```
+
+- **Live streaming:** open Studio (<http://localhost:8080>), run `/brainstorm`, and watch the
+  transient "…is drafting" preview fill token-by-token as agents generate (it clears on each
+  question/gate/result). The browser's WebSocket is proxied to the API by nginx.
+- **Real evals during a run:** drive a brainstorm; eval scores land at
+  <http://localhost:8000/v1/admin/evals/summary?org_id=YOUR_ORG> (avg score + pass rate, by
+  eval and by agent).
+- **Real eval golden suite (one-shot):**
+
+  ```bash
+  docker compose --profile evals run --rm evals
+  ```
+
+  Scores the golden suite with the real judge and prints a JSON report. Without credentials it
+  degrades gracefully (judge errors → neutral scores) — proof the path is wired; add creds for
+  real numbers.
+
+> Note: `PDLC_RUN_EVALS` adds judge LLM calls per major step (extra cost). Leave it off for
+> normal use; turn it on to validate or to gather quality baselines.
+
 ## TLS (Caddy reverse proxy)
 
 ```bash
