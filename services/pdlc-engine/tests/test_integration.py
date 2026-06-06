@@ -168,6 +168,78 @@ def test_rls_force_blocks_cross_org_as_non_owner_role():
     assert seen_b == 0 and seen_a >= 1
 
 
+def test_org_members_rls_locked_but_login_works_via_definer():
+    """org_members is RLS-FORCEd: the non-owner role can't read another org's
+    membership directly, yet login still works through the SECURITY DEFINER
+    `auth_lookup` function (which runs before any org context exists)."""
+    import uuid as _uuid
+
+    from app.db.session import _sync_url
+    from sqlalchemy import create_engine, text
+
+    owner_url = _sync_url(settings.db_url)
+    owner = create_engine(owner_url, future=True)
+    sfx = _uuid.uuid4().hex[:8]
+    org_a, org_b = _uuid.uuid4(), _uuid.uuid4()
+    user_a, user_b = _uuid.uuid4(), _uuid.uuid4()
+
+    # As the superuser owner (bypasses RLS): ensure the app role + grants, then
+    # seed two orgs each with one admin user.
+    with owner.begin() as c:
+        c.execute(text(
+            "do $$ begin if not exists (select from pg_roles where rolname='pdlc_app') "
+            "then create role pdlc_app login password 'pdlc_app' nosuperuser; end if; end $$;"
+        ))
+        c.execute(text("grant usage on schema public to pdlc_app"))
+        c.execute(text("grant select, insert on all tables in schema public to pdlc_app"))
+        c.execute(text("grant execute on function auth_lookup(text) to pdlc_app"))
+        c.execute(text(
+            "insert into organizations (id,name,slug,settings,created_at) "
+            "values (:a,'A',:sa,'{}'::jsonb,now()), (:b,'B',:sb,'{}'::jsonb,now())"
+        ), {"a": org_a, "b": org_b, "sa": f"a-{sfx}", "sb": f"b-{sfx}"})
+        c.execute(text("insert into users (id,email,created_at) values (:a,:ea,now()),(:b,:eb,now())"),
+                  {"a": user_a, "b": user_b, "ea": f"alice-{sfx}@x.io", "eb": f"bob-{sfx}@x.io"})
+        c.execute(text("insert into org_members (org_id,user_id,role) values (:oa,:ua,'admin'),(:ob,:ub,'admin')"),
+                  {"oa": org_a, "ua": user_a, "ob": org_b, "ub": user_b})
+
+    app_url = owner_url.split("://", 1)[1].split("@", 1)[1]
+    app_engine = create_engine(f"postgresql+psycopg://pdlc_app:pdlc_app@{app_url}", future=True)
+
+    # Login: auth_lookup resolves alice's org with NO org context (definer bypass).
+    with app_engine.begin() as c:
+        row = c.execute(text("select org_id from auth_lookup(:e)"), {"e": f"alice-{sfx}@x.io"}).first()
+    assert row is not None and str(row.org_id) == str(org_a)
+
+    # Direct read: scoped to org A sees only A's member; org B is invisible.
+    with app_engine.begin() as c:
+        c.execute(text("select set_config('app.org_id', :v, true)"), {"v": str(org_a)})
+        n_a = c.execute(text("select count(*) from org_members")).scalar()
+        sees_b = c.execute(text("select count(*) from org_members where org_id=:b"), {"b": str(org_b)}).scalar()
+    assert n_a == 1 and sees_b == 0
+
+    # With no org context, the app role sees no membership at all.
+    with app_engine.begin() as c:
+        assert c.execute(text("select count(*) from org_members")).scalar() == 0
+
+
+def test_postgres_user_store_create_and_login_roundtrip():
+    """The real PostgresUserStore: create_org + create_user (org_members under
+    RLS) + get_by_email through auth_lookup."""
+    from app.auth.passwords import hash_password, verify_password
+    from app.auth.store import PostgresUserStore
+
+    store = PostgresUserStore(settings)
+    email = f"user-{uuid.uuid4().hex[:8]}@example.test"
+    org_id = store.create_org("roundtrip-org")
+    store.create_user(org_id=org_id, email=email, pw_hash=hash_password("pw-123456"), role="admin")
+
+    rec = store.get_by_email(email)
+    assert rec is not None
+    assert rec["org_id"] == org_id and rec["role"] == "admin"
+    assert verify_password("pw-123456", rec["pw_hash"])
+    assert store.get_by_email("nobody@example.test") is None
+
+
 def test_s3_artifact_roundtrip_against_minio():
     from app.persistence.artifacts import S3ArtifactStore
 
