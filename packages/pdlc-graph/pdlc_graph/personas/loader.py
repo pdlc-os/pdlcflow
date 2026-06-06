@@ -1,13 +1,13 @@
 """Reads persona soul-spec markdown files.
 
-The 10 persona files (atlas.md, bolt.md, echo.md, friday.md, jarvis.md,
-muse.md, neo.md, phantom.md, pulse.md, sentinel.md) are verbatim copies
-of upstream pdlc/agents/*.md and serve as the system prompt for each
-persona's create_react_agent.
+The 9 LLM persona files (atlas.md, bolt.md, echo.md, friday.md, jarvis.md,
+muse.md, neo.md, phantom.md, pulse.md) are adapted from upstream pdlc/agents/*.md
+and serve as the system prompt for each persona's create_react_agent.
 
 Sentinel is loaded for completeness but never invoked as an LLM — the
 deterministic Python evaluator in pdlc_graph/sentinel/evaluator.py is
-the real implementation. See agents/sentinel.md "Operating Precondition".
+the real implementation. sentinel.md is its contract/character spec
+(rewritten for pdlcflow — no Claude Code / JS-hook mechanics).
 """
 
 from __future__ import annotations
