@@ -74,7 +74,7 @@ jobs:
       - name: setup python
         run: uv python install 3.12
       - name: sync workspace
-        run: uv sync --extra dev
+        run: uv sync
       - name: start minio
         run: |
           docker run -d --name minio -p 9000:9000 \
