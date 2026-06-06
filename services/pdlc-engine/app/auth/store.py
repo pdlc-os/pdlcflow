@@ -66,21 +66,19 @@ class PostgresUserStore:
             return int(conn.execute(select(func.count()).select_from(User)).scalar() or 0)
 
     def get_by_email(self, email: str) -> UserRecord | None:
-        from sqlalchemy import select
-
-        from ..db.models import OrgMember, User
+        # Go through the SECURITY DEFINER `auth_lookup` so login works even though
+        # org_members is RLS-FORCEd (no org context exists yet at login time).
+        from sqlalchemy import text
 
         with self._engine.begin() as conn:
             row = conn.execute(
-                select(User.id, User.email, User.password_hash, OrgMember.org_id, OrgMember.role)
-                .join(OrgMember, OrgMember.user_id == User.id)
-                .where(User.email == email.lower())
-                .limit(1)
+                text("select user_id, org_id, role, password_hash from auth_lookup(:e)"),
+                {"e": email.lower()},
             ).first()
         if row is None:
             return None
         return UserRecord(
-            user_id=str(row.id), email=row.email, org_id=str(row.org_id),
+            user_id=str(row.user_id), email=email.lower(), org_id=str(row.org_id),
             role=row.role, pw_hash=row.password_hash or "",
         )
 
@@ -99,10 +97,13 @@ class PostgresUserStore:
         from sqlalchemy import insert
 
         from ..db.models import OrgMember, User
+        from ..db.rls import set_org_context
 
         user_id = uuid4()
         with self._engine.begin() as conn:
             conn.execute(insert(User).values(id=user_id, email=email.lower(), password_hash=pw_hash))
+            # org_members is RLS-FORCEd — bind app.org_id so the WITH CHECK passes.
+            set_org_context(conn, org_id)
             conn.execute(insert(OrgMember).values(org_id=org_id, user_id=user_id, role=role))
         return str(user_id)
 

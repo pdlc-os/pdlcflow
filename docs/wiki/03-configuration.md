@@ -83,9 +83,9 @@ Auth is **enforced only when `PDLC_AUTH_REQUIRED=true`** (default off = open API
 - **`PDLC_DB_URL`** → the app role (`pdlc_app`), created by the compose Postgres init script (`postgres-init/01-app-role.sql`) with `ALTER DEFAULT PRIVILEGES` so owner-created tables auto-grant it DML.
 - **`PDLC_MIGRATION_DB_URL`** → the owner (`postgres`) — DDL + `FORCE` run here (`alembic upgrade head`). Defaults to `PDLC_DB_URL` when unset (single-role dev, no enforcement).
 - Every adapter sets `app.org_id` per transaction (`db.rls.set_org_context`), so the app sees only its org's rows; an insert/read for another org returns nothing / is rejected **at the database**.
-- **`org_members` is intentionally not RLS-scoped** — login resolves a user's org by email before any org context exists. Membership is scoped at the app layer; a `SECURITY DEFINER` auth-lookup function is the documented follow-on to also lock it at the DB.
+- **`org_members` is RLS-locked too** (`0004`). Login can't be org-scoped (it resolves a user's org by email *before* any context exists), so it goes through a narrow **`SECURITY DEFINER` `auth_lookup(email)`** function (owned by a superuser → bypasses RLS for that one lookup, `EXECUTE` granted only to the app role). The app role can therefore log a user in but **cannot** read another org's membership directly.
 
-Verified against real Postgres (the `integration` CI job + `test_rls_force_blocks_cross_org_as_non_owner_role`): as the non-owner role, cross-org reads return zero rows and cross-org inserts are rejected.
+Verified against real Postgres (the `integration` CI job): as the non-owner role, cross-org reads return zero rows and cross-org inserts are rejected (`test_rls_force_blocks_cross_org_as_non_owner_role`); `org_members` is invisible cross-org yet login still works via the definer (`test_org_members_rls_locked_but_login_works_via_definer`).
 
 ## The "always falls back to in-memory" safety note
 

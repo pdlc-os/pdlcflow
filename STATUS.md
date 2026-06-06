@@ -184,3 +184,10 @@ Delivered incrementally (one PR per bundle). Auth deferred. Every adapter is fla
 - [ ] Follow-ons: `SECURITY DEFINER` auth-lookup so org_members can also be RLS-locked; rotate the `pdlc_app` dev password; Cognito/OIDC SSO.
 
 **Auth + RLS arc complete (Phases 1–3):** app-layer auth derives org from the JWT, the Studio logs in, and Postgres independently enforces the same org boundary — defense in depth. All flag-gated; default-off keeps dev/CI hermetic.
+
+## Phase 3.1 — RLS-lock org_members via SECURITY DEFINER login (✅ verified vs real Postgres)
+
+- [x] **`0004_auth_lookup`**: a narrow `SECURITY DEFINER` `auth_lookup(email)` (owned by the superuser → bypasses RLS for the pre-context login lookup; `EXECUTE` granted only to `pdlc_app`, revoked from PUBLIC), then **org_members re-ENABLED + FORCEd** with its policy. Closes the one gap left by 0003.
+- [x] **`PostgresUserStore`**: `get_by_email` now calls `auth_lookup(...)` (so login works under the lock); `create_user` sets `app.org_id` before the org_members insert (WITH CHECK).
+- [x] **Verified live** (docker): `test_org_members_rls_locked_but_login_works_via_definer` — as `pdlc_app`, `auth_lookup` resolves a user's org with no context, but a direct `org_members` read is org-scoped (own org sees its member; other org invisible; no-context sees nothing). `test_postgres_user_store_create_and_login_roundtrip` exercises the adapter end-to-end. Full hermetic suite green (217); ruff clean.
+- [ ] Follow-ons: rotate the `pdlc_app` dev password; Cognito/OIDC SSO. The DB-level tenant-isolation guarantee now covers **every** org-scoped table (no caveats).
