@@ -20,7 +20,7 @@ pdlcflow/
 ├── apps/
 │   └── studio/                # React + Vite + Tailwind + shadcn/ui + Chainlit-inspired tokens
 ├── packages/
-│   ├── event-schema/          # Pydantic envelope + 37 typed payloads + registry doc
+│   ├── event-schema/          # Pydantic envelope + 40-event taxonomy + registry doc
 │   └── pdlc-graph/            # LangGraph engine: meta-graph, phase subgraphs, party meetings, personas, Sentinel evaluator
 ├── services/
 │   └── pdlc-engine/           # FastAPI: routes, WS, clickstream, DB models, 7-provider LLM factory, Alembic
@@ -87,11 +87,11 @@ pnpm cdk deploy --all
 
 ## Documentation
 
-- **[Wiki](./docs/wiki/README.md)** — install, launch, use & monitor pdlcflow; the core PDLC flow + specialized flows (agents, party mode, night-shift, utilities, migration), with mermaid diagrams.
+- **[Wiki](./docs/wiki/README.md)** — install, launch, use & monitor pdlcflow; the core PDLC flow + specialized flows (agents, party mode, night-shift, utilities, migration, evals), with mermaid diagrams.
+- **[Deploy guide](./deploy/README.md)** — run from published images with no clone (`setup.sh` wizard).
+- [Changelog](./CHANGELOG.md) · [Phase tracker](./STATUS.md)
+- [Self-host README](./infra/compose/README.md) · [SaaS / CDK README](./infra/cdk/README.md)
 - [Architecture proposal](./docs/.research/.langgraph-bedrock-saas-migration-2026-06-05.md) — 15 sections, 5 mermaid diagrams.
-- [Self-host README](./infra/compose/README.md)
-- [SaaS / CDK README](./infra/cdk/README.md)
-- [Phase tracker](./STATUS.md)
 
 ## License
 

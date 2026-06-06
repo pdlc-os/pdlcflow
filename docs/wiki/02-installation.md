@@ -3,7 +3,35 @@
 
 # Installation
 
-This page covers installing pdlcflow for **self-host** via Docker Compose (the recommended path) and the **dev** path (no Docker) using `uv` and `pnpm`.
+Three ways to run pdlcflow:
+
+1. **Deploy from published images** (recommended — no clone) — `docker` + a few files from `deploy/`.
+2. **Self-host from source** — clone + `docker compose up --build` (for local changes).
+3. **Dev** (no Docker) — `uv` + `pnpm` for working on the code.
+
+## Deploy from published images (no clone)
+
+Run the whole stack from prebuilt **GHCR** images — you only need Docker + three files
+(not the source). This is the easiest way to stand up or distribute pdlcflow.
+
+```bash
+base=https://raw.githubusercontent.com/pdlc-os/pdlcflow/main/deploy
+mkdir pdlcflow && cd pdlcflow
+curl -fsSLO $base/docker-compose.yml
+curl -fsSL  $base/setup.sh -o setup.sh && chmod +x setup.sh
+mkdir -p postgres-init && curl -fsSL $base/postgres-init/01-app-role.sh -o postgres-init/01-app-role.sh
+
+./setup.sh                  # interactive: prompts for the few real choices, generates
+                            # secrets (JWT + DB passwords), writes .env. No hand-editing.
+docker compose up -d
+docker compose run --rm api uv run alembic upgrade head
+```
+
+Then open **http://localhost:8080** (Studio) and **http://localhost:8000/health** (API).
+`setup.sh` asks only: image version · require-login (+ bootstrap admin) · real LLM provider +
+credentials · run evals — everything else is defaulted. Prefer manual config? `curl` the
+`.env.example`, copy to `.env`, edit, and `docker compose up -d`. Pin a release with
+`PDLCFLOW_VERSION=1.5.0` in `.env`. Full details: [`deploy/README.md`](https://github.com/pdlc-os/pdlcflow/blob/main/deploy/README.md).
 
 ## Prerequisites
 
