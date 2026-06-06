@@ -1,6 +1,7 @@
 // WebSocket client with auto-reconnect — matches the engine's thread channel.
 
 import type { Pending } from './api';
+import { getToken } from './token';
 
 export interface NightShiftFrame {
   type: 'night_shift.started' | 'night_shift.verdict' | 'night_shift.completed' | 'night_shift.aborted';
@@ -29,7 +30,9 @@ export interface ConnectOpts {
 
 export function connect(opts: ConnectOpts): () => void {
   const proto = window.location.protocol === 'https:' ? 'wss' : 'ws';
-  const url = `${proto}://${window.location.host}/ws/threads/${opts.threadId}`;
+  const token = getToken();
+  const qs = token ? `?token=${encodeURIComponent(token)}` : '';
+  const url = `${proto}://${window.location.host}/ws/threads/${opts.threadId}${qs}`;
   let socket: WebSocket | null = null;
   let closed = false;
   let attempt = 0;

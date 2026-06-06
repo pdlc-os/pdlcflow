@@ -21,6 +21,17 @@ origin; no CORS config is needed in dev. The API base is hard-coded to `/v1`
 (`lib/api.ts`) and the WebSocket URL is derived from `window.location`
 (`lib/ws.ts`), so the same build works in both modes.
 
+## Signing in (when auth is enabled)
+
+When the engine runs with `PDLC_AUTH_REQUIRED=true`, the Studio shows a **login overlay**
+(email + password → `POST /v1/auth/login`). On success the JWT + identity are stored in
+`localStorage`, the token is attached as a `Bearer` header on every REST call and as
+`?token=` on the WebSocket, and the Studio binds its **org to the token's org** (so requests
+match the authenticated principal). The header shows the signed-in user with a **Sign out**
+control; a **Sign in** button lets you authenticate proactively. A `401` from any call
+re-opens the overlay. When auth is **off** (default), no token is sent and the Studio works
+exactly as before. (Auth state: `store/useAuth.ts` + `lib/token.ts`.)
+
 ## Layout
 
 `AppShell.tsx` is the frame: a top bar with Org / Squad / Initiative / Project
