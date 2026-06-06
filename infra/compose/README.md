@@ -59,7 +59,7 @@ docker compose up --build
 
 The app connects as the **non-superuser `pdlc_app`** role (`PDLC_DB_URL`) so Postgres RLS is
 enforced; **migrations run as the owner** (`PDLC_MIGRATION_DB_URL=postgres`). The `pdlc_app`
-role is created on first DB init by `postgres-init/01-app-role.sql` (change its dev password
+role is created on first DB init by `postgres-init/01-app-role.sh` (change its dev password
 for real use). Apply migrations (as the owner — the api container's env routes alembic to the
 migration URL automatically):
 

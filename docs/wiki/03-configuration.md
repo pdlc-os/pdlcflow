@@ -80,7 +80,7 @@ Auth is **enforced only when `PDLC_AUTH_REQUIRED=true`** (default off = open API
 
 `0002` enables RLS + an `org_id = current_setting('app.org_id')` policy on the org-scoped tables; `0003` **FORCE**s it on the tenant-content tables. Because superusers bypass RLS, the **app connects as a non-superuser role** so the policy actually applies:
 
-- **`PDLC_DB_URL`** → the app role (`pdlc_app`), created by the compose Postgres init script (`postgres-init/01-app-role.sql`) with `ALTER DEFAULT PRIVILEGES` so owner-created tables auto-grant it DML.
+- **`PDLC_DB_URL`** → the app role (`pdlc_app`), created by the compose Postgres init script (`postgres-init/01-app-role.sh`) with `ALTER DEFAULT PRIVILEGES` so owner-created tables auto-grant it DML.
 - **`PDLC_MIGRATION_DB_URL`** → the owner (`postgres`) — DDL + `FORCE` run here (`alembic upgrade head`). Defaults to `PDLC_DB_URL` when unset (single-role dev, no enforcement).
 - Every adapter sets `app.org_id` per transaction (`db.rls.set_org_context`), so the app sees only its org's rows; an insert/read for another org returns nothing / is rejected **at the database**.
 - **`org_members` is RLS-locked too** (`0004`). Login can't be org-scoped (it resolves a user's org by email *before* any context exists), so it goes through a narrow **`SECURITY DEFINER` `auth_lookup(email)`** function (owned by a superuser → bypasses RLS for that one lookup, `EXECUTE` granted only to the app role). The app role can therefore log a user in but **cannot** read another org's membership directly.

@@ -191,3 +191,10 @@ Delivered incrementally (one PR per bundle). Auth deferred. Every adapter is fla
 - [x] **`PostgresUserStore`**: `get_by_email` now calls `auth_lookup(...)` (so login works under the lock); `create_user` sets `app.org_id` before the org_members insert (WITH CHECK).
 - [x] **Verified live** (docker): `test_org_members_rls_locked_but_login_works_via_definer` — as `pdlc_app`, `auth_lookup` resolves a user's org with no context, but a direct `org_members` read is org-scoped (own org sees its member; other org invisible; no-context sees nothing). `test_postgres_user_store_create_and_login_roundtrip` exercises the adapter end-to-end. Full hermetic suite green (217); ruff clean.
 - [ ] Follow-ons: rotate the `pdlc_app` dev password; Cognito/OIDC SSO. The DB-level tenant-isolation guarantee now covers **every** org-scoped table (no caveats).
+
+## Distribution — deploy from published images (✅ no clone required)
+
+- [x] **`release-images` workflow**: on a version tag (or manual dispatch), builds + pushes multi-arch (`amd64`+`arm64`) `ghcr.io/pdlc-os/pdlcflow-api` and `pdlcflow-studio` images to GHCR (semver + `latest`).
+- [x] **`deploy/`**: a standalone `docker-compose.yml` (image refs, no `build:`), an interactive **`setup.sh`** (prompts for the few real choices, generates secrets, writes `.env` — with the pdlcflow/PDLC banner), `.env.example` for manual config, the env-driven `postgres-init/01-app-role.sh`, and a README. Users `curl` 3 files → `setup.sh` → `docker compose up` → migrate.
+- [x] **Verified end-to-end with real Docker**: fresh-built images boot the full standalone stack — env-driven `pdlc_app` role created (non-super), migrations 0001→0004 apply as owner, app runs as `pdlc_app` under RLS (`POST /v1/commands` → 200), `/health` ok, Studio 200, admin cross-org → 403.
+- [x] Postgres role-init converted to an **env-driven shell script** (`PDLC_APP_DB_PASSWORD`) in both compose setups — no committed-file editing. Root README + wiki updated.

@@ -1,0 +1,85 @@
+# pdlcflow — standalone deployment from published images (no repo clone needed).
+#
+#   1. curl this file + .env.example + postgres-init/ into a directory
+#   2. ./setup.sh          (interactive — generates .env)  OR  cp .env.example .env && edit
+#   3. docker compose up -d
+#   4. docker compose run --rm api uv run alembic upgrade head
+#
+# Images are pulled from GHCR; pin a release with PDLCFLOW_VERSION in .env.
+name: pdlcflow
+
+x-version: &version ${PDLCFLOW_VERSION:-latest}
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-pdlc}
+      POSTGRES_DB: pdlc
+      PDLC_APP_DB_PASSWORD: ${PDLC_APP_DB_PASSWORD:-pdlc_app}  # used by postgres-init/01-app-role.sh
+    volumes:
+      - "pgdata:/var/lib/postgresql/data"
+      - "./postgres-init:/docker-entrypoint-initdb.d:ro"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+    ports: ["9000:9000", "9001:9001"]
+    volumes: ["miniodata:/data"]
+
+  api:
+    image: ghcr.io/pdlc-os/pdlcflow-api:${PDLCFLOW_VERSION:-latest}
+    env_file: .env
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    ports: ["8000:8000"]
+    volumes: ["artifacts:/var/lib/pdlcflow/artifacts"]
+
+  worker:
+    image: ghcr.io/pdlc-os/pdlcflow-api:${PDLCFLOW_VERSION:-latest}
+    command: ["uv", "run", "arq", "app.worker.arq_settings.WorkerSettings"]
+    env_file: .env
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    volumes: ["artifacts:/var/lib/pdlcflow/artifacts"]
+
+  studio:
+    image: ghcr.io/pdlc-os/pdlcflow-studio:${PDLCFLOW_VERSION:-latest}
+    depends_on: [api]
+    ports: ["8080:80"]
+
+  # One-shot: score the eval golden suite with the real judge (needs PDLC_WIRE_LLM
+  # + creds in .env).  docker compose --profile evals run --rm evals
+  evals:
+    profiles: ["evals"]
+    image: ghcr.io/pdlc-os/pdlcflow-api:${PDLCFLOW_VERSION:-latest}
+    env_file: .env
+    environment:
+      PDLC_RUN_EVALS: "1"
+      PDLC_WIRE_LLM: "true"
+    working_dir: /workspace/services/pdlc-engine
+    command: ["uv", "run", "python", "/workspace/scripts/run_eval_suite.py", "--real"]
+
+volumes:
+  pgdata:
+  miniodata:
+  artifacts:
