@@ -52,26 +52,33 @@ class PostgresTaskStore:
             )
         return external_id
 
-    def add_dependency(self, project_id: str, blocker_external_id: str, blocked_external_id: str) -> None:
+    def add_dependency(
+        self, org_id: str, project_id: str, blocker_external_id: str, blocked_external_id: str
+    ) -> None:
         with self._engine.begin() as conn:
+            set_org_context(conn, org_id)  # RLS
             conn.execute(
                 update(Task)
                 .where(Task.project_id == project_id, Task.external_id == blocked_external_id)
                 .values(depends_on=func.array_append(Task.depends_on, blocker_external_id))
             )
 
-    def list(self, project_id: str) -> list[dict]:
+    def list(self, org_id: str, project_id: str) -> list[dict]:
         with self._engine.begin() as conn:
+            set_org_context(conn, org_id)  # RLS
             rows = conn.execute(
                 select(Task).where(Task.project_id == project_id).order_by(Task.external_id)
             ).mappings().all()
         return [dict(r) for r in rows]
 
-    def claim(self, project_id: str, external_id: str, branch: str, claimed_by: str) -> bool:
+    def claim(
+        self, org_id: str, project_id: str, external_id: str, branch: str, claimed_by: str
+    ) -> bool:
         """Atomic claim. Returns False if the task is already claimed or the
         branch is taken in the project (rejected by the unique partial index)."""
         try:
             with self._engine.begin() as conn:
+                set_org_context(conn, org_id)  # RLS
                 res = conn.execute(
                     update(Task)
                     .where(

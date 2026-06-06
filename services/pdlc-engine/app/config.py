@@ -48,6 +48,9 @@ class Settings(BaseSettings):
     wire_llm: bool = False
     use_postgres_checkpointer: bool = False
     pg_pool_max_size: int = 20
+    # When RLS is enforced the app connects as a non-owner role (db_url); DDL /
+    # migrations run as the owner. Defaults to db_url when unset (single-role dev).
+    migration_db_url: str | None = None
     # use_arq_dispatch: enqueue graph turns to the Arq worker instead of running
     # them inline in the API (needs Redis + the Redis bus for pending delivery).
     use_arq_dispatch: bool = False

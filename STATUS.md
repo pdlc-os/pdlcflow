@@ -174,3 +174,13 @@ Delivered incrementally (one PR per bundle). Auth deferred. Every adapter is fla
 - [x] **Shell**: header shows the user + Sign out, or a Sign in button (proactive); a 401 re-opens login. **Auth off (default) → no token sent, Studio unchanged.**
 - [x] Studio `tsc` + `vite build` clean. With this, `PDLC_AUTH_REQUIRED=true` works end-to-end in the browser.
 - [ ] Next: Phase 3 (RLS FORCE — non-owner DB role + org threaded through the remaining reads + integration tests). Cognito/OIDC SSO login is a later add.
+
+## Phase 3 — RLS FORCE (✅ DB-enforced tenant isolation, verified vs real Postgres)
+
+- [x] **Non-superuser app role**: the app connects as `pdlc_app` (`PDLC_DB_URL`) so RLS applies (superusers bypass it); migrations run as the owner (`PDLC_MIGRATION_DB_URL`, used by `env.py`). Compose `postgres-init/01-app-role.sql` creates the role + `ALTER DEFAULT PRIVILEGES` so owner-created tables auto-grant it DML.
+- [x] **`0003_rls_force`**: `FORCE ROW LEVEL SECURITY` on the tenant-content tables (squads/initiatives/applications/domains/projects/tasks/memory_files/approval_gates/*_llm_config/events); **org_members dropped from RLS** (login resolves org-by-email pre-context; documented `SECURITY DEFINER` follow-on).
+- [x] **org threaded through every query path**: `TaskStore.add_dependency/list/claim` now take `org_id` (+ in-memory store, `plan.py`, tests); `PostgresTaskStore` + `PostgresAnalyticsStore` + `PostgresSink` (grouped by org) call `set_org_context` per transaction.
+- [x] **Verified against real Postgres** (docker): migrations 0001→0002→0003 apply; `test_rls_force_blocks_cross_org_as_non_owner_role` proves that, as `pdlc_app`, cross-org reads return **zero rows** and cross-org inserts are **rejected**. 5 Postgres integration tests pass live; full hermetic suite green (**217**); ruff clean. `greenlet` added (async-SQLAlchemy/alembic).
+- [ ] Follow-ons: `SECURITY DEFINER` auth-lookup so org_members can also be RLS-locked; rotate the `pdlc_app` dev password; Cognito/OIDC SSO.
+
+**Auth + RLS arc complete (Phases 1–3):** app-layer auth derives org from the JWT, the Studio logs in, and Postgres independently enforces the same org boundary — defense in depth. All flag-gated; default-off keeps dev/CI hermetic.

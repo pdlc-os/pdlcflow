@@ -31,36 +31,33 @@ class PostgresSink:
         if not batch:
             return
         try:
+            from collections import defaultdict
+
             from sqlalchemy import insert
 
             from ...db.models import Event
+            from ...db.rls import set_org_context
 
-            rows = [
-                {
-                    "event_id": e.event_id,
-                    "event_type": e.event_type,
-                    "schema_version": e.schema_version,
-                    "ts": e.ts,
-                    "org_id": e.org_id,
-                    "squad_id": e.squad_id,
-                    "initiative_id": e.initiative_id,
-                    "application_id": e.application_id,
-                    "project_id": e.project_id,
-                    "repository": e.repository,
-                    "domains": list(e.domains or []),
-                    "roadmap_id": e.roadmap_id,
-                    "prd_id": e.prd_id,
-                    "user_story_id": e.user_story_id,
-                    "plan_step": e.plan_step,
-                    "session_id": e.session_id,
-                    "correlation_id": e.correlation_id,
-                    "causation_id": e.causation_id,
-                    "actor": e.actor,
-                    "payload": e.payload,
+            def _row(e):
+                return {
+                    "event_id": e.event_id, "event_type": e.event_type,
+                    "schema_version": e.schema_version, "ts": e.ts, "org_id": e.org_id,
+                    "squad_id": e.squad_id, "initiative_id": e.initiative_id,
+                    "application_id": e.application_id, "project_id": e.project_id,
+                    "repository": e.repository, "domains": list(e.domains or []),
+                    "roadmap_id": e.roadmap_id, "prd_id": e.prd_id,
+                    "user_story_id": e.user_story_id, "plan_step": e.plan_step,
+                    "session_id": e.session_id, "correlation_id": e.correlation_id,
+                    "causation_id": e.causation_id, "actor": e.actor, "payload": e.payload,
                 }
-                for e in batch
-            ]
+
+            # Group by org so RLS (set per transaction) admits each org's rows.
+            by_org: dict = defaultdict(list)
+            for e in batch:
+                by_org[str(e.org_id)].append(_row(e))
             with self._ensure_engine().begin() as conn:
-                conn.execute(insert(Event), rows)
+                for org_id, rows in by_org.items():
+                    set_org_context(conn, org_id)
+                    conn.execute(insert(Event), rows)
         except Exception as exc:  # never crash the drain loop
             log.warning("events insert failed (%d rows): %s", len(batch), exc)
