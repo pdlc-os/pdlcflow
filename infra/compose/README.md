@@ -55,6 +55,23 @@ docker compose up --build
 > Note: `PDLC_RUN_EVALS` adds judge LLM calls per major step (extra cost). Leave it off for
 > normal use; turn it on to validate or to gather quality baselines.
 
+## Row-level security (DB-enforced tenant isolation)
+
+The app connects as the **non-superuser `pdlc_app`** role (`PDLC_DB_URL`) so Postgres RLS is
+enforced; **migrations run as the owner** (`PDLC_MIGRATION_DB_URL=postgres`). The `pdlc_app`
+role is created on first DB init by `postgres-init/01-app-role.sql` (change its dev password
+for real use). Apply migrations (as the owner — the api container's env routes alembic to the
+migration URL automatically):
+
+```bash
+docker compose run --rm api uv run alembic upgrade head
+```
+
+After that, every org-scoped query the app makes is filtered by `app.org_id` at the database —
+a compromised request can't read or write another tenant's rows. For a single-role dev setup,
+point `PDLC_DB_URL` + `PDLC_MIGRATION_DB_URL` both at `postgres` (RLS enabled but the superuser
+bypasses it). Note: the role + grants are created only on a **fresh** `pgdata` volume.
+
 ## TLS (Caddy reverse proxy)
 
 ```bash

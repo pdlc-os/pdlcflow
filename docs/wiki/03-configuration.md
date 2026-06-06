@@ -74,7 +74,18 @@ Auth is **enforced only when `PDLC_AUTH_REQUIRED=true`** (default off = open API
 
   Create more users via the admin-only `POST /v1/auth/users`. Accounts live in the user store (in-memory in dev/test; Postgres `users`/`org_members` when `PDLC_TASK_STORE=postgres`). `PDLC_AUTH_MODE=cognito` (SSO) is scaffolded for a later phase.
 
-> Auth asserts the principal at the app layer; **RLS FORCE** (a future phase) makes Postgres enforce the same org boundary at the wire. They compose — auth is the trustworthy source of `org_id` that RLS keys on.
+> Auth asserts the principal at the app layer; **RLS FORCE** (Phase 3) makes Postgres enforce the same org boundary at the wire. They compose — auth is the trustworthy source of `org_id` that RLS keys on. See *Row-level security* below.
+
+## Row-level security (Phase 3 — DB-enforced tenant isolation)
+
+`0002` enables RLS + an `org_id = current_setting('app.org_id')` policy on the org-scoped tables; `0003` **FORCE**s it on the tenant-content tables. Because superusers bypass RLS, the **app connects as a non-superuser role** so the policy actually applies:
+
+- **`PDLC_DB_URL`** → the app role (`pdlc_app`), created by the compose Postgres init script (`postgres-init/01-app-role.sql`) with `ALTER DEFAULT PRIVILEGES` so owner-created tables auto-grant it DML.
+- **`PDLC_MIGRATION_DB_URL`** → the owner (`postgres`) — DDL + `FORCE` run here (`alembic upgrade head`). Defaults to `PDLC_DB_URL` when unset (single-role dev, no enforcement).
+- Every adapter sets `app.org_id` per transaction (`db.rls.set_org_context`), so the app sees only its org's rows; an insert/read for another org returns nothing / is rejected **at the database**.
+- **`org_members` is intentionally not RLS-scoped** — login resolves a user's org by email before any org context exists. Membership is scoped at the app layer; a `SECURITY DEFINER` auth-lookup function is the documented follow-on to also lock it at the DB.
+
+Verified against real Postgres (the `integration` CI job + `test_rls_force_blocks_cross_org_as_non_owner_role`): as the non-owner role, cross-org reads return zero rows and cross-org inserts are rejected.
 
 ## The "always falls back to in-memory" safety note
 

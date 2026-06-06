@@ -8,7 +8,10 @@ services:
       POSTGRES_PASSWORD: pdlc
       POSTGRES_DB: pdlc
     ports: ["5432:5432"]
-    volumes: ["pgdata:/var/lib/postgresql/data"]
+    volumes:
+      - "pgdata:/var/lib/postgresql/data"
+      # Creates the non-owner `pdlc_app` role on first init (Phase 3 RLS).
+      - "./postgres-init:/docker-entrypoint-initdb.d:ro"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 5s

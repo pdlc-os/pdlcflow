@@ -17,10 +17,14 @@ if config.config_file_name:
 
 target_metadata = Base.metadata
 
+# Migrations run as the schema owner; the app connects as a (non-owner) role when
+# RLS is enforced. Falls back to db_url for single-role dev.
+_MIGRATION_URL = settings.migration_db_url or settings.db_url
+
 
 def run_migrations_offline() -> None:
     context.configure(
-        url=settings.db_url,
+        url=_MIGRATION_URL,
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
@@ -37,7 +41,7 @@ def _do_run_migrations(connection):
 
 async def run_migrations_online() -> None:
     cfg = config.get_section(config.config_ini_section) or {}
-    cfg["sqlalchemy.url"] = settings.db_url
+    cfg["sqlalchemy.url"] = _MIGRATION_URL
     engine = async_engine_from_config(cfg, prefix="sqlalchemy.", poolclass=pool.NullPool)
     async with engine.connect() as conn:
         await conn.run_sync(_do_run_migrations)

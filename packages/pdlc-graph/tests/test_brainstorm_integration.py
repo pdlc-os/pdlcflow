@@ -50,7 +50,7 @@ def test_night_shift_runs_all_four_subphases():
     assert out["design_docs"]["architecture"] and out["design_approved"] is True
     assert out["threat_model_ref"] and out["ux_review_ref"]
     assert out["plan_ref"] and out["plan_approved"] is True
-    assert len(get_task_store().list("proj-1")) == 4
+    assert len(get_task_store().list("o", "proj-1")) == 4
     # Handoff points at Construction.
     assert out["handoff"]["next_phase"] == "Construction / Build"
 

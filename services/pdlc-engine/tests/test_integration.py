@@ -46,15 +46,15 @@ def test_postgres_task_store_external_id_and_atomic_claim():
     a = store.create(org, proj, "data model", "body", ["domain:backend"], external_id="bd-1")
     b = store.create(org, proj, "api", "body", [], external_id="bd-2")
     assert a == "bd-1" and b == "bd-2"
-    store.add_dependency(proj, "bd-1", "bd-2")
+    store.add_dependency(org, proj, "bd-1", "bd-2")
 
-    rows = {r["external_id"]: r for r in store.list(proj)}
+    rows = {r["external_id"]: r for r in store.list(org, proj)}
     assert rows["bd-2"]["depends_on"] == ["bd-1"]
 
     # Atomic claim: first wins; same branch in the project is rejected; double-claim fails.
-    assert store.claim(proj, "bd-1", "feat/x", "dev@acme") is True
-    assert store.claim(proj, "bd-2", "feat/x", "dev@acme") is False  # branch taken
-    assert store.claim(proj, "bd-1", "feat/y", "dev@acme") is False  # already claimed
+    assert store.claim(org, proj, "bd-1", "feat/x", "dev@acme") is True
+    assert store.claim(org, proj, "bd-2", "feat/x", "dev@acme") is False  # branch taken
+    assert store.claim(org, proj, "bd-1", "feat/y", "dev@acme") is False  # already claimed
 
 
 def test_postgres_analytics_rollup_over_real_events():
@@ -109,6 +109,63 @@ def test_redis_bus_publish_replay_and_subscribe():
 
     got = asyncio.run(asyncio.wait_for(_first(), timeout=5))
     assert got["n"] == 1
+
+
+def test_rls_force_blocks_cross_org_as_non_owner_role():
+    """RLS FORCE: connected as a NON-superuser role, a session only ever sees its
+    own org's rows even when it asks for another org's — and can't insert for one.
+    """
+    import uuid as _uuid
+
+    from app.db.session import _sync_url
+    from sqlalchemy import create_engine, text
+
+    owner_url = _sync_url(settings.db_url)  # the CI job's db_url is the superuser
+    owner = create_engine(owner_url, future=True)
+
+    # 1) ensure the schema is FORCEd + a non-owner role exists with grants.
+    with owner.begin() as c:
+        for t in ("events",):
+            c.execute(text(f"alter table {t} force row level security"))
+        c.execute(text(
+            "do $$ begin if not exists (select from pg_roles where rolname='pdlc_app') "
+            "then create role pdlc_app login password 'pdlc_app' nosuperuser; end if; end $$;"
+        ))
+        c.execute(text("grant usage on schema public to pdlc_app"))
+        c.execute(text("grant select, insert on all tables in schema public to pdlc_app"))
+
+    org_a, org_b = _uuid.uuid4(), _uuid.uuid4()
+    proj = _uuid.uuid4()
+
+    # 2) as the non-owner app role, write an event for org A with app.org_id=A.
+    app_url = owner_url.split("://", 1)[1].split("@", 1)[1]  # host:port/db
+    app_engine = create_engine(f"postgresql+psycopg://pdlc_app:pdlc_app@{app_url}", future=True)
+    insert_sql = text(
+        "insert into events (event_id, event_type, schema_version, ts, org_id, project_id, domains, payload) "
+        "values (gen_random_uuid(), 'agent.invoked', 1, now(), :org, :proj, '{}'::text[], '{}'::jsonb)"
+    )
+    with app_engine.begin() as c:
+        c.execute(text("select set_config('app.org_id', :v, true)"), {"v": str(org_a)})
+        c.execute(insert_sql, {"org": str(org_a), "proj": str(proj)})
+
+    # 3) inserting for org B while app.org_id=A is rejected by the policy.
+    with app_engine.begin() as c:
+        c.execute(text("select set_config('app.org_id', :v, true)"), {"v": str(org_a)})
+        try:
+            c.execute(insert_sql, {"org": str(org_b), "proj": str(proj)})
+            wrote_cross_org = True
+        except Exception:
+            wrote_cross_org = False
+    assert wrote_cross_org is False, "RLS should reject an insert for a different org"
+
+    # 4) a session scoped to org B sees zero of org A's events (even querying all).
+    with app_engine.begin() as c:
+        c.execute(text("select set_config('app.org_id', :v, true)"), {"v": str(org_b)})
+        seen_b = c.execute(text("select count(*) from events")).scalar()
+    with app_engine.begin() as c:
+        c.execute(text("select set_config('app.org_id', :v, true)"), {"v": str(org_a)})
+        seen_a = c.execute(text("select count(*) from events where org_id = :o"), {"o": str(org_a)}).scalar()
+    assert seen_b == 0 and seen_a >= 1
 
 
 def test_s3_artifact_roundtrip_against_minio():

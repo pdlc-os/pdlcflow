@@ -47,7 +47,7 @@ def test_plan_pauses_at_gate_then_approves():
     assert intr["wave_count"] >= 1
 
     # Tasks were created in the store with bd-NN external ids.
-    tasks = get_task_store().list("proj-1")
+    tasks = get_task_store().list("o", "proj-1")
     assert len(tasks) == 4
     assert all(t["external_id"].startswith("bd-") for t in tasks)
 
@@ -63,7 +63,7 @@ def test_plan_dependencies_and_plan_file():
     g.invoke(_initial(), cfg)
     final = g.invoke(Command(resume={"approved": True}), cfg)
 
-    store_tasks = {t["external_id"]: t for t in get_task_store().list("proj-1")}
+    store_tasks = {t["external_id"]: t for t in get_task_store().list("o", "proj-1")}
     # Skeleton: bd-2 depends on bd-1; bd-4 depends on bd-2 and bd-3.
     assert store_tasks["bd-2"]["depends_on"] == ["bd-1"]
     assert set(store_tasks["bd-4"]["depends_on"]) == {"bd-2", "bd-3"}
@@ -90,7 +90,7 @@ def test_night_shift_runs_to_completion_without_interrupt():
     assert "__interrupt__" not in out
     assert out["plan_approved"] is True
     assert out["plan_ref"].endswith(".md")
-    assert len(get_task_store().list("proj-1")) == 4
+    assert len(get_task_store().list("o", "proj-1")) == 4
 
 
 def test_render_plan_is_pure():
