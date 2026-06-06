@@ -14,7 +14,7 @@ from .dispatch import (
     wire_dispatcher,
 )
 from .graph_runner import GraphRunner, build_checkpointer, get_runner, reset_runner, set_runner
-from .llm_backend import wire_llm_backend
+from .llm_backend import wire_llm_backend, wire_token_streaming
 from .ports import (
     InMemoryEventBus,
     InMemoryGateStore,
@@ -50,4 +50,5 @@ __all__ = [
     "wire_dispatcher",
     "wire_event_bus",
     "wire_llm_backend",
+    "wire_token_streaming",
 ]

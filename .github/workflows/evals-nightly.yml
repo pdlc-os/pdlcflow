@@ -41,11 +41,21 @@ jobs:
     env:
       PDLC_RUN_EVALS: "1"
       PDLC_WIRE_LLM: "true"
+      # Provider is var-driven, so switching is a settings change (no code edit):
+      # set PDLC_DEFAULT_LLM_PROVIDER + add that provider's secret below.
       PDLC_DEFAULT_LLM_PROVIDER: ${{ vars.PDLC_DEFAULT_LLM_PROVIDER || 'bedrock' }}
       PDLC_JUDGE_TIER: ${{ vars.PDLC_JUDGE_TIER || 'opus' }}
+      # Bedrock
       AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
+      # Anthropic API (direct) / OpenAI / Google Gemini — set the matching secret
+      # + flip PDLC_DEFAULT_LLM_PROVIDER to anthropic | openai | gemini.
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+      # Vertex AI also needs a service-account file — see docs/wiki/17-evals.md.
+      GOOGLE_CLOUD_PROJECT: ${{ vars.GOOGLE_CLOUD_PROJECT }}
     steps:
       - uses: actions/checkout@v4
       - name: install uv
@@ -56,7 +66,12 @@ jobs:
         run: uv sync
       - name: score suite with the real judge (report-only)
         working-directory: services/pdlc-engine
-        run: uv run python ../../scripts/run_eval_suite.py --real --out ../../eval-report-real.json
+        run: |
+          if [ -z "${AWS_ACCESS_KEY_ID}${ANTHROPIC_API_KEY}${OPENAI_API_KEY}${GOOGLE_API_KEY}" ]; then
+            echo "::notice::No provider credentials configured — skipping real eval. Add the matching secret (e.g. AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY for Bedrock) to activate."
+            exit 0
+          fi
+          uv run python ../../scripts/run_eval_suite.py --real --out ../../eval-report-real.json
       - name: job summary
         if: always()
         run: |

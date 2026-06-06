@@ -24,6 +24,7 @@ import logging
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.types import Command
 from pdlc_graph.graphs.meta import build_meta_graph
+from pdlc_graph.llm_port import reset_thread_context, set_thread_context
 
 from .ports import (
     PendingInteraction,
@@ -91,7 +92,13 @@ class GraphRunner:
     # -- internals ----------------------------------------------------------
     def _advance(self, thread_id: str, invoke_input) -> PendingInteraction | None:
         cfg = {"configurable": {"thread_id": thread_id}}
-        self._graph.invoke(invoke_input, cfg)
+        # Bind the thread for the duration of the turn so llm_port.complete() can
+        # stream token frames to this thread's channel (no-op if streaming is off).
+        tok = set_thread_context(thread_id)
+        try:
+            self._graph.invoke(invoke_input, cfg)
+        finally:
+            reset_thread_context(tok)
         return self._sync_pending(thread_id, cfg)
 
     def _pending_interrupt(self, cfg) -> dict | None:
