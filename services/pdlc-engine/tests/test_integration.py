@@ -26,10 +26,9 @@ def test_alembic_schema_present():
 
 def _seed_project() -> tuple[str, str]:
     """Insert a real org → squad → project so tasks satisfy their FK."""
-    from sqlalchemy import insert
-
     from app.db.models import Organization, Project, Squad
     from app.db.session import get_sync_engine
+    from sqlalchemy import insert
 
     org_id, squad_id, proj_id = uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
     with get_sync_engine(settings).begin() as c:
