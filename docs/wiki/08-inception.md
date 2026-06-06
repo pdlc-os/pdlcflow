@@ -167,5 +167,8 @@ A spec is `{"screens": [...]}`. Screen builders (all pure):
 
 
 ---
+
+
+---
 <!-- nav:bottom -->
-⏮ [First: Overview](01-overview.md) · ◀ [Prev: Party Mode](07-party-mode.md) · [🏠 Home](README.md) · [Next: Construction (the build subgraph)](09-construction.md) ▶ · [Last: API Reference](16-api-reference.md) ⏭
+⏮ [First: Overview](01-overview.md) · ◀ [Prev: Party Mode](07-party-mode.md) · [🏠 Home](README.md) · [Next: Construction (the build subgraph)](09-construction.md) ▶ · [Last: Evals Framework](17-evals.md) ⏭

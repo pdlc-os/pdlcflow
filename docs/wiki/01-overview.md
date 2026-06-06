@@ -81,5 +81,8 @@ A key design property: **every backend defaults to in-memory and falls back to i
 
 
 ---
+
+
+---
 <!-- nav:bottom -->
-⏮ [First: Overview](01-overview.md) · ◀ [Prev: Home](README.md) · [🏠 Home](README.md) · [Next: Installation](02-installation.md) ▶ · [Last: API Reference](16-api-reference.md) ⏭
+⏮ [First: Overview](01-overview.md) · ◀ [Prev: Home](README.md) · [🏠 Home](README.md) · [Next: Installation](02-installation.md) ▶ · [Last: Evals Framework](17-evals.md) ⏭

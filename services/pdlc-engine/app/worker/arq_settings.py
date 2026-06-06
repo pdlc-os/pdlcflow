@@ -16,6 +16,7 @@ from arq.connections import RedisSettings
 
 from ..clickstream import wire_emitter
 from ..config import settings
+from ..evals import wire_evals
 from ..persistence import wire_persistence
 from ..runtime import (
     GraphRunner,
@@ -47,6 +48,7 @@ async def startup(_ctx: dict) -> None:
     wire_emitter(settings)
     set_runner(GraphRunner(checkpointer=build_checkpointer(settings)))
     wire_llm_backend(settings)
+    wire_evals(settings)
 
 
 async def shutdown(_ctx: dict) -> None:

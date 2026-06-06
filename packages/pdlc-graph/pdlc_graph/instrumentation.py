@@ -49,6 +49,43 @@ def emit_event(event_type: str, state: dict, payload: dict, correlation_id: str 
     _emitter.emit(event_type, state, payload, corr)
 
 
+def evaluate(
+    trigger: str,
+    state: dict,
+    output: str,
+    *,
+    target: str,
+    sources: dict[str, str] | None = None,
+    extra: dict | None = None,
+) -> list:
+    """Run the evals registered for `trigger` over one agent output, emitting
+    `eval.scored` (always) and `eval.blocked` (for failed blocking evals).
+
+    Strict no-op — returns [] — unless evals are enabled at boot
+    (`PDLC_RUN_EVALS`). Never raises into the calling node. Returns the list of
+    EvalResult so a node can optionally enforce (see evals.blocking_failures).
+    """
+    try:
+        from .evals import EvalContext, run_evals_for
+    except Exception:  # pragma: no cover - evals package always present
+        return []
+    ctx = EvalContext(
+        trigger=trigger, target=target, output=output or "",
+        sources=sources or {}, state=state, extra=extra or {},
+    )
+    results = run_evals_for(ctx)
+    for r in results:
+        emit_event("eval.scored", state, r.to_payload())
+        if r.blocking and not r.passed:
+            emit_event(
+                "eval.blocked", state,
+                {"eval_id": r.eval_id, "gate": trigger, "dimension": r.dimension,
+                 "score": round(float(r.score), 4), "threshold": r.threshold,
+                 "reason": r.rationale[:300]},
+            )
+    return results
+
+
 def instrumented_node(event_type: str) -> Callable:
     def deco(fn: Callable) -> Callable:
         @functools.wraps(fn)

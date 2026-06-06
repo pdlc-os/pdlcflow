@@ -1,0 +1,6 @@
+{
+  "trigger": "prd",
+  "target": "atlas",
+  "description": "Golden reference for a PRD about a dark-mode toggle. The drift eval compares fresh output against `reference` (Jaccard over words); a drop below threshold flags regression.",
+  "reference": "Overview The dark mode toggle lets users switch the application theme between light and dark from settings. Problem Statement Users working at night experience eye strain with the light theme. Target User All authenticated users. Requirement MUST persist the chosen theme per user. Acceptance Criteria the toggle switches the theme and the preference survives reload. Out of Scope automatic theme based on system preference."
+}

@@ -166,5 +166,8 @@ have data the moment a project is migrated — no waiting for new activity.
 
 
 ---
+
+
+---
 <!-- nav:bottom -->
-⏮ [First: Overview](01-overview.md) · ◀ [Prev: Monitoring & Analytics](14-monitoring.md) · [🏠 Home](README.md) · [Next: API Reference](16-api-reference.md) ▶ · [Last: API Reference](16-api-reference.md) ⏭
+⏮ [First: Overview](01-overview.md) · ◀ [Prev: Monitoring & Analytics](14-monitoring.md) · [🏠 Home](README.md) · [Next: API Reference](16-api-reference.md) ▶ · [Last: Evals Framework](17-evals.md) ⏭

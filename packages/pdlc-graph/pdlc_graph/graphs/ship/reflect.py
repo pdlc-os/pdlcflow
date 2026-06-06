@@ -18,7 +18,7 @@ from datetime import date as _date
 from langgraph.graph import END, START, StateGraph
 
 from ... import gates
-from ...instrumentation import instrumented_node
+from ...instrumentation import evaluate, instrumented_node
 from ...llm_port import complete
 from ...ports import put_artifact
 from ...render import render_episode, render_metrics
@@ -108,6 +108,9 @@ def retro_and_episode(state: PDLCState) -> dict:
     )
     path = f"docs/pdlc/memory/episodes/{episode_id}_{_slug(feature)}_{today}.md"
     episode_ref = put_artifact(project_id, path, episode_md)
+
+    # Phase J: score the episode/retro output (no-op unless evals enabled).
+    evaluate("episode", state, episode_md, target="atlas", sources={"feature": feature})
 
     return {"sub_phase": "Reflect", "episode_ref": episode_ref}
 

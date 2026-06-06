@@ -36,6 +36,26 @@ jobs:
         working-directory: ${{ matrix.package }}
         run: uv run pytest -q || true
 
+  evals:
+    name: evals (hermetic, stub judge)
+    runs-on: ubuntu-latest
+    env:
+      PDLC_RUN_EVALS: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - name: install uv
+        uses: astral-sh/setup-uv@v3
+      - name: setup python
+        run: uv python install 3.12
+      - name: sync workspace
+        run: uv sync
+      - name: eval harness (pdlc-graph)
+        working-directory: packages/pdlc-graph
+        run: uv run --extra dev pytest -m eval -q
+      - name: eval harness (pdlc-engine)
+        working-directory: services/pdlc-engine
+        run: uv run --extra dev pytest -m eval -q
+
   integration:
     name: integration (postgres + redis + minio)
     runs-on: ubuntu-latest

@@ -5,6 +5,7 @@ from fastapi import APIRouter
 
 from .agents import router as agents_router
 from .domains import router as domains_router
+from .evals import router as evals_router
 from .exports import router as exports_router
 from .features import router as features_router
 from .initiatives import router as initiatives_router
@@ -21,3 +22,4 @@ router.include_router(agents_router)
 router.include_router(features_router)
 router.include_router(exports_router)
 router.include_router(models_router)
+router.include_router(evals_router)

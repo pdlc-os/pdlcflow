@@ -69,5 +69,8 @@ Wiring is defensive: `wire_persistence`, `build_checkpointer`, `wire_event_bus`,
 
 
 ---
+
+
+---
 <!-- nav:bottom -->
-⏮ [First: Overview](01-overview.md) · ◀ [Prev: Installation](02-installation.md) · [🏠 Home](README.md) · [Next: Launching & Operating](04-launching.md) ▶ · [Last: API Reference](16-api-reference.md) ⏭
+⏮ [First: Overview](01-overview.md) · ◀ [Prev: Installation](02-installation.md) · [🏠 Home](README.md) · [Next: Launching & Operating](04-launching.md) ▶ · [Last: Evals Framework](17-evals.md) ⏭

@@ -267,5 +267,8 @@ fields (e.g. `doctor → {passed, failed, healthy}`,
 
 
 ---
+
+
+---
 <!-- nav:bottom -->
-⏮ [First: Overview](01-overview.md) · ◀ [Prev: Night Shift](11-night-shift.md) · [🏠 Home](README.md) · [Next: Studio — the browser UI](13-studio.md) ▶ · [Last: API Reference](16-api-reference.md) ⏭
+⏮ [First: Overview](01-overview.md) · ◀ [Prev: Night Shift](11-night-shift.md) · [🏠 Home](README.md) · [Next: Studio — the browser UI](13-studio.md) ▶ · [Last: Evals Framework](17-evals.md) ⏭

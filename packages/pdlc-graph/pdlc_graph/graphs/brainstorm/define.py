@@ -17,7 +17,7 @@ from datetime import date as _date
 from langgraph.graph import END, START, StateGraph
 
 from ... import gates
-from ...instrumentation import instrumented_node
+from ...instrumentation import evaluate, instrumented_node
 from ...llm_port import complete
 from ...ports import put_artifact
 from ...render import render_prd
@@ -101,6 +101,10 @@ def define_prd(state: PDLCState) -> dict:
     slug = feature.strip().lower().replace(" ", "-")
     path = f"docs/pdlc/prds/PRD_{slug}_{today}.md"
     prd_ref = put_artifact(project_id, path, prd_md)
+
+    # Phase J: score the PRD (no-op unless evals are enabled). Grounded against
+    # the brainstorm log the PRD is synthesized from.
+    evaluate("prd", state, prd_md, target="atlas", sources={"brainstorm_log": log})
     return {"prd_ref": prd_ref}
 
 

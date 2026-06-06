@@ -9,6 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .clickstream import wire_emitter
 from .config import settings
+from .evals import wire_evals
 from .persistence import wire_persistence
 from .routes import admin as admin_routes
 from .routes import approval_gates as approval_routes
@@ -42,6 +43,7 @@ async def lifespan(_app: FastAPI):
     set_runner(GraphRunner(checkpointer=build_checkpointer(settings)))
     wire_dispatcher(settings)
     wire_llm_backend(settings)
+    wire_evals(settings)  # after LLM wiring so the judge can use the factory
     yield
 
 
