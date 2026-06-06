@@ -4,7 +4,20 @@ test gets a fresh MemorySaver, gate store, event bus, and artifact/task stores.
 
 from __future__ import annotations
 
+import os
+
 import pytest
+
+
+def pytest_collection_modifyitems(config, items):
+    """Skip @pytest.mark.integration tests unless PDLC_RUN_INTEGRATION is set
+    (they need live Postgres/Redis/MinIO — the integration CI job sets it)."""
+    if os.getenv("PDLC_RUN_INTEGRATION"):
+        return
+    skip = pytest.mark.skip(reason="integration: set PDLC_RUN_INTEGRATION=1 (needs live infra)")
+    for item in items:
+        if "integration" in item.keywords:
+            item.add_marker(skip)
 
 
 @pytest.fixture(autouse=True)

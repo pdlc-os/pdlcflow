@@ -118,6 +118,9 @@ Delivered incrementally (one PR per bundle). Auth deferred. Every adapter is fla
 - [x] 5 migration/RLS/guard tests (metadata tables, `depends_on` column, `SET LOCAL` SQL, 403 guard, valid audit event) + the admin 422→403 update. App boots; `GET /v1/admin/live` without org → 403. Full repo suite green (188 — engine 54, graph 109, event-schema 5, migrate 20). ruff clean.
 - [ ] **Enforcement hardening** (documented follow-on): RLS is ENABLED but not FORCEd (the app connects as table owner, so non-forced RLS is bypassed). Full enforcement needs a dedicated non-owner DB role + `force row level security` + threading `org_id` through the project-scoped read methods (`list`/`claim`).
 
+### Integration CI (✅ exercises the real paths)
+- [x] A blocking **`integration`** job in `.github/workflows/ci.yml`: Postgres + Redis service containers + a MinIO step, `alembic upgrade head`, then `pytest -m integration`. 6 integration tests validate what the hermetic suite can't — Postgres checkpointer durability across runner instances, the Postgres task store (external_id + atomic branch-claim via the unique partial index), Postgres analytics rollups over real events, the Redis bus publish/replay/subscribe, and the S3/MinIO artifact round-trip. Tests are `@pytest.mark.integration`, skipped locally unless `PDLC_RUN_INTEGRATION=1` (so the hermetic suite stays infra-free).
+
 **Phase H summary:** all four bundles landed (durability, live streaming, persistence, migrations+RLS) as real, flag-gated adapters with in-memory fallback — the hermetic suite + dev stay green; the Postgres/Redis/S3/MinIO paths are exercised via `docker compose up`. Auth enforcement remains deferred (open API). The architecture is now production-shaped for self-host; remaining SaaS-only items (Cognito/SSO, per-tenant KMS, ClickHouse, multi-AZ, RLS FORCE) are scaffolded/documented.
 
 ## Phase I — Migration tooling (✅ scan/push/taxonomy/backfill + engine import)
