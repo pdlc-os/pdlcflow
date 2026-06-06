@@ -1,0 +1,135 @@
+<!-- nav:top -->
+[🏠 Wiki Home](README.md)
+
+# Installation
+
+This page covers installing pdlcflow for **self-host** via Docker Compose (the recommended path) and the **dev** path (no Docker) using `uv` and `pnpm`.
+
+## Prerequisites
+
+For the Docker Compose path:
+
+- **Docker** with the Compose plugin (`docker compose`, v2).
+- Roughly 2 GB free disk for the images + volumes (`pgdata`, `miniodata`, `artifacts`).
+- Optional: AWS credentials if you point the LLM provider at Bedrock; an Ollama host if you run air-gapped local models.
+
+For the dev path:
+
+- **uv** (Python 3.12 toolchain manager) for the engine + graph packages.
+- **pnpm** (Node 20) for Studio.
+
+## Clone
+
+```bash
+git clone https://github.com/pdlc-os/pdlcflow.git
+cd pdlcflow
+```
+
+## Docker Compose path (self-host)
+
+The compose stack lives in `infra/compose/`. It defines six services — `postgres` (5432), `redis` (6379), `minio` (9000 API / 9001 console), `api` (8000), `worker` (Arq), `studio` (8080 → nginx:80) — plus an optional `caddy` TLS profile (80/443).
+
+### 1. Configure the environment
+
+```bash
+cd infra/compose
+cp .env.example .env
+```
+
+Edit `.env`. At minimum set a real `PDLC_JWT_SECRET`, and fill in `AWS_*` if you use Bedrock. The shipped `.env.example` already enables the self-host backends:
+
+```ini
+PDLC_DB_URL=postgresql+asyncpg://postgres:pdlc@postgres:5432/pdlc
+PDLC_REDIS_URL=redis://redis:6379/0
+PDLC_USE_POSTGRES_CHECKPOINTER=true
+PDLC_USE_REDIS_BUS=true
+PDLC_ARTIFACT_STORE=filesystem
+PDLC_ARTIFACT_DIR=/var/lib/pdlcflow/artifacts
+PDLC_TASK_STORE=postgres
+PDLC_ANALYTICS_BACKEND=postgres
+PDLC_CLICKSTREAM_SINK=postgres
+PDLC_DEFAULT_LLM_PROVIDER=bedrock
+```
+
+> Note: `PDLC_WIRE_LLM` is **off** by default — persona completions run on the deterministic offline stub until you set it (and provide provider credentials). See the configuration page.
+
+### 2. Bring up the stack
+
+```bash
+docker compose up --build
+```
+
+The `api` and `worker` containers are built from `services/pdlc-engine/Dockerfile` (a `python:3.12-slim` image that `uv sync`s the workspace and runs `uvicorn app.main:app --host 0.0.0.0 --port 8000`). Studio is built from `apps/studio/Dockerfile` (a Node 20 build served by nginx, which proxies `/v1/*` and `/ws/*` to `api:8000`). `postgres` and `redis` come up first behind healthchecks; the `api` and `worker` wait for them.
+
+### 3. Run database migrations
+
+The schema is **not** auto-created. Apply the Alembic migrations once the DB is healthy:
+
+```bash
+cd services/pdlc-engine && uv run alembic upgrade head
+```
+
+- `0001_init` builds the full 25-table schema (`Base.metadata.create_all` + the `pgcrypto`/`citext` extensions).
+- `0002_rls` enables row-level-security with an `org_id = current_setting('app.org_id')` isolation policy on every org-scoped table.
+
+(You can also run this inside the running `api` container, e.g. `docker compose exec api uv run alembic upgrade head`.)
+
+### 4. Create the MinIO bucket (only if using S3 artifacts)
+
+The self-host default is `PDLC_ARTIFACT_STORE=filesystem`, which needs **no** bucket — it writes to the mounted `artifacts` volume at `PDLC_ARTIFACT_DIR`. If instead you set `PDLC_ARTIFACT_STORE=s3` with `PDLC_S3_ENDPOINT_URL=http://minio:9000`, create the artifacts bucket first. Open the MinIO console at <http://localhost:9001> (login `minioadmin` / `minioadmin`) and create a bucket matching `PDLC_S3_ARTIFACTS_BUCKET` (default `pdlcflow-artifacts-dev`), or use the MinIO client:
+
+```bash
+docker compose exec minio mc alias set local http://localhost:9000 minioadmin minioadmin
+docker compose exec minio mc mb local/pdlcflow-artifacts-dev
+```
+
+### 5. Verify
+
+```bash
+curl http://localhost:8000/health        # {"status":"ok","phase":"A"}
+curl http://localhost:8000/health/ready   # {"status":"ready","checks":{...}}
+```
+
+Then open **Studio** at <http://localhost:8080>. The engine API is at <http://localhost:8000>. Tail logs with:
+
+```bash
+docker compose logs -f api worker
+```
+
+### Tear down
+
+```bash
+docker compose down        # keep the DB + artifact volumes
+docker compose down -v     # also wipe pgdata / miniodata / artifacts
+```
+
+## Dev path (no Docker)
+
+Run the engine and Studio side by side on the host. By default every backend is in-memory, so you need **no** Postgres/Redis/MinIO to start.
+
+### Engine
+
+```bash
+uv sync
+uv run uvicorn app.main:app --reload --app-dir services/pdlc-engine --port 8000
+```
+
+### Studio
+
+```bash
+pnpm install
+pnpm --filter @pdlcflow/studio dev     # Vite on :5173
+```
+
+Vite proxies `/v1/*` and `/ws/*` to `http://localhost:8000`, so the two run together. Verify with `curl http://localhost:8000/health` and open <http://localhost:5173>.
+
+### Tests
+
+```bash
+uv run pytest        # hermetic suite — no network/DB/AWS required
+```
+
+
+---
+<!-- nav:bottom -->
+⏮ [First: Overview](01-overview.md) · ◀ [Prev: Overview](01-overview.md) · [🏠 Home](README.md) · [Next: Configuration](03-configuration.md) ▶ · [Last: API Reference](16-api-reference.md) ⏭

@@ -72,6 +72,7 @@ pnpm cdk deploy --all
 
 ## Documentation
 
+- **[Wiki](./docs/wiki/README.md)** — install, launch, use & monitor pdlcflow; the core PDLC flow + specialized flows (agents, party mode, night-shift, utilities, migration), with mermaid diagrams.
 - [Architecture proposal](./docs/.research/.langgraph-bedrock-saas-migration-2026-06-05.md) — 15 sections, 5 mermaid diagrams.
 - [Self-host README](./infra/compose/README.md)
 - [SaaS / CDK README](./infra/cdk/README.md)
