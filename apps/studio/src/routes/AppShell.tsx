@@ -1,11 +1,15 @@
 import { Link, Outlet } from 'react-router-dom';
-import { ChevronDown, ChevronRight, LogOut, Moon, Sun } from 'lucide-react';
+import { ChevronDown, ChevronRight, LogOut, Monitor, Moon, Sun } from 'lucide-react';
 
+import type { Theme } from '@/lib/theme';
 import { useTheme } from '@/store/useTheme';
 import { useAuth } from '@/store/useAuth';
 import { LoginView } from '@/components/LoginView';
 import { StatusLine } from '@/components/StatusLine';
 import { SideDrawer } from '@/components/SideDrawer';
+
+// Cycle light → dark → system → light.
+const NEXT_THEME: Record<Theme, Theme> = { light: 'dark', dark: 'system', system: 'light' };
 
 export function AppShell() {
   const { theme, setTheme } = useTheme();
@@ -40,11 +44,18 @@ export function AppShell() {
             <button onClick={promptLogin} className="text-xs hover:text-fg">Sign in</button>
           )}
           <button
-            aria-label="Toggle theme"
-            onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+            aria-label={`Theme: ${theme} (click to change)`}
+            title={`Theme: ${theme}`}
+            onClick={() => setTheme(NEXT_THEME[theme])}
             className="rounded-md p-1 hover:bg-border/60"
           >
-            {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+            {theme === 'light' ? (
+              <Sun className="h-4 w-4" />
+            ) : theme === 'dark' ? (
+              <Moon className="h-4 w-4" />
+            ) : (
+              <Monitor className="h-4 w-4" />
+            )}
           </button>
         </div>
       </header>

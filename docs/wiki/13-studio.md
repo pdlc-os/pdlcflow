@@ -35,8 +35,9 @@ exactly as before. (Auth state: `store/useAuth.ts` + `lib/token.ts`.)
 ## Layout
 
 `AppShell.tsx` is the frame: a top bar with Org / Squad / Initiative / Project
-switchers, a phase pill, a **theme toggle** (light/dark with system-preference
-detection), and an **Atlas Console** link (`/admin/live`). The left
+switchers, a phase pill, a **theme toggle** that cycles **light → dark → system**
+(the `system` mode follows the OS and live-updates with it; the choice persists),
+and an **Atlas Console** link (`/admin/live`). The left
 `SideDrawer` and a bottom `StatusLine` round out the shell. Routes:
 
 - `/` — project switcher (`routes/index.tsx`).
