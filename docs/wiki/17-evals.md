@@ -53,8 +53,12 @@ flowchart LR
 | `plan` | Inception · Plan (task list) | Neo/Atlas | PRD / design |
 | `review` | Construction · Party Review (REVIEW.md) | Neo | feature/build context |
 | `episode` | Operation · Reflect (episode/retro) | Atlas | feature/run context |
+| `deploy` | Operation · Ship (deploy-target selection) | Pulse | resolved tier + night-shift flag |
 | `sentinel_relay` | Night-Shift (verdict relay) | Sentinel | the verbatim marker |
 | `regression` | Golden-set CI / drift runs | any | committed golden reference |
+
+> The `design_docs` and `plan` triggers also feed `spec_adherence`, which is grounded against
+> the **PRD** (fetched from `prd_ref`) so it can check requirement coverage.
 
 ## Evals enabled in the starter
 
@@ -65,6 +69,8 @@ flowchart LR
 | `citation` | citation | deterministic | prd, design_docs, plan | Does the output **reference the source artifacts** it was built from? | measure (block-capable) |
 | `faithful_relay` | faithful_relay | deterministic | sentinel_relay | Sentinel relays the evaluator's reason **verbatim** — no paraphrase (audit integrity) | measure (block-capable) |
 | `drift` | drift | deterministic | regression | Output **similarity to a committed golden reference**; a drop flags regression | measure |
+| `spec_adherence` | correctness | LLM-judge | design_docs, plan | Does the design/plan **satisfy every PRD requirement + acceptance criterion** (no scope drift)? | measure (block-capable) |
+| `prod_safety` | safety | deterministic | deploy | Deploy **never targets production under an autonomous night-shift run** (the prod-deploy ban, as a score) | measure (recommend blocking) |
 
 These map 1:1 to the coverage requested: **per-agent output scoring** (`agent_output_quality`),
 **hallucination/groundedness/faithfulness** (`groundedness`), **LLM-as-judge / rubric
@@ -110,20 +116,53 @@ CI** (the hermetic `evals` job).
 - **API:** `GET /v1/admin/evals/summary?org_id=...` → `{ by_eval: {id: {n, avg_score, pass_rate}}, by_agent: {...} }` (org-scoped; cross-org banned → 403).
 - **CI:** the hermetic `evals` job runs the harness end-to-end with the deterministic stub judge (`pytest -m eval`).
 
+## Golden suite, drift tracking & the nightly run
+
+A **golden suite** (`pdlc_graph/evals/golden/suite.json`) is a set of fixed
+`(trigger, output, sources/extra)` cases run through every eval. The committed
+**baseline** (`suite_baseline.json`) records the expected score per `case::eval`.
+
+- **Locally / in CI (deterministic):** `scripts/run_eval_suite.py` scores the suite with
+  the stub judge and **fails on any regression vs the baseline** — so a code change that
+  shifts a deterministic score is caught. This also runs as a hermetic test
+  (`test_golden_suite_has_no_drift_vs_baseline`) in the `evals` CI job.
+  ```bash
+  uv run python scripts/run_eval_suite.py --fail-on-regress 0.0   # drift check
+  uv run python scripts/run_eval_suite.py --write-baseline        # after an intentional change
+  ```
+- **Nightly (real model):** `.github/workflows/evals-nightly.yml` runs on a daily cron:
+  - **`drift` job** — hermetic; the regression guard above + uploads `eval-report-stub.json`.
+  - **`real` job** — wires the **real LLM-as-judge** (`--real`) and scores the suite with an
+    actual model, uploading `eval-report-real.json` + a job summary. **Report-only** (LLM
+    variance is expected; it doesn't hard-fail). Drift-over-time = the per-run artifacts.
+
+### Enabling the real-LLM nightly
+
+It's **off until you opt in** (so forks/CI never need credentials):
+
+1. Set repository **variable** `RUN_REAL_EVALS=true` (and optionally `PDLC_DEFAULT_LLM_PROVIDER`,
+   `PDLC_JUDGE_TIER`, `AWS_REGION`).
+2. Add provider **secrets** (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` for Bedrock; or the
+   equivalents for your configured provider).
+3. Trigger it via the **Actions → evals-nightly → Run workflow** button, or wait for the cron.
+
+For richer trend analysis, push `eval-report-real.json` to a store (S3 / a metrics DB) and
+chart `scores` over time — a documented next step beyond the per-run artifacts.
+
 ## Recommended evals to enable next
 
 This is an agentic **SDLC** framework, so quality, safety, and traceability all matter.
 A pragmatic roadmap beyond the starter:
 
+> ✅ Already shipped: **spec-adherence** (`spec_adherence`) and **prod-safety** (`prod_safety`).
+
 **Correctness & grounding**
-- *Spec-adherence* — does the design/plan actually satisfy every PRD acceptance criterion? (judge: PRD vs design)
 - *Requirement-coverage* — every `MUST` requirement maps to ≥1 task and ≥1 test.
 - *Cross-artifact consistency* — PRD ↔ design ↔ tasks ↔ tests don't contradict each other.
 - *Code-grounded claims* — review/episode statements trace to the actual diff (not invented).
 
 **Safety & policy**
 - *Security-finding precision/recall* — Phantom's findings vs a labeled set (no false alarms, no misses).
-- *Prod-safety* — deploy plans never target production under night-shift (assert the 3-layer ban).
 - *PII/secret leakage* — outputs/events contain no secrets or PII.
 - *Prompt-injection resistance* — agents ignore injected instructions in source artifacts.
 

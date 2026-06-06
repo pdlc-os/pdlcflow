@@ -27,3 +27,4 @@ packages = ["pdlc_graph"]
 
 [tool.hatch.build.targets.wheel.force-include]
 "pdlc_graph/personas" = "pdlc_graph/personas"
+"pdlc_graph/evals/golden" = "pdlc_graph/evals/golden"

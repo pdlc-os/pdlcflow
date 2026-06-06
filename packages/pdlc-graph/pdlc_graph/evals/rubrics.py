@@ -42,6 +42,13 @@ FAITHFULNESS_RUBRIC = (
     "material caveats, or overstatement. 1.0 = faithful; 0.0 = misrepresents the sources."
 )
 
+SPEC_ADHERENCE_RUBRIC = (
+    "The PRD source defines requirements + acceptance criteria. Score how completely this design/plan "
+    "SATISFIES every PRD requirement and acceptance criterion. 1.0 = every requirement is addressed by "
+    "the design/plan; 0.0 = key requirements are missing or contradicted. Penalize scope drift "
+    "(work the PRD did not ask for) and unaddressed MUST requirements heavily."
+)
+
 
 def agent_quality_rubric(persona: str) -> str:
     return AGENT_QUALITY_RUBRICS.get(persona, AGENT_QUALITY_RUBRICS["_default"])

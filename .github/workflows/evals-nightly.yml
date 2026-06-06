@@ -1,0 +1,70 @@
+name: evals-nightly
+
+# Scheduled eval run + drift tracking. Two jobs:
+#   drift   — hermetic (stub judge): scores the golden suite and FAILS on any
+#             regression vs the committed baseline. Always runs; uploads a report.
+#   real    — real LLM-as-judge: scores the suite with an actual model so you get
+#             true quality numbers + drift over time. Report-only (LLM variance is
+#             expected). Runs ONLY when the repo variable RUN_REAL_EVALS == 'true'
+#             and provider credentials are configured as secrets.
+on:
+  schedule:
+    - cron: "0 7 * * *" # daily 07:00 UTC
+  workflow_dispatch: {}
+
+jobs:
+  drift:
+    name: eval drift (hermetic, stub judge)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: install uv
+        uses: astral-sh/setup-uv@v3
+      - name: setup python
+        run: uv python install 3.12
+      - name: sync workspace
+        run: uv sync
+      - name: score suite + fail on regression
+        run: uv run python scripts/run_eval_suite.py --fail-on-regress 0.0 --out eval-report-stub.json
+      - name: upload report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: eval-report-stub
+          path: eval-report-stub.json
+
+  real:
+    name: eval scores (real LLM judge)
+    runs-on: ubuntu-latest
+    # Activate by setting repo variable RUN_REAL_EVALS=true + the provider secrets.
+    if: ${{ vars.RUN_REAL_EVALS == 'true' }}
+    env:
+      PDLC_RUN_EVALS: "1"
+      PDLC_WIRE_LLM: "true"
+      PDLC_DEFAULT_LLM_PROVIDER: ${{ vars.PDLC_DEFAULT_LLM_PROVIDER || 'bedrock' }}
+      PDLC_JUDGE_TIER: ${{ vars.PDLC_JUDGE_TIER || 'opus' }}
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: install uv
+        uses: astral-sh/setup-uv@v3
+      - name: setup python
+        run: uv python install 3.12
+      - name: sync workspace
+        run: uv sync
+      - name: score suite with the real judge (report-only)
+        working-directory: services/pdlc-engine
+        run: uv run python ../../scripts/run_eval_suite.py --real --out ../../eval-report-real.json
+      - name: job summary
+        if: always()
+        run: |
+          echo "## Real-LLM eval scores" >> "$GITHUB_STEP_SUMMARY"
+          python3 -c "import json; r=json.load(open('eval-report-real.json')); [print(f'- {k}: {v}') for k,v in r['scores'].items()]" >> "$GITHUB_STEP_SUMMARY" || true
+      - name: upload report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: eval-report-real
+          path: eval-report-real.json

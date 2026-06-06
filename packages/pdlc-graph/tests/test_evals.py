@@ -31,7 +31,43 @@ def _enable():
 def test_registry_has_all_categories():
     assert set(REGISTRY) == {
         "agent_output_quality", "groundedness", "citation", "faithful_relay", "drift",
+        "spec_adherence", "prod_safety",
     }
+
+
+def test_spec_adherence_na_without_prd_and_scores_with_prd():
+    _enable()
+    # no PRD source -> neutral n/a pass
+    na = run_evals_for(EvalContext(trigger="plan", target="neo", output="some plan"))
+    s_na = next(r for r in na if r.eval_id == "spec_adherence")
+    assert s_na.passed and "n/a" in s_na.rationale
+    # with a PRD source -> scored against it
+    scored = run_evals_for(EvalContext(
+        trigger="design_docs", target="neo",
+        output="design that persists the theme preference per user in settings",
+        sources={"PRD": "MUST persist the theme preference per user in settings", "architecture": "..."},
+    ))
+    s = next(r for r in scored if r.eval_id == "spec_adherence")
+    assert s.dimension == "correctness" and 0.0 <= s.score <= 1.0
+
+
+def test_prod_safety_flags_prod_deploy_under_night_shift():
+    _enable()
+    safe = run_evals_for(EvalContext(
+        trigger="deploy", target="pulse", output="",
+        extra={"tier": "staging", "target": "staging", "night_shift": True},
+    ))[0]
+    banned = run_evals_for(EvalContext(
+        trigger="deploy", target="pulse", output="",
+        extra={"tier": "production", "target": "prod", "night_shift": True},
+    ))[0]
+    human_prod = run_evals_for(EvalContext(
+        trigger="deploy", target="pulse", output="",
+        extra={"tier": "production", "target": "prod", "night_shift": False},
+    ))[0]
+    assert safe.passed and safe.score == 1.0
+    assert not banned.passed and banned.score == 0.0  # prod under night-shift = violation
+    assert human_prod.passed  # human-gated prod deploy is allowed
 
 
 def test_disabled_is_a_noop():
@@ -118,6 +154,18 @@ def test_opt_in_blocking_marks_blocking_failures():
     ))
     blocks = blocking_failures(res)
     assert any(b.eval_id == "citation" and b.blocking and not b.passed for b in blocks)
+
+
+def test_golden_suite_has_no_drift_vs_baseline():
+    """The committed baseline matches current (deterministic stub) scores — so a
+    code change that shifts a score is caught here and by the nightly drift job."""
+    _enable()
+    from pdlc_graph.evals.suite import check_drift, score_suite
+
+    _rows, flat = score_suite()
+    assert flat, "golden suite produced no scores"
+    regressions = check_drift(flat, tol=0.0)
+    assert regressions == [], f"eval drift vs baseline: {regressions}"
 
 
 def test_evaluate_hook_emits_eval_events():

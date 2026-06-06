@@ -25,7 +25,7 @@ from ...deploy_port import (
     infer_tier,
     select_deploy_targets,
 )
-from ...instrumentation import instrumented_node
+from ...instrumentation import evaluate, instrumented_node
 from ...llm_port import complete
 from ...ports import put_artifact
 from ...render import render_changelog, render_deployments
@@ -72,6 +72,13 @@ def prepare(state: PDLCState) -> dict:
     candidates = select_deploy_targets(state.get("deploy_candidates") or ["staging"])
     deploy_target = candidates[0] if candidates else "staging"
     deploy_tier = infer_tier(deploy_target)
+
+    # Phase J: prod-safety eval on the chosen target (no-op unless evals enabled).
+    evaluate(
+        "deploy", state, "", target="pulse",
+        extra={"tier": deploy_tier, "target": deploy_target,
+               "night_shift": bool(state.get("night_shift_active"))},
+    )
 
     return {
         "version": version,
