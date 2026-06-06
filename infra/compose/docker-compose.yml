@@ -7,6 +7,7 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: pdlc
       POSTGRES_DB: pdlc
+      PDLC_APP_DB_PASSWORD: ${PDLC_APP_DB_PASSWORD:-pdlc_app}  # used by postgres-init/01-app-role.sh
     ports: ["5432:5432"]
     volumes:
       - "pgdata:/var/lib/postgresql/data"
