@@ -165,3 +165,12 @@ Delivered incrementally (one PR per bundle). Auth deferred. Every adapter is fla
 - [x] **Guard**: `get_principal` (flag-aware) + `resolve_org` (cross-org ban + role) unify the auth-on/auth-off paths so the prior cross-org-ban behavior is identical when off. ruff `flake8-bugbear` allowlist added for the FastAPI `Depends`/`Query` idiom.
 - [x] 9 auth tests (password roundtrip, auth-off open, login→token→authed call, bad creds 401, cross-org 403, admin role 401/403, /me, bootstrap). Full repo suite green (**217**); ruff clean; bootstrap→login→/me verified end-to-end.
 - [ ] Next: Phase 2 (Studio login flow) and Phase 3 (RLS FORCE: non-owner DB role + thread org through the remaining reads + integration tests). Cognito/OIDC scaffolded.
+
+## Phase 2 — Studio login (✅ end-to-end auth in the browser)
+
+- [x] **Login overlay** (`components/LoginView.tsx`): email/password → `POST /v1/auth/login`; JWT + identity persisted to `localStorage` (`lib/token.ts`).
+- [x] **Token transport**: `lib/api.ts` attaches `Authorization: Bearer` on every REST call + surfaces the overlay on `401`; `lib/ws.ts` appends `?token=` to the thread WebSocket.
+- [x] **Org from token**: `store/useAuth.ts` binds `useThread.orgId` to the signed-in identity's org (so requests match the principal); restored from `localStorage` on load.
+- [x] **Shell**: header shows the user + Sign out, or a Sign in button (proactive); a 401 re-opens login. **Auth off (default) → no token sent, Studio unchanged.**
+- [x] Studio `tsc` + `vite build` clean. With this, `PDLC_AUTH_REQUIRED=true` works end-to-end in the browser.
+- [ ] Next: Phase 3 (RLS FORCE — non-owner DB role + org threaded through the remaining reads + integration tests). Cognito/OIDC SSO login is a later add.

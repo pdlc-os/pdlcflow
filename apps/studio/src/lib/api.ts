@@ -1,12 +1,24 @@
 // Typed REST client — matches the pdlc-engine adapter surface (Phase D).
 
+import { clearSession, fireUnauthorized, getToken, type Identity } from './token';
+
 const BASE = '/v1';
 
 async function json<T>(path: string, init?: RequestInit): Promise<T> {
+  const token = getToken();
   const r = await fetch(`${BASE}${path}`, {
     ...init,
-    headers: { 'content-type': 'application/json', ...(init?.headers ?? {}) },
+    headers: {
+      'content-type': 'application/json',
+      ...(token ? { authorization: `Bearer ${token}` } : {}),
+      ...(init?.headers ?? {}),
+    },
   });
+  if (r.status === 401) {
+    // Auth is enforced and we have no/expired token — surface the login overlay.
+    clearSession();
+    fireUnauthorized();
+  }
   if (!r.ok) throw new Error(`${r.status} ${r.statusText} ${path}`);
   return r.json() as Promise<T>;
 }
@@ -152,8 +164,22 @@ export const admin = {
     `${BASE}/admin/exports/rollup.csv?org_id=${encodeURIComponent(orgId)}&dimension=${dimension}`,
 };
 
+export interface LoginResponse {
+  access_token: string;
+  token_type: string;
+  identity: Identity;
+}
+
 export const api = {
   health: () => json<{ status: string }>('/../health'),
+
+  login: (email: string, password: string) =>
+    json<LoginResponse>('/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ email, password }),
+    }),
+
+  me: () => json<Identity>('/auth/me'),
 
   invokeCommand: (body: InvokeBody) =>
     json<CommandResponse>('/commands', { method: 'POST', body: JSON.stringify(body) }),

@@ -1,12 +1,15 @@
 import { Link, Outlet } from 'react-router-dom';
-import { ChevronDown, ChevronRight, Moon, Sun } from 'lucide-react';
+import { ChevronDown, ChevronRight, LogOut, Moon, Sun } from 'lucide-react';
 
 import { useTheme } from '@/store/useTheme';
+import { useAuth } from '@/store/useAuth';
+import { LoginView } from '@/components/LoginView';
 import { StatusLine } from '@/components/StatusLine';
 import { SideDrawer } from '@/components/SideDrawer';
 
 export function AppShell() {
   const { theme, setTheme } = useTheme();
+  const { identity, needsLogin, logout, promptLogin } = useAuth();
   return (
     <div className="flex h-full flex-col">
       <header className="flex h-12 items-center gap-2 border-b border-border px-4 text-sm">
@@ -24,6 +27,18 @@ export function AppShell() {
         </span>
         <div className="ml-auto flex items-center gap-3 text-muted-fg">
           <Link to="/admin/live" className="hover:text-fg">Atlas Console</Link>
+          {identity ? (
+            <span className="flex items-center gap-1.5">
+              <span className="text-xs text-fg" title={`${identity.email} · ${identity.role}`}>
+                {identity.email}
+              </span>
+              <button aria-label="Sign out" onClick={logout} className="rounded-md p-1 hover:bg-border/60">
+                <LogOut className="h-4 w-4" />
+              </button>
+            </span>
+          ) : (
+            <button onClick={promptLogin} className="text-xs hover:text-fg">Sign in</button>
+          )}
           <button
             aria-label="Toggle theme"
             onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
@@ -33,6 +48,8 @@ export function AppShell() {
           </button>
         </div>
       </header>
+
+      {needsLogin && <LoginView />}
 
       <div className="flex flex-1 overflow-hidden">
         <SideDrawer />
