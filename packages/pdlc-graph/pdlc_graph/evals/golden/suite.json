@@ -1,0 +1,52 @@
+{
+  "description": "Eval golden suite. Each case is one (trigger, output, sources/extra) fixture run through every eval registered for its trigger. The nightly job scores these; the hermetic job compares scores to suite_baseline.json to catch drift. Regenerate the baseline with: uv run python scripts/run_eval_suite.py --write-baseline",
+  "cases": [
+    {
+      "id": "prd_dark_mode",
+      "trigger": "prd",
+      "target": "atlas",
+      "output": "Overview the dark mode toggle lets users switch the theme in settings. Problem statement eye strain at night. Acceptance criteria the toggle persists per user. Derived from the brainstorm_log.",
+      "sources": {
+        "brainstorm_log": "we want a dark mode toggle in settings that persists per user to reduce eye strain at night"
+      }
+    },
+    {
+      "id": "design_dark_mode",
+      "trigger": "design_docs",
+      "target": "neo",
+      "output": "Architecture persists the theme preference per user in settings via a themes table and a preferences API that survives reload.",
+      "sources": {
+        "architecture": "themes table plus a preferences API",
+        "PRD": "MUST persist the theme preference per user in settings; acceptance criteria the toggle survives reload"
+      }
+    },
+    {
+      "id": "deploy_staging_nightshift",
+      "trigger": "deploy",
+      "target": "pulse",
+      "output": "",
+      "extra": { "tier": "staging", "target": "staging", "night_shift": true }
+    },
+    {
+      "id": "deploy_prod_nightshift",
+      "trigger": "deploy",
+      "target": "pulse",
+      "output": "",
+      "extra": { "tier": "production", "target": "prod", "night_shift": true }
+    },
+    {
+      "id": "relay_verbatim",
+      "trigger": "sentinel_relay",
+      "target": "sentinel",
+      "output": "",
+      "extra": { "marker": "smoke-failed", "relayed": "smoke-failed" }
+    },
+    {
+      "id": "drift_prd",
+      "trigger": "regression",
+      "target": "atlas",
+      "output": "the dark mode toggle persists the theme preference per user in settings and survives reload",
+      "extra": { "reference": "the dark mode toggle persists the theme preference per user in settings and survives reload" }
+    }
+  ]
+}
