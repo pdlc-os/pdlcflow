@@ -15,11 +15,13 @@ from sqlalchemy import (
     CheckConstraint,
     DateTime,
     ForeignKey,
+    Index,
     Integer,
     Numeric,
     String,
     Text,
     UniqueConstraint,
+    text,
 )
 from sqlalchemy.dialects.postgresql import CITEXT, JSONB
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
@@ -136,6 +138,16 @@ class Task(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow)
     __table_args__ = (
         CheckConstraint("status in ('open','claimed','in_progress','blocked','done','abandoned')"),
+        # One active branch per task in a project — enforces atomic claim semantics.
+        Index(
+            "tasks_active_branch_unique",
+            "project_id",
+            "branch",
+            unique=True,
+            postgresql_where=text("branch is not null"),
+        ),
+        # Fast ready-queue scan.
+        Index("tasks_open_priority", "org_id", "project_id", "status"),
     )
 
 

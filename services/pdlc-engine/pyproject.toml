@@ -44,3 +44,8 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["app"]
+
+[tool.pytest.ini_options]
+markers = [
+    "integration: requires live Postgres/Redis/MinIO (run with PDLC_RUN_INTEGRATION=1)",
+]

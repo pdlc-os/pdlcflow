@@ -21,8 +21,8 @@ class PostgresSink:
 
     def _ensure_engine(self):
         if self._engine is None:
-            from ..config import settings
-            from ..db.session import get_sync_engine
+            from ...config import settings
+            from ...db.session import get_sync_engine
 
             self._engine = get_sync_engine(settings)
         return self._engine
@@ -33,7 +33,7 @@ class PostgresSink:
         try:
             from sqlalchemy import insert
 
-            from ..db.models import Event
+            from ...db.models import Event
 
             rows = [
                 {

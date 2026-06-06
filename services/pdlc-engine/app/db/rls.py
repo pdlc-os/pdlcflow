@@ -19,12 +19,16 @@ from sqlalchemy.ext.asyncio import AsyncSession
 @asynccontextmanager
 async def with_org_scope(session: AsyncSession, org_id: UUID) -> AsyncIterator[None]:
     """Bind app.org_id on the current connection for the duration of the block."""
-    await session.execute(text("SET LOCAL app.org_id = :v"), {"v": str(org_id)})
+    await session.execute(text("select set_config('app.org_id', :v, true)"), {"v": str(org_id)})
     yield
 
 
 def set_org_context(conn, org_id: str) -> None:
     """Sync equivalent — bind app.org_id on a sync connection inside a
     transaction so the RLS policies admit this org's rows. Called by the sync
-    Postgres adapters (task store, analytics) at the start of each `begin()`."""
-    conn.execute(text("SET LOCAL app.org_id = :v"), {"v": str(org_id)})
+    Postgres adapters (task store, analytics) at the start of each `begin()`.
+
+    Uses `set_config(..., is_local => true)` rather than `SET LOCAL …` because
+    Postgres `SET` does not accept bind parameters.
+    """
+    conn.execute(text("select set_config('app.org_id', :v, true)"), {"v": str(org_id)})

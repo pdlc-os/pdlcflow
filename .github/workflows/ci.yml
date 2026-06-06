@@ -36,6 +36,63 @@ jobs:
         working-directory: ${{ matrix.package }}
         run: uv run pytest -q || true
 
+  integration:
+    name: integration (postgres + redis + minio)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: pdlc
+          POSTGRES_DB: pdlc
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s --health-timeout 3s --health-retries 20
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s --health-timeout 3s --health-retries 20
+    env:
+      PDLC_DB_URL: postgresql+asyncpg://postgres:pdlc@localhost:5432/pdlc
+      PDLC_REDIS_URL: redis://localhost:6379/0
+      PDLC_RUN_INTEGRATION: "1"
+      PDLC_ARTIFACT_STORE: s3
+      PDLC_S3_ENDPOINT_URL: http://localhost:9000
+      PDLC_TASK_STORE: postgres
+      PDLC_ANALYTICS_BACKEND: postgres
+      AWS_ACCESS_KEY_ID: minioadmin
+      AWS_SECRET_ACCESS_KEY: minioadmin
+      AWS_REGION: us-east-1
+    steps:
+      - uses: actions/checkout@v4
+      - name: install uv
+        uses: astral-sh/setup-uv@v3
+      - name: setup python
+        run: uv python install 3.12
+      - name: sync workspace
+        run: uv sync
+      - name: start minio
+        run: |
+          docker run -d --name minio -p 9000:9000 \
+            -e MINIO_ROOT_USER=minioadmin -e MINIO_ROOT_PASSWORD=minioadmin \
+            minio/minio server /data
+          for i in $(seq 1 30); do
+            curl -sf http://localhost:9000/minio/health/live && break || sleep 2
+          done
+      - name: create artifact bucket
+        working-directory: services/pdlc-engine
+        run: uv run python -c "import boto3; boto3.client('s3', endpoint_url='http://localhost:9000').create_bucket(Bucket='pdlcflow-artifacts-dev')"
+      - name: alembic upgrade head
+        working-directory: services/pdlc-engine
+        run: uv run alembic upgrade head
+      - name: integration tests
+        working-directory: services/pdlc-engine
+        run: uv run --extra dev pytest -m integration -q
+
   node:
     name: node (${{ matrix.package }})
     runs-on: ubuntu-latest
