@@ -20,11 +20,12 @@ import uuid
 from typing import Any
 
 from event_schema import EventEnvelope
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from pdlc_graph.ports import put_artifact
 from pydantic import BaseModel, Field
 
 from ..analytics import get_analytics_store
+from ..auth.local import Identity, get_principal, resolve_org
 
 router = APIRouter(prefix="/migrate", tags=["migrate"])
 
@@ -103,9 +104,14 @@ def _deterministic_event_id(ev: ImportEvent) -> uuid.UUID:
 
 
 @router.post("/import")
-def import_project(payload: ImportPayload) -> dict[str, int]:
+def import_project(
+    payload: ImportPayload,
+    principal: Identity | None = Depends(get_principal),
+) -> dict[str, int]:
     """Ingest an upstream project's events + memory files; echo entity counts."""
 
+    # auth on => org comes from the token (can't import into another org); admin-only.
+    org_id = resolve_org(principal, payload.org_id, "/v1/migrate/import", admin=True)
     store = get_analytics_store()
 
     envelopes: list[EventEnvelope] = []
@@ -115,7 +121,7 @@ def import_project(payload: ImportPayload) -> dict[str, int]:
                 event_id=_deterministic_event_id(ev),
                 event_type=ev.event_type,
                 ts=ev.ts,
-                org_id=uuid.UUID(payload.org_id),
+                org_id=uuid.UUID(org_id),
                 project_id=uuid.UUID(payload.project_id),
                 domains=list(payload.taxonomy.domains),
                 roadmap_id=ev.roadmap_id,
@@ -124,9 +130,9 @@ def import_project(payload: ImportPayload) -> dict[str, int]:
             )
         )
 
-    before = store.totals(org_id=payload.org_id)["events"]
+    before = store.totals(org_id=org_id)["events"]
     store.ingest(envelopes)
-    after = store.totals(org_id=payload.org_id)["events"]
+    after = store.totals(org_id=org_id)["events"]
 
     for mf in payload.memory_files:
         put_artifact(

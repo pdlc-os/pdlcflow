@@ -14,9 +14,10 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
+from ..auth.local import Identity, get_principal
 from ..runtime import get_dispatcher, get_gate_store
 
 router = APIRouter(prefix="/approval-gates", tags=["approval-gates"])
@@ -61,7 +62,13 @@ def _to_gate(rec) -> Gate:
 
 
 @router.get("", response_model=list[Gate])
-def list_open_gates(org_id: str | None = None, project_id: str | None = None) -> list[Gate]:
+def list_open_gates(
+    org_id: str | None = None,
+    project_id: str | None = None,
+    principal: Identity | None = Depends(get_principal),
+) -> list[Gate]:
+    if principal is not None:  # auth on: scope strictly to the caller's org
+        org_id = principal.org_id
     recs = get_gate_store().list_open(org_id=org_id, project_id=project_id)
     return [_to_gate(r) for r in recs]
 
@@ -74,13 +81,18 @@ def _resume_value(rec, req: ResolveRequest):
 
 
 @router.post("/{gate_id}/resolve", response_model=ResolveResponse)
-def resolve(gate_id: UUID, req: ResolveRequest) -> ResolveResponse:
+def resolve(
+    gate_id: UUID, req: ResolveRequest,
+    principal: Identity | None = Depends(get_principal),
+) -> ResolveResponse:
     store = get_gate_store()
     rec = store.get(gate_id)
     if rec is None:
         raise HTTPException(status_code=404, detail="gate not found")
     if rec.status != "open":
         raise HTTPException(status_code=409, detail=f"gate already {rec.status}")
+    if principal is not None and rec.org_id != principal.org_id:
+        raise HTTPException(status_code=403, detail="cross-org access is not permitted")
 
     store.resolve(gate_id, status="resolved")
     next_pending = get_dispatcher().resume(rec.thread_id, _resume_value(rec, req))

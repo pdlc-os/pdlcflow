@@ -26,6 +26,13 @@ class Settings(BaseSettings):
     jwt_secret: str = "change-me-in-production"
     jwt_alg: str = "HS256"
     jwt_ttl_s: int = 60 * 60 * 12
+    # Enforce auth: when True, protected routes require a valid JWT and derive
+    # org_id from the token (not the request). Off => open API (today's default).
+    auth_required: bool = False
+    # Env-bootstrapped first admin: on boot, if set and no users exist, create an
+    # org + admin user. Further users come from the admin-only /v1/auth/users.
+    bootstrap_admin_email: str | None = None
+    bootstrap_admin_password: str | None = None
 
     # LLM defaults
     default_llm_provider: Literal[

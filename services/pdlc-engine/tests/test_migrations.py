@@ -8,9 +8,9 @@ access guard.
 from __future__ import annotations
 
 import pytest
+from app.auth.local import resolve_org
 from app.db.models import Base
 from app.db.rls import set_org_context
-from app.routes.admin._guard import require_org
 from fastapi import HTTPException
 
 
@@ -41,10 +41,11 @@ def test_set_org_context_issues_set_local():
     assert captured["params"] == {"v": "org-123"}
 
 
-def test_require_org_allows_and_denies():
-    assert require_org("org-1", "/admin/live") == "org-1"
+def test_resolve_org_allows_and_denies_when_auth_off():
+    # auth off (principal=None): cross-org ban — org required, else 403.
+    assert resolve_org(None, "org-1", "/admin/live") == "org-1"
     with pytest.raises(HTTPException) as exc:
-        require_org(None, "/admin/live")
+        resolve_org(None, None, "/admin/live")
     assert exc.value.status_code == 403
 
 

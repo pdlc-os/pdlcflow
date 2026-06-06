@@ -1,8 +1,9 @@
 """Atlas Console admin routes — live, initiatives, domains, squads, agents,
 features (time-travel), exports, models."""
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
+from ...auth.local import require_admin
 from .agents import router as agents_router
 from .domains import router as domains_router
 from .evals import router as evals_router
@@ -13,7 +14,8 @@ from .live import router as live_router
 from .models import router as models_router
 from .squads import router as squads_router
 
-router = APIRouter()
+# Every admin route requires the admin/owner role when auth is enforced (no-op when off).
+router = APIRouter(dependencies=[Depends(require_admin)])
 router.include_router(live_router)
 router.include_router(initiatives_router)
 router.include_router(domains_router)

@@ -16,9 +16,10 @@ from __future__ import annotations
 from typing import Literal
 from uuid import UUID, uuid4
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
+from ..auth.local import Identity, get_principal, resolve_org
 from ..runtime import get_dispatcher
 
 router = APIRouter(prefix="/commands", tags=["commands"])
@@ -50,7 +51,7 @@ _UTILITY_COMMANDS: set[str] = {
 
 class InvokeCommandRequest(BaseModel):
     command: Command
-    org_id: UUID
+    org_id: UUID | None = None  # ignored when auth is on (org comes from the token)
     project_id: UUID
     args: list[str] = []
     feature: str | None = None
@@ -67,13 +68,13 @@ class InvokeCommandResponse(BaseModel):
     pending: dict | None = None  # the opened gate / question, if the graph paused
 
 
-def _initial_state(req: InvokeCommandRequest, thread_id: str, session_id: str) -> dict:
+def _initial_state(req: InvokeCommandRequest, thread_id: str, session_id: str, org_id: str) -> dict:
     feature = req.feature or (req.args[0] if req.args else None)
     state: dict = dict(req.seed_state or {})
     # Authoritative keys win over anything in seed_state.
     state.update(
         {
-            "org_id": str(req.org_id),
+            "org_id": org_id,
             "project_id": str(req.project_id),
             "session_id": session_id,
             "thread_id": thread_id,
@@ -90,10 +91,14 @@ def _initial_state(req: InvokeCommandRequest, thread_id: str, session_id: str) -
 
 
 @router.post("", response_model=InvokeCommandResponse)
-def invoke(req: InvokeCommandRequest) -> InvokeCommandResponse:
+def invoke(
+    req: InvokeCommandRequest,
+    principal: Identity | None = Depends(get_principal),
+) -> InvokeCommandResponse:
+    org_id = resolve_org(principal, str(req.org_id) if req.org_id else None, "/v1/commands")
     session_id = str(uuid4())
-    thread_id = f"{req.org_id}:{req.project_id}:{session_id}"
-    state = _initial_state(req, thread_id, session_id)
+    thread_id = f"{org_id}:{req.project_id}:{session_id}"
+    state = _initial_state(req, thread_id, session_id, org_id)
 
     pending = get_dispatcher().start(thread_id, state)
     return InvokeCommandResponse(

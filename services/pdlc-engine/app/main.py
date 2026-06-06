@@ -7,12 +7,14 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from .auth.wiring import wire_auth
 from .clickstream import wire_emitter
 from .config import settings
 from .evals import wire_evals
 from .persistence import wire_persistence
 from .routes import admin as admin_routes
 from .routes import approval_gates as approval_routes
+from .routes import auth as auth_routes
 from .routes import commands as command_routes
 from .routes import health as health_routes
 from .routes import migrate as migrate_routes
@@ -46,6 +48,7 @@ async def lifespan(_app: FastAPI):
     wire_llm_backend(settings)
     wire_token_streaming(settings)  # live "drafting" preview frames (off by default)
     wire_evals(settings)  # after LLM wiring so the judge can use the factory
+    wire_auth(settings)  # select user store + bootstrap the env admin
     yield
 
 
@@ -65,6 +68,7 @@ app.add_middleware(
 )
 
 app.include_router(health_routes.router)
+app.include_router(auth_routes.router, prefix="/v1")
 app.include_router(command_routes.router, prefix="/v1")
 app.include_router(approval_routes.router, prefix="/v1")
 app.include_router(admin_routes.router, prefix="/v1/admin")

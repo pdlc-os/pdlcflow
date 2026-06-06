@@ -157,3 +157,11 @@ Delivered incrementally (one PR per bundle). Auth deferred. Every adapter is fla
 - [x] 15 eval tests (12 graph + 3 engine), `@pytest.mark.eval`; full repo suite green (**203**); ruff clean. CI gains a hermetic `evals` job (`pytest -m eval`) + the nightly workflow.
 - [x] Docs: [`docs/wiki/17-evals.md`](docs/wiki/17-evals.md) — framework, enabled evals, golden-suite/drift + nightly, recommended-evals roadmap, and how to add new evals.
 - [ ] Follow-ons (documented): activate the real-LLM nightly (set `RUN_REAL_EVALS` + secrets); semantic (embedding) drift; durable score-over-time store + charts; promote groundedness/spec_adherence/prod_safety to blocking after baselining; the remaining recommended evals in the wiki.
+
+## Phase 1 auth enforcement (✅ flag-gated; org from token)
+
+- [x] **Enforcement** behind `PDLC_AUTH_REQUIRED` (default off → open API, all prior tests/Studio unaffected). When on: `/v1/commands`, `/v1/approval-gates`, `/v1/admin/*`, `/v1/migrate/import` + the thread WebSocket require a Bearer JWT (WS via `?token=`); **org_id is derived from the token** (mismatch → 403); admin/analytics routes require the admin/owner role.
+- [x] **Login + accounts**: `POST /v1/auth/login` (issues JWT), `GET /v1/auth/me`, admin-only `POST /v1/auth/users`. Env-bootstrapped first admin (`PDLC_BOOTSTRAP_ADMIN_EMAIL/PASSWORD`). User store port: in-memory (dev/test) + Postgres (`users`/`org_members`, +`password_hash` column). bcrypt hashing (dropped passlib — broke on bcrypt 4.x).
+- [x] **Guard**: `get_principal` (flag-aware) + `resolve_org` (cross-org ban + role) unify the auth-on/auth-off paths so the prior cross-org-ban behavior is identical when off. ruff `flake8-bugbear` allowlist added for the FastAPI `Depends`/`Query` idiom.
+- [x] 9 auth tests (password roundtrip, auth-off open, login→token→authed call, bad creds 401, cross-org 403, admin role 401/403, /me, bootstrap). Full repo suite green (**217**); ruff clean; bootstrap→login→/me verified end-to-end.
+- [ ] Next: Phase 2 (Studio login flow) and Phase 3 (RLS FORCE: non-owner DB role + thread org through the remaining reads + integration tests). Cognito/OIDC scaffolded.
