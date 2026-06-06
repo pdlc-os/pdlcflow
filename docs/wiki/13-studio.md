@@ -130,7 +130,18 @@ auto-reconnect. `ProjectView` wires the frames into the store:
 | `interaction.opened` | `setPending(frame.interaction)` — keeps the view in sync if the graph advances out-of-band |
 | `thread.completed` | `setPending(null)` + `setResult(frame.summary)` |
 | `night_shift.*` | `appendVerdict(frame)` (started / verdict / completed / aborted) |
-| `token`, `status` | forward-compatible (token streaming not yet wired) |
+| `token` | `streamToken(frame)` — live "drafting" preview (see below) |
+| `status` | forward-compatible |
+
+### Live token streaming — the "drafting" preview
+
+When the engine runs with `PDLC_STREAM_TOKENS=true` (set in the compose `.env`), every agent
+generation streams to the thread channel as `token` frames — `{start}` → `{chunk}…` → `{done}`.
+The Studio shows them in a transient **`StreamingPreview`** line ("Atlas is drafting…") that
+fills token-by-token and **clears when the next question / gate / result arrives**, so the
+transcript never fills with internal drafting passes. It works the same with the deterministic
+stub (chunks its output) and a real model (`model.stream()` via the provider factory). Off by
+default so tests + the no-stream path are byte-identical.
 
 Because the bus **replays** recent history on connect, a client attaching after
 a gate opened still sees it.

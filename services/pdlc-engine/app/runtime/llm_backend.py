@@ -26,20 +26,35 @@ class FactoryCompletionBackend:
         self._factory = factory
         self._org_id = org_id
 
-    def complete(
-        self, persona: str, prompt: str, *, tier: str | None = None, system: str | None = None
-    ) -> str:
-        model = self._factory.get_model(
+    def _model(self, persona: str, tier: str | None):
+        return self._factory.get_model(
             persona=persona,
             tier=tier or _DEFAULT_TIER,  # type: ignore[arg-type]
             tenant=TenantCtx(org_id=self._org_id),
         )
+
+    @staticmethod
+    def _messages(system: str | None, prompt: str) -> list:
         messages: list = []
         if system:
             messages.append(("system", system))
         messages.append(("human", prompt))
-        result = model.invoke(messages)
+        return messages
+
+    def complete(
+        self, persona: str, prompt: str, *, tier: str | None = None, system: str | None = None
+    ) -> str:
+        result = self._model(persona, tier).invoke(self._messages(system, prompt))
         return getattr(result, "content", str(result))
+
+    def stream(
+        self, persona: str, prompt: str, *, tier: str | None = None, system: str | None = None
+    ):
+        """Yield text chunks as the model streams (powers live token streaming)."""
+        for chunk in self._model(persona, tier).stream(self._messages(system, prompt)):
+            text = getattr(chunk, "content", "")
+            if text:
+                yield text
 
 
 def wire_llm_backend(settings) -> bool:
@@ -61,3 +76,24 @@ def wire_llm_backend(settings) -> bool:
     except Exception as exc:  # never block boot on this
         log.warning("LLM backend wiring failed (%s); using offline stub", exc)
         return False
+
+
+def wire_token_streaming(settings) -> bool:
+    """Install a token publisher that pushes `token` frames onto the thread's bus
+    channel as agents generate. Guarded by `settings.stream_tokens` so tests +
+    the no-stream path are unchanged. Returns True if installed."""
+    if not getattr(settings, "stream_tokens", False):
+        return False
+    from pdlc_graph.llm_port import set_token_publisher
+
+    from .ports import get_event_bus
+
+    def _publish(thread_id: str, frame: dict) -> None:
+        try:
+            get_event_bus().publish(f"thread:{thread_id}", frame)
+        except Exception:  # streaming must never break a turn
+            pass
+
+    set_token_publisher(_publish)
+    log.info("token streaming enabled")
+    return True

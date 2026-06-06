@@ -17,8 +17,8 @@ export type Frame =
   | { type: 'interaction.opened'; interaction: Pending }
   | { type: 'thread.completed'; thread_id: string; summary?: Record<string, unknown> }
   | NightShiftFrame
-  // forward-compatible: token streaming / status frames
-  | { type: 'token'; thread_id: string; chunk: string }
+  // live "drafting" preview — a generation streams start → chunk… → done
+  | { type: 'token'; thread_id: string; chunk?: string; start?: boolean; done?: boolean; persona?: string }
   | { type: 'status'; phase: string; sub_phase: string | null };
 
 export interface ConnectOpts {

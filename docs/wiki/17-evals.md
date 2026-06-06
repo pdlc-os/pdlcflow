@@ -138,14 +138,28 @@ A **golden suite** (`pdlc_graph/evals/golden/suite.json`) is a set of fixed
 
 ### Enabling the real-LLM nightly
 
-It's **off until you opt in** (so forks/CI never need credentials):
+The repository **variables are already set** (`RUN_REAL_EVALS=true`,
+`PDLC_DEFAULT_LLM_PROVIDER=bedrock`, `PDLC_JUDGE_TIER=opus`, `AWS_REGION=us-east-1`), so the
+`real` job runs nightly. It **safely no-ops (green) until provider credentials exist** —
+add the matching **secret** to activate it:
 
-1. Set repository **variable** `RUN_REAL_EVALS=true` (and optionally `PDLC_DEFAULT_LLM_PROVIDER`,
-   `PDLC_JUDGE_TIER`, `AWS_REGION`).
-2. Add provider **secrets** (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` for Bedrock; or the
-   equivalents for your configured provider).
-3. Trigger it via the **Actions → evals-nightly → Run workflow** button, or wait for the cron.
+```bash
+# Bedrock (the configured default):
+gh secret set AWS_ACCESS_KEY_ID --body "AKIA..."
+gh secret set AWS_SECRET_ACCESS_KEY --body "..."
+```
 
+**Switching provider later** is a settings change only (no code edit):
+
+| Provider | Set variable | Add secret(s) |
+|---|---|---|
+| AWS Bedrock (default) | `PDLC_DEFAULT_LLM_PROVIDER=bedrock` | `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` |
+| Anthropic API (direct) | `PDLC_DEFAULT_LLM_PROVIDER=anthropic` | `ANTHROPIC_API_KEY` |
+| OpenAI | `PDLC_DEFAULT_LLM_PROVIDER=openai` | `OPENAI_API_KEY` |
+| Google Gemini | `PDLC_DEFAULT_LLM_PROVIDER=gemini` | `GOOGLE_API_KEY` |
+| Vertex AI | `PDLC_DEFAULT_LLM_PROVIDER=vertex` | service-account JSON (+ `GOOGLE_CLOUD_PROJECT` var); mount it and set `GOOGLE_APPLICATION_CREDENTIALS` |
+
+Trigger a run now via **Actions → evals-nightly → Run workflow**, or wait for the daily cron.
 For richer trend analysis, push `eval-report-real.json` to a store (S3 / a metrics DB) and
 chart `scores` over time — a documented next step beyond the per-run artifacts.
 

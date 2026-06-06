@@ -1,11 +1,16 @@
 import { create } from 'zustand';
 
 import { api, type Pending } from '@/lib/api';
-import type { NightShiftFrame } from '@/lib/ws';
+import type { Frame, NightShiftFrame } from '@/lib/ws';
 
 export interface TranscriptItem {
   id: string;
   role: 'user' | 'agent' | 'system';
+  text: string;
+}
+
+export interface Streaming {
+  persona?: string;
   text: string;
 }
 
@@ -22,6 +27,7 @@ interface ThreadStore {
   transcript: TranscriptItem[];
   result: Record<string, unknown> | null;  // completion summary (night-shift outcome, etc.)
   verdicts: NightShiftFrame[];  // live night-shift Sentinel verdict stream
+  streaming: Streaming | null;  // live "drafting" preview (token frames)
 
   start: (command: string, opts?: { feature?: string; mode?: 'sketch' | 'socratic' }) => Promise<void>;
   answer: (answers: string[]) => Promise<void>;
@@ -29,6 +35,7 @@ interface ThreadStore {
   setPending: (p: Pending | null) => void;
   setResult: (r: Record<string, unknown> | null) => void;
   appendVerdict: (v: NightShiftFrame) => void;
+  streamToken: (f: Extract<Frame, { type: 'token' }>) => void;
   reset: () => void;
 }
 
@@ -47,10 +54,18 @@ export const useThread = create<ThreadStore>((set, get) => ({
   transcript: [],
   result: null,
   verdicts: [],
+  streaming: null,
 
-  setPending: (p) => set({ pending: p, status: p ? 'awaiting' : get().status }),
-  setResult: (r) => set({ result: r }),
+  // A new pending/result clears the live preview (the generation that produced it is done).
+  setPending: (p) => set({ pending: p, status: p ? 'awaiting' : get().status, streaming: p ? null : get().streaming }),
+  setResult: (r) => set({ result: r, streaming: null }),
   appendVerdict: (v) => set((s) => ({ verdicts: [...s.verdicts, v] })),
+  streamToken: (f) =>
+    set((s) => {
+      if (f.start) return { streaming: { persona: f.persona, text: '' } };
+      if (f.chunk) return { streaming: { persona: s.streaming?.persona ?? f.persona, text: (s.streaming?.text ?? '') + f.chunk } };
+      return {}; // done: leave the buffer until the next pending/result clears it
+    }),
 
   start: async (command, opts) => {
     const { orgId, projectId } = get();
@@ -59,6 +74,7 @@ export const useThread = create<ThreadStore>((set, get) => ({
       pending: null,
       result: null,
       verdicts: [],
+      streaming: null,
       transcript: [say('user', `/${command}${opts?.feature ? ` ${opts.feature}` : ''}`)],
     });
     try {
@@ -75,6 +91,7 @@ export const useThread = create<ThreadStore>((set, get) => ({
         threadId: res.thread_id,
         pending: res.pending,
         status: res.pending ? 'awaiting' : 'complete',
+        streaming: null,
         transcript: [
           ...s.transcript,
           say('system', res.pending ? describe(res.pending) : 'Thread completed.'),
@@ -100,7 +117,7 @@ export const useThread = create<ThreadStore>((set, get) => ({
   },
 
   reset: () =>
-    set({ threadId: null, pending: null, status: 'idle', transcript: [], result: null, verdicts: [] }),
+    set({ threadId: null, pending: null, status: 'idle', transcript: [], result: null, verdicts: [], streaming: null }),
 }));
 
 async function advance(
@@ -115,6 +132,7 @@ async function advance(
     set((s) => ({
       pending: res.pending,
       status: res.pending ? 'awaiting' : 'complete',
+      streaming: null,
       transcript: [
         ...s.transcript,
         echo,

@@ -63,6 +63,11 @@ class Settings(BaseSettings):
     s3_artifacts_bucket: str = "pdlcflow-artifacts-dev"
     s3_events_bucket: str = "pdlcflow-events-dev"
 
+    # Live token streaming — publish `token` frames to the thread channel as
+    # agents generate, powering the Studio's live "drafting" preview. Off in
+    # tests (so the no-stream path is byte-identical); on for dev/compose.
+    stream_tokens: bool = False
+
     # Evals (Phase J). Off => the eval harness is a strict no-op. When on, evals
     # score agent output at major steps and emit eval.scored/eval.blocked events.
     run_evals: bool = False

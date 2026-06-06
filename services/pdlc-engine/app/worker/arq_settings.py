@@ -25,6 +25,7 @@ from ..runtime import (
     set_runner,
     wire_event_bus,
     wire_llm_backend,
+    wire_token_streaming,
 )
 
 
@@ -48,6 +49,7 @@ async def startup(_ctx: dict) -> None:
     wire_emitter(settings)
     set_runner(GraphRunner(checkpointer=build_checkpointer(settings)))
     wire_llm_backend(settings)
+    wire_token_streaming(settings)
     wire_evals(settings)
 
 

@@ -23,6 +23,7 @@ from .runtime import (
     wire_dispatcher,
     wire_event_bus,
     wire_llm_backend,
+    wire_token_streaming,
 )
 from .websocket.handler import ws_router
 
@@ -43,6 +44,7 @@ async def lifespan(_app: FastAPI):
     set_runner(GraphRunner(checkpointer=build_checkpointer(settings)))
     wire_dispatcher(settings)
     wire_llm_backend(settings)
+    wire_token_streaming(settings)  # live "drafting" preview frames (off by default)
     wire_evals(settings)  # after LLM wiring so the judge can use the factory
     yield
 

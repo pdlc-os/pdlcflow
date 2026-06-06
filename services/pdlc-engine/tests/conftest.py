@@ -25,6 +25,7 @@ def _reset_runtime():
     from app.analytics import reset_analytics_store
     from app.runtime import reset_dispatcher, reset_runner, reset_runtime_ports
     from pdlc_graph.evals import reset_eval_config, reset_judge_backend
+    from pdlc_graph.llm_port import reset_token_publisher
     from pdlc_graph.ports import reset_artifact_store, reset_task_store
 
     reset_runtime_ports()
@@ -35,4 +36,5 @@ def _reset_runtime():
     reset_analytics_store()
     reset_eval_config()
     reset_judge_backend()
+    reset_token_publisher()
     yield

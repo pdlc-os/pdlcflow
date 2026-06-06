@@ -5,6 +5,7 @@ import { ChatPanel } from '@/components/ChatPanel';
 import { MemoryFileViewer } from '@/components/MemoryFileViewer';
 import { NightShiftMissionControl } from '@/components/NightShiftMissionControl';
 import { QuestionCard } from '@/components/QuestionCard';
+import { StreamingPreview } from '@/components/StreamingPreview';
 import { connect, type NightShiftFrame } from '@/lib/ws';
 import { useThread } from '@/store/useThread';
 
@@ -14,9 +15,11 @@ export function ProjectView() {
   const status = useThread((s) => s.status);
   const result = useThread((s) => s.result);
   const verdicts = useThread((s) => s.verdicts);
+  const streaming = useThread((s) => s.streaming);
   const setPending = useThread((s) => s.setPending);
   const setResult = useThread((s) => s.setResult);
   const appendVerdict = useThread((s) => s.appendVerdict);
+  const streamToken = useThread((s) => s.streamToken);
   const answer = useThread((s) => s.answer);
   const resolveApproval = useThread((s) => s.resolveApproval);
 
@@ -31,12 +34,14 @@ export function ProjectView() {
         else if (f.type === 'thread.completed') {
           setPending(null);
           if (f.summary) setResult(f.summary);
+        } else if (f.type === 'token') {
+          streamToken(f);
         } else if (f.type.startsWith('night_shift.')) {
           appendVerdict(f as NightShiftFrame);
         }
       },
     });
-  }, [threadId, setPending, setResult, appendVerdict]);
+  }, [threadId, setPending, setResult, appendVerdict, streamToken]);
 
   const busy = status === 'running';
   const question = pending?.kind === 'user_input_required' ? pending : null;
@@ -57,6 +62,7 @@ export function ProjectView() {
       <div className="flex flex-col gap-4">
         <h2 className="text-lg font-semibold tracking-tight">Studio</h2>
         <ChatPanel />
+        <StreamingPreview streaming={streaming} />
         {isNightShift && (
           <NightShiftMissionControl
             phase={nsPhase as 'awaiting-contract' | 'running' | 'completed' | 'aborted' | 'declined'}
