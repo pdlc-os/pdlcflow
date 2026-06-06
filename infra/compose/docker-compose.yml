@@ -67,8 +67,9 @@ services:
 
   studio:
     build:
-      context: ../../apps/studio
-      dockerfile: Dockerfile
+      # Repo-root context so the pnpm workspace lockfile is available.
+      context: ../../
+      dockerfile: apps/studio/Dockerfile
     depends_on: [api]
     ports: ["8080:80"]
 
