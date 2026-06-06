@@ -69,6 +69,21 @@ services:
     depends_on: [api]
     ports: ["8080:80"]
 
+  # One-shot: score the eval golden suite with the REAL judge (needs PDLC_WIRE_LLM
+  # + provider creds in .env). Run with:  docker compose --profile evals run --rm evals
+  evals:
+    profiles: ["evals"]
+    build:
+      context: ../../
+      dockerfile: services/pdlc-engine/Dockerfile
+    env_file: .env
+    environment:
+      PDLC_RUN_EVALS: "1"
+      PDLC_WIRE_LLM: "true"
+    # Standalone — scores the golden suite via the judge; no DB/Redis needed.
+    working_dir: /workspace/services/pdlc-engine
+    command: ["uv", "run", "python", "/workspace/scripts/run_eval_suite.py", "--real"]
+
   caddy:
     image: caddy:2-alpine
     profiles: [tls]
