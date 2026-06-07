@@ -101,8 +101,25 @@ def invoke(
     state = _initial_state(req, thread_id, session_id, org_id)
 
     pending = get_dispatcher().start(thread_id, state)
+    _record_turn(org_id, thread_id, str(req.project_id),
+                 user=f"/{req.command}" + (f" {req.feature}" if req.feature else ""),
+                 pending=pending)
     return InvokeCommandResponse(
         thread_id=thread_id,
         started=True,
         pending=pending.as_dict() if pending else None,
     )
+
+
+def _record_turn(org_id, thread_id, project_id, *, user: str, pending) -> None:
+    """Append the user turn + the agent's response to the durable transcript.
+    Best-effort: never break the request on a transcript failure."""
+    try:
+        from ..persistence.transcript import get_transcript_store, summarize_pending
+
+        store = get_transcript_store()
+        store.append(org_id=org_id, thread_id=thread_id, project_id=project_id, role="user", text=user)
+        store.append(org_id=org_id, thread_id=thread_id, project_id=project_id,
+                     role="agent", text=summarize_pending(pending))
+    except Exception:  # pragma: no cover - never fail a turn on transcript
+        pass

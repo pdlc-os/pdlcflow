@@ -357,3 +357,25 @@ def test_checkpoint_tables_are_rls_forced():
     assert len(rows) == 3
     for _, enabled, forced in rows:
         assert enabled and forced
+
+
+def test_thread_transcript_rls_and_roundtrip():
+    """thread_transcript is RLS-FORCEd; the Postgres store appends + lists per org.
+    (Cross-org isolation as the non-owner role is verified on docker.)"""
+    from app.db.session import get_sync_engine
+    from app.persistence.transcript import PostgresTranscriptStore
+    from sqlalchemy import text
+
+    with get_sync_engine(settings).begin() as c:
+        forced = c.execute(text(
+            "select relforcerowsecurity from pg_class where relname='thread_transcript'"
+        )).scalar()
+    assert forced is True
+
+    s = PostgresTranscriptStore(settings)
+    org = str(uuid.uuid4())
+    tid = f"{org}:{uuid.uuid4()}:{uuid.uuid4()}"
+    s.append(org_id=org, thread_id=tid, project_id=None, role="user", text="/doctor")
+    s.append(org_id=org, thread_id=tid, project_id=None, role="agent", text="(completed)")
+    assert any(t["thread_id"] == tid and "doctor" in t["label"] for t in s.list_threads(org_id=org))
+    assert len(s.list_thread(org_id=org, thread_id=tid)) == 2

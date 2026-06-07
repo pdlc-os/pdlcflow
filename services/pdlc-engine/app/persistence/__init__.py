@@ -48,6 +48,16 @@ def wire_persistence(settings) -> None:
         except Exception as exc:  # pragma: no cover - prod-only path
             log.warning("postgres task store unavailable (%s); using in-memory", exc)
 
+    # --- conversation transcript store ---
+    if getattr(settings, "task_store", "memory") == "postgres":
+        try:
+            from .transcript import PostgresTranscriptStore, set_transcript_store
+
+            set_transcript_store(PostgresTranscriptStore(settings))
+            log.info("transcript store: postgres")
+        except Exception as exc:  # pragma: no cover - prod-only path
+            log.warning("postgres transcript store unavailable (%s); using in-memory", exc)
+
     # --- analytics read store ---
     if getattr(settings, "analytics_backend", "memory") == "postgres":
         try:
