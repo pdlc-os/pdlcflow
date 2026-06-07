@@ -3,6 +3,37 @@
 All notable changes to pdlcflow are documented here. This project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## v1.8.0 — 2026-06-07
+
+"Release A" — operational CLI + Studio UX quick wins. (The larger GitHub-repo and
+schema-hierarchy work is tracked for a following release.)
+
+### Added
+- **`pdlcflow` control CLI + `PDLCFLOW_HOME`.** The installer symlinks a `pdlcflow`
+  command onto PATH and exports `PDLCFLOW_HOME`; subcommands wrap docker compose in
+  that dir: `setup` (up -d) · `start` · `stop` · `status` (ps) · `remove` (down) ·
+  `wipe` (down -v). The updater recreates the symlink/env if missing; the
+  uninstaller removes them.
+- **Create projects from the Studio landing page** → straight into the project's
+  chat (replacing the hardcoded demo tiles).
+- **Conversations nested under each project** in the left nav — click to open/replay.
+
+### Changed / Fixed
+- **Composer is multi-line.** It's now a `<textarea>`: **Enter sends**,
+  **Shift/Ctrl/Cmd/Alt+Enter** inserts a newline; it auto-grows then scrolls.
+- **Slash-command caret fix.** The highlight overlay now shares the textarea's exact
+  typography (color-only highlight), so the caret no longer trails when typing a
+  `/command`.
+- **Sign-in overlay is dismissable** (Cancel always shown + Esc + backdrop click) —
+  previously self-hosted simulation-mode users with no identity were trapped on it.
+
+### Notes
+- Studio projects are backed by a client-side registry for now; the next release
+  promotes them to a server-side, org-scoped entity as part of the data-model
+  redesign (Org→Domain→Squad→repos, Squad↔Initiative many-to-many, cross-org
+  initiatives), alongside GitHub-repo selection, repo-backed memory, and chat
+  file attachments.
+
 ## v1.7.1 — 2026-06-07
 
 Patch: fixes a one-line-installer failure on a fresh deploy.

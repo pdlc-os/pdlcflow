@@ -1,6 +1,6 @@
 [project]
 name = "pdlc-migrate"
-version = "1.7.1"
+version = "1.8.0"
 description = "Migration CLI — import upstream pdlc projects into pdlcflow"
 requires-python = ">=3.12"
 license = { text = "MIT" }
