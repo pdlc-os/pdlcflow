@@ -43,6 +43,16 @@ credentials · run evals — everything else is defaulted. Prefer manual config?
 `.env.example`, copy to `.env`, edit, and `docker compose up -d`. Pin a release with
 `PDLCFLOW_VERSION=1.5.0` in `.env`. Full details: [`deploy/README.md`](https://github.com/pdlc-os/pdlcflow/blob/main/deploy/README.md).
 
+**Update / uninstall** (same one-line pattern):
+
+```bash
+# update: refresh files + pull images + recreate + migrate (your .env is kept)
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/pdlc-os/pdlcflow/main/deploy/update.sh)"
+
+# uninstall: stop + remove the stack (keeps data + files by default; asks before deleting)
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/pdlc-os/pdlcflow/main/deploy/uninstall.sh)"
+```
+
 ## Prerequisites
 
 For the Docker Compose path:

@@ -53,13 +53,37 @@ docker compose run --rm api uv run alembic upgrade head
 It auto-generates the JWT secret + the Postgres/app-role passwords and writes `.env`
 (git-ignored). Re-run any time.
 
+## Update
+
+```bash
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/pdlc-os/pdlcflow/main/deploy/update.sh)"
+```
+
+Refreshes the deploy files (compose + scripts; **never** your `.env`), pulls the latest
+images, recreates the stack, and applies any new DB migrations. Run from your deploy dir
+(or above `./pdlcflow`), or pass `--dir=<path>`. Bump the pinned version with
+`update.sh --version=1.6.0` (append flags to the one-liner as
+`bash -c "$(curl …)" -- --version=1.6.0`). `--no-migrate` skips the schema step.
+
+## Uninstall
+
+```bash
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/pdlc-os/pdlcflow/main/deploy/uninstall.sh)"
+```
+
+Stops + removes the stack. **By default it keeps your data and files**, then asks (default
+*No*) before each irreversible step. Flags: `--data` (delete the Postgres/MinIO/artifacts
+volumes — irreversible), `--images` (remove the pulled images), `--purge` (all of those +
+remove the deploy directory), `--yes` (no prompts; only flagged actions run). `--dir=<path>`
+selects the deployment.
+
 ## Notes
 - Pin the version in `.env` (`PDLCFLOW_VERSION=1.5.0`) for reproducible deploys; `latest`
   tracks the newest release.
 - **RLS:** the app connects as the non-superuser `pdlc_app` role (created on first DB init);
   migrations run as the owner. `setup.sh` keeps both passwords in sync.
 - **Real evals one-shot:** `docker compose --profile evals run --rm evals` (needs LLM creds).
-- **Upgrade:** bump `PDLCFLOW_VERSION`, `docker compose pull && docker compose up -d`, then
-  `docker compose run --rm api uv run alembic upgrade head`.
+- **Upgrade:** use the [Update](#update) one-liner (or manually bump `PDLCFLOW_VERSION`,
+  `docker compose pull && docker compose up -d`, then `… alembic upgrade head`).
 - TLS / reverse proxy, backups, and scaling are deployment-specific — front the `studio`
   (`:8080`) + `api` (`:8000`) with your own proxy.
