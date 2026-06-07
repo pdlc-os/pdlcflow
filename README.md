@@ -72,7 +72,8 @@ the guardrails a real organization needs.
 - **Live experience** — a React **Studio** with real-time WebSocket updates and live token
   "drafting" previews.
 - **Deploy anywhere** — one-line install from published container images, Docker Compose for
-  self-host, or AWS CDK (8 stacks) for multi-tenant SaaS.
+  self-host, or multi-tenant SaaS on **AWS, GCP, or Azure** (full-parity Terraform modules;
+  plus an AWS-native CDK).
 - **Migration tooling** — a CLI to scan, map, and back-fill from an existing PDLC setup.
 
 ## Bring your own LLM
@@ -158,13 +159,20 @@ pnpm install
 pnpm --filter @pdlcflow/studio dev   # proxies /v1 and /ws to http://localhost:8000
 ```
 
-### Deploy SaaS (AWS)
+### Deploy SaaS (AWS, GCP, or Azure)
+
+Multi-cloud Terraform (full-parity modules per cloud) lives in
+[`infra/terraform/`](./infra/terraform/README.md):
 
 ```bash
-cd infra/cdk
-pnpm install
-pnpm cdk bootstrap aws://<account>/<region>
-pnpm cdk deploy --all
+cd infra/terraform/modules/<aws|gcp|azure>
+terraform init && terraform apply -var-file=../../example.tfvars
+```
+
+Or the AWS-native CDK ([`infra/cdk/`](./infra/cdk/README.md)):
+
+```bash
+cd infra/cdk && pnpm install && pnpm cdk bootstrap aws://<account>/<region> && pnpm cdk deploy --all
 ```
 
 ## Configuration
@@ -191,7 +199,7 @@ you opt in.
   evals), with diagrams.
 - **[Deploy guide](./deploy/README.md)** — install / update / uninstall from published images.
 - **[Configuration](./docs/wiki/03-configuration.md)** · **[Changelog](./CHANGELOG.md)** · **[Phase tracker](./STATUS.md)**
-- **[Self-host README](./infra/compose/README.md)** · **[SaaS / CDK README](./infra/cdk/README.md)**
+- **[Self-host README](./infra/compose/README.md)** · **[Multi-cloud Terraform (AWS/GCP/Azure)](./infra/terraform/README.md)** · **[SaaS / CDK README](./infra/cdk/README.md)**
 - **[Architecture proposal](./docs/.research/.langgraph-bedrock-saas-migration-2026-06-05.md)** — the full design (15 sections, mermaid diagrams, event taxonomy, schema, provider factory, CDK topology).
 
 ## Relationship to upstream `pdlc`
@@ -221,6 +229,7 @@ pdlcflow/
 │   └── pdlc-engine/     # FastAPI: REST + WebSocket, clickstream, DB models, 7-provider LLM factory, Alembic
 ├── infra/
 │   ├── compose/         # Docker Compose (self-host, single-tenant)
+│   ├── terraform/       # Multi-cloud SaaS IaC — full-parity AWS / GCP / Azure modules
 │   └── cdk/             # AWS CDK (SaaS, multi-tenant) — 8 stacks
 ├── tools/
 │   └── pdlc-migrate/    # CLI: scan / push / taxonomy / backfill
