@@ -86,8 +86,6 @@ Evaluation order:
    with that reason.
 2. An `ns-progress:complete` marker → `complete` (loop exits cleanly).
 3. Stagnation check (no new progress + no abort) → abort with `stagnation`.
-   (The Phase A stub always returns False, so no false aborts during scaffold
-   runs.)
 4. Otherwise → `continue`.
 
 `_state_md` derives markers from state: `construction_complete` →

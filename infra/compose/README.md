@@ -110,10 +110,11 @@ docker compose down
 docker compose down -v
 ```
 
-## Phase A status
+## Status
 
-This compose stack boots the scaffold described in
-[`../../docs/.research/.langgraph-bedrock-saas-migration-2026-06-05.md`](../../docs/.research/.langgraph-bedrock-saas-migration-2026-06-05.md).
-The 17 slash commands, party meetings, and approval gates are stubbed —
-endpoints return shape-correct responses and Studio renders Chainlit-style
-chat with the right layout, but the real graph turns land in Phases B–F.
+The full PDLC lifecycle is implemented — the 17 commands, party meetings,
+approval gates, night-shift, evals, auth/RLS, and live streaming all run real
+graph turns. See [`STATUS.md`](../../STATUS.md) for the per-phase checklist and
+[`CHANGELOG.md`](../../CHANGELOG.md) for releases. For a no-clone deploy from
+published images, use [`../../deploy/`](../../deploy/README.md); for multi-cloud
+SaaS, [`../terraform/`](../terraform/README.md).

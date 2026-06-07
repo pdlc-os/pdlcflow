@@ -39,6 +39,7 @@ c "Updating pdlcflow in $(pwd)"
 
 c "↓ Refreshing deploy files (your .env is left untouched)"
 curl -fsSLO "$BASE/docker-compose.yml"
+curl -fsSLO "$BASE/.env.example"
 for f in setup.sh install.sh update.sh uninstall.sh; do
   curl -fsSL "$BASE/$f" -o "$f" && chmod +x "$f"
 done

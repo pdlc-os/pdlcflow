@@ -58,7 +58,9 @@ if yn "Use real LLM models now (else offline stub)?" n; then
   case "$provider" in
     bedrock)   creds+=("AWS_ACCESS_KEY_ID=$(ask 'AWS_ACCESS_KEY_ID' '')")
                creds+=("AWS_SECRET_ACCESS_KEY=$(ask 'AWS_SECRET_ACCESS_KEY' '')")
-               creds+=("AWS_REGION=$(ask 'AWS_REGION' 'us-east-1')") ;;
+               _region="$(ask 'AWS region (for Bedrock)' 'us-east-1')"
+               creds+=("AWS_REGION=${_region}")            # boto3 credential chain
+               creds+=("PDLC_BEDROCK_REGION=${_region}") ;;  # region the engine's Bedrock client uses
     anthropic) creds+=("ANTHROPIC_API_KEY=$(ask 'ANTHROPIC_API_KEY' '')") ;;
     openai)    creds+=("OPENAI_API_KEY=$(ask 'OPENAI_API_KEY' '')") ;;
     gemini)    creds+=("GOOGLE_API_KEY=$(ask 'GOOGLE_API_KEY' '')") ;;
