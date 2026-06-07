@@ -74,6 +74,8 @@ It is parsed `\/?(\w[\w-]*)\s*(.*)` into `command = "brainstorm"` and
 that drive UX Discovery, the store seeds `seed_state: { visual: true }` so the
 visual companion fires.
 
+**Conversation history.** The right rail lists past threads (Conversations) — newest first, labelled by the first command. Click one to replay its verbatim transcript and continue it (`/v1/admin/threads`), or "+ New" to start fresh. Your org/project/thread persist across reloads. (Transcript stored durably + org-isolated; see [monitoring](14-monitoring.md).)
+
 **Composer affordances.** As you type `/`, an **autocomplete menu** filters the
 commands (↑/↓ to move, Enter/Tab to complete, Esc to dismiss), each with a
 one-line summary + its argument hint. The recognized `/command` token is
