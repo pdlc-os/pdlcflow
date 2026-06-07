@@ -3,6 +3,57 @@
 All notable changes to pdlcflow are documented here. This project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## v1.6.0 — 2026-06-06
+
+Distribution, multi-cloud, provider-neutral model selection, and observability on top of
+v1.5.0. All new capability is flag-gated and off by default; dev/CI stay hermetic.
+
+### Distribution — deploy without cloning
+- **Published container images** to GHCR (`pdlcflow-api`, `pdlcflow-studio`, multi-arch) via a
+  `release-images` workflow, plus a standalone `deploy/docker-compose.yml`.
+- **One-line installer** — `bash -c "$(curl … deploy/install.sh)"` downloads the files, runs an
+  interactive **`setup.sh`** wizard (prompts + generates secrets → `.env`), brings the stack up,
+  and migrates. Matching **`update.sh`** + **`uninstall.sh`** one-liners.
+
+### Multi-cloud SaaS (Terraform)
+- **`infra/terraform/`** — full-parity modules for **AWS, GCP, and Azure** mirroring the 8 CDK
+  stacks (managed Postgres/Redis/object-storage, serverless containers, CDN, identity, event
+  streaming, LLM access, secrets, logs). Validated with `tofu validate` (not deploy-tested).
+
+### Provider-neutral model selection
+- **Per-persona capability tiers wired** — agents declare a tier and `complete()` honors it
+  (previously everything defaulted to the top tier). Tiers renamed to generic
+  **`premium` / `balanced` / `economy`**; the `tier_map` auto-selects each provider's
+  highest/general/economy model (Claude family keeps Opus/Sonnet/Haiku). Defaults set to the
+  highest current model per provider (2026-06).
+- **Per-tenant / per-agent overrides wired** (`org_llm_config` / `agent_llm_config` + the
+  `/v1/admin/models/*` API), verified against real Postgres.
+- **Credentials as config for every provider** — direct-API providers fall back to their env key
+  (`ANTHROPIC_API_KEY` / `OPENAI_API_KEY` / `GOOGLE_API_KEY` / `AZURE_OPENAI_*`), Bedrock/Vertex
+  use the cloud SDK chains; the install wizard now covers all **7** providers.
+
+### Observability — human vs agent work
+- Every event tagged **`actor_type`** (human / agent / system). New **Work Narrative**
+  (`GET /v1/admin/narrative` + a Nexus Console view): a date window → stats + an LLM-written
+  story separating human (Studio) work from autonomous agent work.
+
+### Security
+- **Artifact tenant isolation** — artifacts namespaced `{org_id}/{project_id}/{path}` with the
+  org bound from the turn context + path-traversal guards (the file-layer analogue of RLS).
+
+### Naming / docs
+- **Atlas Console → Nexus Console** (the admin dashboard) to avoid confusion with the Atlas
+  agent. Professional, provider-neutral README; expanded wiki.
+
+### Engineering
+- ~234 hermetic tests + live integration (Postgres/Redis/MinIO + RLS + overrides + narrative);
+  CI green (python ×4, node ×2, evals, integration). Multi-cloud Terraform `tofu validate`.
+
+### Known limitations
+- Multi-cloud Terraform is validated, not deploy-tested. Per-tenant `secret_ref` →
+  secrets-manager resolution, OIDC auth on GCP/Azure, Azure Blob artifact adapter, and native
+  Pub/Sub / Event Hubs clickstream sinks remain documented follow-ons.
+
 ## v1.5.0 — 2026-06-06
 
 Adds an evaluation framework and completes the multi-tenant auth + RLS hardening on top of
