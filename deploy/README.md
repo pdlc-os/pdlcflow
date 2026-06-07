@@ -3,6 +3,11 @@
 Run the whole stack from **prebuilt images** on GitHub Container Registry — you only
 need Docker + these few files, not the source repo.
 
+> **Image access.** The `ghcr.io/pdlc-os/pdlcflow-api` and `pdlcflow-studio` packages are
+> **public**, so the pulls below work with no login. If you mirror pdlcflow into your own org
+> and keep the packages **private**, deployers must authenticate first:
+> `echo "$GHCR_PAT" | docker login ghcr.io -u <user> --password-stdin` (PAT with `read:packages`).
+
 ## Quick start
 
 ```bash
