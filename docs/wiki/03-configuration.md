@@ -38,6 +38,26 @@ All engine configuration is environment-driven through Pydantic settings with th
 
 > AWS credentials (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION`) are read by boto3 directly — only needed when using Bedrock, Firehose, or real S3.
 
+## Per-agent model tiers (provider-neutral)
+
+Agents don't hard-code a model. Each persona declares a **capability tier** in its
+soul-spec frontmatter (`model: opus | sonnet | haiku`), and the engine's `tier_map`
+resolves that tier to a concrete model **for whichever provider is active**:
+
+| Tier | Meaning | Personas | Bedrock / Anthropic / Vertex | OpenAI / Azure | Gemini |
+| --- | --- | --- | --- | --- | --- |
+| `opus` | highest capability | atlas, bolt, friday, neo, pulse | Claude Opus | `gpt-5.5` | `gemini-3.1-pro` |
+| `sonnet` | general purpose | echo, jarvis, muse, phantom | Claude Sonnet | `gpt-5.4` | `gemini-3.5-flash` |
+| `haiku` | low token / fast | sentinel | Claude Haiku | `gpt-5.4-mini` | `gemini-3.1-flash-lite` |
+
+So switching `PDLC_DEFAULT_LLM_PROVIDER` keeps the persona→tier association and
+auto-selects each provider's equivalent — Anthropic-family providers keep the real
+Opus/Sonnet/Haiku models; OpenAI/Gemini/etc. map to their highest/general/cheap models.
+
+**Overrides** (no code change): per tenant, `org_llm_config.tier_map` replaces the whole
+table; per agent, `agent_llm_config.model_id` pins an exact model. Default model IDs drift —
+verify against your provider and override as needed. (See `app/llm/tier_map.py`.)
+
 ## In-memory vs real backend matrix
 
 Each seam is independently switchable. The left column is the dev/test default; the right is the self-host (Postgres/Redis/MinIO) production shape.

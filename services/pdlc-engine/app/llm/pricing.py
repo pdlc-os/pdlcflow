@@ -9,22 +9,24 @@ from __future__ import annotations
 
 # (input_$_per_1M, output_$_per_1M)
 PRICES: dict[tuple[str, str], tuple[float, float]] = {
-    ("bedrock",   "anthropic.claude-opus-4-7"):    (15.0, 75.0),
+    ("bedrock",   "anthropic.claude-opus-4-8"):    (15.0, 75.0),
     ("bedrock",   "anthropic.claude-sonnet-4-6"):  (3.0,  15.0),
     ("bedrock",   "anthropic.claude-haiku-4-5"):   (0.8,  4.0),
-    ("anthropic", "claude-opus-4-7"):              (15.0, 75.0),
+    ("anthropic", "claude-opus-4-8"):              (15.0, 75.0),
     ("anthropic", "claude-sonnet-4-6"):            (3.0,  15.0),
     ("anthropic", "claude-haiku-4-5"):             (0.8,  4.0),
-    ("openai",    "gpt-4o"):                       (2.5,  10.0),
-    ("openai",    "gpt-4o-mini"):                  (0.15, 0.6),
-    ("azure",     "gpt-4o"):                       (2.5,  10.0),
-    ("azure",     "gpt-4o-mini"):                  (0.15, 0.6),
-    ("gemini",    "gemini-2.5-pro"):               (1.25, 5.0),
-    ("gemini",    "gemini-2.0-flash"):             (0.075, 0.3),
-    ("gemini",    "gemini-2.0-flash-lite"):        (0.05, 0.2),
-    ("vertex",    "claude-opus-4@20260101"):       (15.0, 75.0),
-    ("vertex",    "claude-sonnet-4@20260101"):     (3.0,  15.0),
-    ("vertex",    "claude-haiku-4@20260101"):      (0.8,  4.0),
+    ("vertex",    "claude-opus-4-8"):              (15.0, 75.0),
+    ("vertex",    "claude-sonnet-4-6"):            (3.0,  15.0),
+    ("vertex",    "claude-haiku-4-5"):             (0.8,  4.0),
+    ("openai",    "gpt-5.5"):                      (5.0,  30.0),
+    ("openai",    "gpt-5.4"):                      (2.5,  15.0),
+    ("openai",    "gpt-5.4-mini"):                 (0.75, 4.5),
+    ("azure",     "gpt-5.5"):                      (5.0,  30.0),
+    ("azure",     "gpt-5.4"):                      (2.5,  15.0),
+    ("azure",     "gpt-5.4-mini"):                 (0.75, 4.5),
+    ("gemini",    "gemini-3.1-pro"):               (2.0,  10.0),
+    ("gemini",    "gemini-3.5-flash"):             (0.3,  2.5),
+    ("gemini",    "gemini-3.1-flash-lite"):        (0.1,  0.4),
     ("ollama",    "*"):                            (0.0,  0.0),  # local; no $
 }
 

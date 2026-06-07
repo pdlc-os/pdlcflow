@@ -15,9 +15,10 @@ from ..llm.factory import LLMProviderFactory, TenantCtx
 
 log = logging.getLogger("pdlc.runtime.llm")
 
-# Persona → tier follows the soul-spec frontmatter; default opus for the
-# product/architecture leads, sonnet otherwise. Kept simple here; the factory's
-# tier_map does the model resolution.
+# The tier is resolved upstream in llm_port.complete() from each persona's
+# soul-spec frontmatter, so a real tier always arrives here; this is just the
+# safety net if a caller passes tier=None explicitly. The factory's tier_map
+# turns the tier into a concrete per-provider model.
 _DEFAULT_TIER = "opus"
 
 

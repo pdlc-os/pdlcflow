@@ -89,6 +89,13 @@ flow through one pluggable LLM factory; pick the backend per deployment with a s
 | **Azure OpenAI** | `azure` | Azure-hosted OpenAI |
 | **Ollama** | `ollama` | Local / air-gapped models |
 
+Agents stay provider-neutral by declaring a **capability tier** (`opus` = frontier,
+`sonnet` = general, `haiku` = cheap/fast) rather than a model. The factory maps the tier to
+the right model for the active provider — Anthropic-family providers keep real
+Opus/Sonnet/Haiku, while OpenAI/Gemini auto-select their highest/general/economy equivalent —
+so switching providers preserves each agent's intended capability level. Defaults are
+overridable per tenant or per agent (see the [configuration guide](./docs/wiki/03-configuration.md#per-agent-model-tiers-provider-neutral)).
+
 Leave the LLM unwired (`PDLC_WIRE_LLM=false`, the default) and pdlcflow runs against a
 deterministic offline stub — so the full stack boots, tests, and demos with **no credentials**.
 
