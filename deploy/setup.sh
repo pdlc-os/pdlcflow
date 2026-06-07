@@ -54,7 +54,7 @@ fi
 wire_llm=false; provider="bedrock"; declare -a creds=()
 if yn "Use real LLM models now (else offline stub)?" n; then
   wire_llm=true
-  provider="$(ask "Provider (bedrock|anthropic|openai|gemini)" "bedrock")"
+  provider="$(ask "Provider (bedrock|anthropic|openai|gemini|azure|vertex|ollama)" "bedrock")"
   case "$provider" in
     bedrock)   creds+=("AWS_ACCESS_KEY_ID=$(ask 'AWS_ACCESS_KEY_ID' '')")
                creds+=("AWS_SECRET_ACCESS_KEY=$(ask 'AWS_SECRET_ACCESS_KEY' '')")
@@ -62,6 +62,12 @@ if yn "Use real LLM models now (else offline stub)?" n; then
     anthropic) creds+=("ANTHROPIC_API_KEY=$(ask 'ANTHROPIC_API_KEY' '')") ;;
     openai)    creds+=("OPENAI_API_KEY=$(ask 'OPENAI_API_KEY' '')") ;;
     gemini)    creds+=("GOOGLE_API_KEY=$(ask 'GOOGLE_API_KEY' '')") ;;
+    azure)     creds+=("AZURE_OPENAI_API_KEY=$(ask 'AZURE_OPENAI_API_KEY' '')")
+               creds+=("AZURE_OPENAI_ENDPOINT=$(ask 'AZURE_OPENAI_ENDPOINT (https://<res>.openai.azure.com)' '')") ;;
+    vertex)    creds+=("GOOGLE_APPLICATION_CREDENTIALS=$(ask 'Path to GCP service-account JSON (or use workload identity)' '')")
+               creds+=("GOOGLE_CLOUD_PROJECT=$(ask 'GOOGLE_CLOUD_PROJECT' '')")
+               creds+=("GOOGLE_CLOUD_REGION=$(ask 'GOOGLE_CLOUD_REGION' 'us-east5')") ;;
+    ollama)    creds+=("PDLC_OLLAMA_ENDPOINT=$(ask 'Ollama endpoint' 'http://localhost:11434')") ;;
     *)         say "  unknown provider — add its credentials to .env manually." ;;
   esac
 fi
@@ -92,7 +98,7 @@ yn "Run evals (scores agent output; uses judge LLM calls when LLM is on)?" n && 
   [ -n "$boot_pw" ] && echo "PDLC_BOOTSTRAP_ADMIN_PASSWORD=${boot_pw}"
   echo "PDLC_WIRE_LLM=${wire_llm}"
   echo "PDLC_DEFAULT_LLM_PROVIDER=${provider}"
-  echo "PDLC_JUDGE_TIER=opus"
+  echo "PDLC_JUDGE_TIER=premium"
   echo "PDLC_RUN_EVALS=${run_evals}"
   echo "PDLC_EVAL_BLOCKING="
   for c in "${creds[@]:-}"; do [ -n "$c" ] && echo "$c"; done
@@ -104,4 +110,4 @@ echo "Next:"
 echo "  docker compose up -d"
 echo "  docker compose run --rm api uv run alembic upgrade head"
 echo "  open http://localhost:8080   (Studio)   ·   http://localhost:8000/health   (API)"
-[ "$auth" = true ] && echo "  sign in as ${boot_email}"
+if [ "$auth" = true ]; then echo "  sign in as ${boot_email}"; fi
