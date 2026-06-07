@@ -32,6 +32,13 @@ need() { command -v "$1" >/dev/null 2>&1 || { echo "✗ '$1' is required but not
 confirm() { local a; read -r -p "$1 (y/N): " a; [[ "$a" =~ ^[Yy] ]]; }
 need docker
 
+# --- pdlcflow CLI removal (mirror of install_cli) ---
+PDLCFLOW_BIN_DIR="${PDLCFLOW_BIN_DIR:-$HOME/.local/bin}"
+_rc_file() { case "${SHELL:-}" in *zsh) echo "$HOME/.zshrc";; *bash) echo "$HOME/.bashrc";; *) echo "$HOME/.profile";; esac; }
+_rc_strip() { local f="$1"; [ -f "$f" ] || return 0
+  awk 'BEGIN{s=1} /^# >>> pdlcflow >>>$/{s=0} s==1{print} /^# <<< pdlcflow <<<$/{s=1}' "$f" > "$f.pdlctmp" && mv "$f.pdlctmp" "$f"; }
+uninstall_cli() { rm -f "$PDLCFLOW_BIN_DIR/pdlcflow"; _rc_strip "$(_rc_file)"; }
+
 if [ -z "$DIR" ]; then
   if [ -f docker-compose.yml ]; then DIR="."
   elif [ -f pdlcflow/docker-compose.yml ]; then DIR="pdlcflow"
@@ -62,6 +69,12 @@ if [ "$DO_IMG" -eq 1 ]; then
   if [ -n "$imgs" ]; then docker rmi $imgs >/dev/null 2>&1 || true; c "→ Removed pdlcflow images"; fi
 fi
 
+# Always remove the 'pdlcflow' command (PATH symlink) + the PDLCFLOW_HOME env block.
+if [ -L "$PDLCFLOW_BIN_DIR/pdlcflow" ] || grep -q '^export PDLCFLOW_HOME=' "$(_rc_file)" 2>/dev/null; then
+  uninstall_cli
+  c "→ Removed the 'pdlcflow' command + PDLCFLOW_HOME from $(_rc_file)"
+fi
+
 if [ "$DO_DIR" -eq 1 ]; then
   cd ..
   rm -rf "$abs"
@@ -71,3 +84,4 @@ fi
 echo
 c "✓ pdlcflow uninstalled."
 [ "$DO_DATA" -eq 0 ] && echo "   Data volumes were kept — re-run with --data (or 'docker compose down -v') to delete them."
+echo "   The PDLCFLOW_HOME export was removed from your shell rc; open a new terminal to clear it from the current session."
