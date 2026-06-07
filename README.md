@@ -6,7 +6,8 @@ pdlcflow is an open-source, multi-tenant platform that turns a structured Produc
 Lifecycle (PDLC) into a browser-based, multi-agent system. A cast of specialized AI agents
 moves each feature through **brainstorm → build → ship**, with human approval gates, persistent
 memory, automatic quality evaluation, and full audit telemetry. It runs on **your choice of
-LLM provider**, self-hosted or on AWS, with tenant isolation enforced at the database.
+LLM provider**, self-hosted or as multi-tenant SaaS on **AWS, GCP, or Azure**, with tenant
+isolation enforced at the database.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
 [![Release](https://img.shields.io/github/v/release/pdlc-os/pdlcflow?sort=semver)](https://github.com/pdlc-os/pdlcflow/releases)
