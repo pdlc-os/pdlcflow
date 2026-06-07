@@ -9,6 +9,9 @@ psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" <<-S
   create role pdlc_app login password '${PDLC_APP_DB_PASSWORD:-pdlc_app}' nosuperuser nocreatedb nocreaterole;
   grant connect on database "$POSTGRES_DB" to pdlc_app;
   grant usage on schema public to pdlc_app;
+  -- CREATE so the LangGraph PostgresSaver can create + own (and RLS-FORCE) its
+  -- checkpoint tables when the app connects as pdlc_app.
+  grant create on schema public to pdlc_app;
   alter default privileges for role "$POSTGRES_USER" in schema public
     grant select, insert, update, delete on tables to pdlc_app;
   alter default privileges for role "$POSTGRES_USER" in schema public

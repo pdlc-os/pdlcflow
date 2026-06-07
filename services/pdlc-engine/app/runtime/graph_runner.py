@@ -52,11 +52,25 @@ def build_checkpointer(settings=None):
     """
     if settings is not None and getattr(settings, "use_postgres_checkpointer", False):
         try:  # prod-only path — requires a reachable Postgres (verified via docker compose)
+            from contextlib import contextmanager
+
             from langgraph.checkpoint.postgres import PostgresSaver
+            from pdlc_graph.ports import current_org
             from psycopg.rows import dict_row
             from psycopg_pool import ConnectionPool
 
-            pool = ConnectionPool(
+            class _TenantScopedPool(ConnectionPool):
+                """Stamp `app.org_id` (the current turn's tenant, from the thread id)
+                on every checked-out connection, so the RLS-FORCEd checkpoint tables
+                isolate per org even though the LangGraph saver owns the connections."""
+
+                @contextmanager
+                def connection(self, timeout=None):
+                    with super().connection(timeout=timeout) as conn:
+                        conn.execute("select set_config('app.org_id', %s, false)", (current_org(),))
+                        yield conn
+
+            pool = _TenantScopedPool(
                 conninfo=_psycopg_conninfo(settings.db_url),
                 max_size=getattr(settings, "pg_pool_max_size", 20),
                 open=True,
@@ -64,11 +78,37 @@ def build_checkpointer(settings=None):
             )
             saver = PostgresSaver(pool)
             saver.setup()  # idempotent — creates the langgraph checkpoint tables
-            log.info("PostgresSaver checkpointer active (durable, multi-process)")
+            _force_checkpoint_rls(pool)
+            log.info("PostgresSaver checkpointer active (durable, multi-process, RLS-FORCEd)")
             return saver
         except Exception as exc:  # pragma: no cover - prod-only path
             log.warning("PostgresSaver unavailable (%s); falling back to MemorySaver", exc)
     return MemorySaver()
+
+
+# LangGraph checkpoint tables (all keyed by thread_id = "org:project:session").
+_CKPT_TABLES = ("checkpoints", "checkpoint_blobs", "checkpoint_writes")
+
+
+def _force_checkpoint_rls(pool) -> None:
+    """FORCE row-level security on the checkpoint tables so a tenant can only see
+    its own threads. Policy: thread_id must start with the connection's
+    `app.org_id` + ':'. Owner-only DDL; idempotent + atomic; best-effort (the saver
+    still works if this fails, e.g. as a superuser where RLS is bypassed anyway)."""
+    try:
+        with pool.connection() as conn, conn.transaction():
+            for t in _CKPT_TABLES:
+                conn.execute(f"alter table {t} enable row level security")
+                conn.execute(f"alter table {t} force row level security")
+                conn.execute(f"drop policy if exists tenant_isolation on {t}")
+                conn.execute(
+                    f"create policy tenant_isolation on {t} "
+                    f"using (thread_id like current_setting('app.org_id', true) || ':%') "
+                    f"with check (thread_id like current_setting('app.org_id', true) || ':%')"
+                )
+        log.info("checkpoint tables RLS-FORCEd (%s)", ", ".join(_CKPT_TABLES))
+    except Exception as exc:  # pragma: no cover - prod-only path
+        log.warning("could not FORCE RLS on checkpoint tables (%s)", exc)
 
 
 def _channel(thread_id: str) -> str:

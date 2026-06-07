@@ -332,3 +332,28 @@ def test_postgres_work_summary_splits_actors():
     assert s["by_actor_type"]["agent"] >= 1
     assert s["by_actor_type"]["system"] >= 1
     assert s["by_agent"]["neo"]["tokens"] >= 10
+
+
+def test_checkpoint_tables_are_rls_forced():
+    """build_checkpointer applies FORCE RLS to the LangGraph checkpoint tables so
+    threads isolate per org (thread_id prefix = app.org_id). Cross-org isolation
+    as the non-owner role is verified on docker; here (CI superuser) we assert the
+    RLS machinery is wired."""
+    from types import SimpleNamespace
+
+    from app.db.session import get_sync_engine
+    from app.runtime.graph_runner import build_checkpointer
+    from sqlalchemy import text
+
+    cfg = SimpleNamespace(use_postgres_checkpointer=True, db_url=settings.db_url, pg_pool_max_size=5)
+    ck = build_checkpointer(cfg)
+    assert type(ck).__name__ == "PostgresSaver"  # not a MemorySaver fallback
+
+    with get_sync_engine(settings).begin() as c:
+        rows = c.execute(text(
+            "select relname, relrowsecurity, relforcerowsecurity from pg_class "
+            "where relname in ('checkpoints','checkpoint_writes','checkpoint_blobs')"
+        )).all()
+    assert len(rows) == 3
+    for _, enabled, forced in rows:
+        assert enabled and forced
