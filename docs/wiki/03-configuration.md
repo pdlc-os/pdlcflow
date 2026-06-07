@@ -87,7 +87,9 @@ Auth is **enforced only when `PDLC_AUTH_REQUIRED=true`** (default off = open API
 
 Verified against real Postgres (the `integration` CI job): as the non-owner role, cross-org reads return zero rows and cross-org inserts are rejected (`test_rls_force_blocks_cross_org_as_non_owner_role`); `org_members` is invisible cross-org yet login still works via the definer (`test_org_members_rls_locked_but_login_works_via_definer`).
 
-## The "always falls back to in-memory" safety note
+### Artifact isolation
+
+PRDs, design docs, reviews, episodes, etc. are namespaced **`{org_id}/{project_id}/{path}`** (filesystem dir / S3 key). The **org is the authoritative tenant** — the runner binds it per turn from the thread id (the JWT-bound org when auth is on), so a node only ever writes under its own tenant prefix even if a `project_id` is forged. `project_id`/`path` are sanitized (no traversal, no absolute paths), and the filesystem store pins every resolved path under its base dir. So one session's / repo's / tenant's files never mix with another's.
 
 Wiring is defensive: `wire_persistence`, `build_checkpointer`, `wire_event_bus`, and `wire_dispatcher` each try to construct the configured real backend and **fall back to the in-memory default if its infrastructure is unreachable** — logging a warning rather than crashing. So:
 
