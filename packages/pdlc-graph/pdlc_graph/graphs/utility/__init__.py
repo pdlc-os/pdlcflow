@@ -12,6 +12,7 @@ from langgraph.graph import END, START, StateGraph
 from ...instrumentation import instrumented_node
 from ...state import PDLCState
 from .abandon import abandon_node
+from .compact import compact_node
 from .decide import decide_node
 from .doctor import doctor_node
 from .hotfix import hotfix_node
@@ -35,6 +36,7 @@ UTILITY_NODES = {
     "override": override_node,
     "rollback": rollback_node,
     "hotfix": hotfix_node,
+    "compact": compact_node,
 }
 
 

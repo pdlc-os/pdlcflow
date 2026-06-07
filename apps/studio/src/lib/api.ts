@@ -170,7 +170,24 @@ export const admin = {
     if (opts?.projectId) q.set('project_id', opts.projectId);
     return json<NarrativeResponse>(`/admin/narrative?${q.toString()}`);
   },
+
+  contextUsage: (orgId: string, projectId?: string) => {
+    const q = new URLSearchParams({ org_id: orgId });
+    if (projectId) q.set('project_id', projectId);
+    return json<ContextUsage>(`/admin/context?${q.toString()}`);
+  },
 };
+
+export interface ContextUsage {
+  model_id: string | null;
+  context_window: number;
+  peak_prompt_tokens: number;
+  last_prompt_tokens: number;
+  cumulative_tokens: number;
+  pct_used: number;
+  near_limit: boolean;
+  calls: number;
+}
 
 export interface WorkSummary {
   window: { from: string | null; to: string | null };

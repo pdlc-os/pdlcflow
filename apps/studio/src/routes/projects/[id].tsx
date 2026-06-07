@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 
 import { ApprovalGateModal } from '@/components/ApprovalGateModal';
 import { ChatPanel } from '@/components/ChatPanel';
+import { ContextMeter } from '@/components/ContextMeter';
 import { MemoryFileViewer } from '@/components/MemoryFileViewer';
 import { NightShiftMissionControl } from '@/components/NightShiftMissionControl';
 import { QuestionCard } from '@/components/QuestionCard';
@@ -74,7 +75,8 @@ export function ProjectView() {
           <QuestionCard pending={question} busy={busy} onSubmit={(a) => void answer(a)} />
         )}
       </div>
-      <aside>
+      <aside className="flex flex-col gap-4">
+        <ContextMeter />
         <MemoryFileViewer />
       </aside>
 
