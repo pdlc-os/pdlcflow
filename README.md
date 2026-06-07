@@ -33,20 +33,17 @@ pdlcflow/
     └── .research/             # Architecture proposals
 ```
 
-## Quickstart — deploy (no clone, prebuilt images)
+## Quickstart — deploy (no clone, one line)
 
-Run from published GHCR images — just Docker + a few files (see [`deploy/`](./deploy/README.md)):
+Run from published GHCR images — just Docker. One command downloads the deploy files,
+runs the interactive setup wizard, and brings the stack up (see [`deploy/`](./deploy/README.md)):
 
 ```bash
-base=https://raw.githubusercontent.com/pdlc-os/pdlcflow/main/deploy
-mkdir pdlcflow && cd pdlcflow
-curl -fsSLO $base/docker-compose.yml
-curl -fsSL  $base/setup.sh -o setup.sh && chmod +x setup.sh
-mkdir -p postgres-init && curl -fsSL $base/postgres-init/01-app-role.sh -o postgres-init/01-app-role.sh
-./setup.sh                 # interactive — prompts + generates secrets, writes .env
-docker compose up -d
-docker compose run --rm api uv run alembic upgrade head
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/pdlc-os/pdlcflow/main/deploy/install.sh)"
 ```
+
+Then open <http://localhost:8080> (Studio) / <http://localhost:8000/health> (API). Use the
+`bash -c "$(curl …)"` form (not `curl | bash`) so the wizard can read your terminal.
 
 ## Quickstart — self-host (from source)
 
