@@ -61,6 +61,27 @@ EVENT_TYPES: set[str] = {
     "eval.scored", "eval.blocked",
 }
 
+# Actor classification — who/what drove an event, so the Nexus Console can split
+# work done by humans (via the Studio) from autonomous agent work. Anything not
+# explicitly human or system is treated as agent (the graph nodes' default).
+_HUMAN_EVENTS: set[str] = {
+    "session.opened", "session.resumed", "session.closed",
+    "gate.resolved", "decision.recorded", "override.invoked", "ui.viewed",
+}
+_SYSTEM_EVENTS: set[str] = {
+    "error", "context.warning", "admin.access.denied",
+    "deploy.requested", "deploy.succeeded", "deploy.blocked",
+}
+
+
+def actor_type_for(event_type: str) -> str:
+    """Classify an event as 'human', 'agent', or 'system' by its type."""
+    if event_type in _HUMAN_EVENTS:
+        return "human"
+    if event_type in _SYSTEM_EVENTS:
+        return "system"
+    return "agent"
+
 
 def _utcnow() -> datetime:
     return datetime.now(UTC)
@@ -103,6 +124,7 @@ class EventEnvelope(BaseModel):
     correlation_id: UUID | None = None
     causation_id: UUID | None = None
     actor: str | None = None
+    actor_type: str | None = None  # "human" | "agent" | "system" (see actor_type_for)
 
     # Typed payload (validated per event type by the emitter)
     payload: dict[str, Any] = Field(default_factory=dict)

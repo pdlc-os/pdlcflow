@@ -17,8 +17,8 @@ graph LR
   GRAPH -->|artifacts| OBJ[(Filesystem / S3·MinIO)]
   GRAPH -->|LLM| LLM[Bedrock / 6 other providers]
   GRAPH -->|events| AN[Analytics store]
-  AN --> ATLAS[Nexus Console]
-  U --> ATLAS
+  AN --> NEXUS[Nexus Console]
+  U --> NEXUS
 ```
 
 ## Contents

@@ -116,8 +116,9 @@ Mounted under `/v1/admin` (`app/routes/admin/`). All return JSON unless noted.
 | `GET /v1/admin/squads/scoreboard?org_id&from&to` | `{rows: [...]}` |
 | `GET /v1/admin/agents/heatmap?org_id` | `{personas: [10 agents], cells: [...]}` |
 | `GET /v1/admin/features/{roadmap_id}/timeline?org_id` | `{roadmap_id, events: [...]}` |
+| `GET /v1/admin/narrative?org_id&from&to&project_id` | `{summary, narrative}` — work stats + LLM narrative (see below) |
 | `GET /v1/admin/exports/rollup.csv?org_id&dimension&from&to` | `text/csv` (`key,events,tokens,usd`) |
-| `GET /v1/admin/models/org-default` etc. | model-config settings (Phase-A stubs) |
+| `GET /v1/admin/models/org-default` etc. | per-tenant / per-agent model config |
 
 The `from`/`to` query params use the alias `from` (mapped to `frm` internally).
 The agents heatmap is special: the **persona list** (the 10 fixed agents:
@@ -127,6 +128,25 @@ back empty without one (preserving the ban without scanning).
 
 The SPA (`apps/studio/src/routes/admin/`) renders each as tables + Recharts bar
 charts, with a CSV export link and an auto-refreshing live feed.
+
+## Human vs agent work + the Work Narrative
+
+Every event carries an **`actor_type`** — `human` (Studio actions: resolving gates,
+recording decisions, overrides, sessions), `agent` (autonomous graph work: design,
+build, review, party meetings, night-shift), or `system` (deploys, errors, audit).
+It's classified from the event type (`event_schema.actor_type_for`) and the `actor`
+field records *who* (the user for human acts, the persona for agent acts).
+
+The **Work Narrative** (`GET /v1/admin/narrative`, Studio → Nexus Console → Narrative)
+takes a date window (`from`/`to`, optional `project_id`) and returns:
+
+- **`summary`** — `total_events`, `by_actor_type` (human/agent/system counts),
+  `by_event_type`, `by_agent` (per-persona actions + tokens), `tokens`, `usd`, and
+  `notable` milestones (gates, deploys, phase transitions, night-shift verdicts, …).
+- **`narrative`** — an LLM-written, standup-style story of the work, explicitly
+  separating what humans did from what agents did. Generated via the LLM port, so it
+  uses the deterministic offline stub when `PDLC_WIRE_LLM` is off and the org's
+  configured provider when on.
 
 ## The cross-org ban
 

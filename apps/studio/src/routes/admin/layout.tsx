@@ -8,6 +8,7 @@ const ROUTES = [
   { to: 'squads',      label: 'Squads' },
   { to: 'agents',      label: 'Agents' },
   { to: 'features',    label: 'Features' },
+  { to: 'narrative',   label: 'Narrative' },
   { to: 'exports',     label: 'Exports' },
   { to: 'models',      label: 'Models' },
 ];

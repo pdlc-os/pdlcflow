@@ -1,5 +1,5 @@
 """Nexus Console admin routes — live, initiatives, domains, squads, agents,
-features (time-travel), exports, models."""
+features (time-travel), exports, models, narrative."""
 
 from fastapi import APIRouter, Depends
 
@@ -12,6 +12,7 @@ from .features import router as features_router
 from .initiatives import router as initiatives_router
 from .live import router as live_router
 from .models import router as models_router
+from .narrative import router as narrative_router
 from .squads import router as squads_router
 
 # Every admin route requires the admin/owner role when auth is enforced (no-op when off).
@@ -25,3 +26,4 @@ router.include_router(features_router)
 router.include_router(exports_router)
 router.include_router(models_router)
 router.include_router(evals_router)
+router.include_router(narrative_router)

@@ -18,6 +18,7 @@ import { AdminAgents } from './routes/admin/agents';
 import { AdminFeatures } from './routes/admin/features';
 import { AdminExports } from './routes/admin/exports';
 import { AdminModels } from './routes/admin/models';
+import { AdminNarrative } from './routes/admin/narrative';
 
 applyTheme(getStoredTheme());
 watchSystemTheme(() => applyTheme(getStoredTheme()));
@@ -40,6 +41,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
               <Route path="agents" element={<AdminAgents />} />
               <Route path="features" element={<AdminFeatures />} />
               <Route path="features/:f" element={<AdminFeatures />} />
+              <Route path="narrative" element={<AdminNarrative />} />
               <Route path="exports" element={<AdminExports />} />
               <Route path="models" element={<AdminModels />} />
             </Route>

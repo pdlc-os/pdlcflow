@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from typing import Protocol
 
-from event_schema import EventEnvelope
+from event_schema import EventEnvelope, actor_type_for
 
 # Dimension name → the flattened event field it groups by. "domain" explodes the
 # domains list; "agent" reads payload.agent_persona.
@@ -47,6 +47,7 @@ def _flatten(e: EventEnvelope) -> dict:
         "user_story_id": e.user_story_id,
         "plan_step": e.plan_step,
         "actor": e.actor,
+        "actor_type": e.actor_type or actor_type_for(e.event_type),
         "agent_persona": p.get("agent_persona"),
         "tokens": int(p.get("tokens_in", 0) or 0) + int(p.get("tokens_out", 0) or 0),
         "usd": float(p.get("usd_estimate", 0) or 0),
@@ -77,6 +78,55 @@ def _agg_evals(rows: list[dict], key: str) -> dict:
     return out
 
 
+# Event types worth surfacing verbatim in a work narrative (milestones).
+_NOTABLE = {
+    "gate.resolved", "decision.recorded", "override.invoked",
+    "deploy.requested", "deploy.succeeded", "deploy.blocked",
+    "phase.transition", "party.consensus_reached", "strike.recorded",
+    "test.failed", "night_shift.completed", "night_shift.verdict", "night_shift.aborted",
+}
+
+
+def summarize_work(rows: list[dict]) -> dict:
+    """Aggregate flattened event rows into a work summary: who did what (human vs
+    agent vs system), by event type, by agent, totals, and notable milestones.
+    Shared by the in-memory + Postgres stores so both produce the same shape."""
+    by_actor_type: dict[str, int] = {"human": 0, "agent": 0, "system": 0}
+    by_event_type: dict[str, int] = {}
+    by_agent: dict[str, dict] = {}
+    tokens = 0
+    usd = 0.0
+    for r in rows:
+        at = r.get("actor_type") or "agent"
+        by_actor_type[at] = by_actor_type.get(at, 0) + 1
+        et = r["event_type"]
+        by_event_type[et] = by_event_type.get(et, 0) + 1
+        tokens += int(r.get("tokens", 0) or 0)
+        usd += float(r.get("usd", 0) or 0)
+        persona = r.get("agent_persona")
+        if persona:
+            g = by_agent.setdefault(persona, {"events": 0, "tokens": 0})
+            g["events"] += 1
+            g["tokens"] += int(r.get("tokens", 0) or 0)
+    notable = sorted(
+        (
+            {"ts": r["ts"], "event_type": r["event_type"], "actor": r.get("actor"),
+             "actor_type": r.get("actor_type"), "roadmap_id": r.get("roadmap_id")}
+            for r in rows if r["event_type"] in _NOTABLE
+        ),
+        key=lambda x: x["ts"],
+    )
+    return {
+        "total_events": len(rows),
+        "by_actor_type": by_actor_type,
+        "by_event_type": dict(sorted(by_event_type.items(), key=lambda kv: kv[1], reverse=True)),
+        "by_agent": dict(sorted(by_agent.items(), key=lambda kv: kv[1]["events"], reverse=True)),
+        "tokens": tokens,
+        "usd": round(usd, 6),
+        "notable": notable[:100],
+    }
+
+
 def _require_org(org_id: str | None) -> str:
     if not org_id:
         # Cross-org analytics are banned (plan §5.3). Surface as a hard error
@@ -92,6 +142,7 @@ class AnalyticsStore(Protocol):
     def live(self, *, org_id, limit=50) -> list[dict]: ...
     def totals(self, *, org_id) -> dict: ...
     def eval_summary(self, *, org_id) -> dict: ...
+    def work_summary(self, *, org_id, frm=None, to=None, project_id=None) -> dict: ...
 
 
 class InMemoryAnalyticsStore:
@@ -160,6 +211,17 @@ class InMemoryAnalyticsStore:
             "events": len(rows),
             "tokens": sum(e["tokens"] for e in rows),
             "usd": round(sum(e["usd"] for e in rows), 6),
+        }
+
+    def work_summary(self, *, org_id, frm=None, to=None, project_id=None) -> dict:
+        org_id = _require_org(org_id)
+        rows = self._scope(org_id, frm, to)
+        if project_id:
+            rows = [r for r in rows if r["project_id"] == str(project_id)]
+        return {
+            "window": {"from": frm, "to": to},
+            "project_id": str(project_id) if project_id else None,
+            **summarize_work(rows),
         }
 
 

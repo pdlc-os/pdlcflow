@@ -4,7 +4,7 @@ Public API is the EventEnvelope plus the typed payload classes per event type.
 The taxonomy and rationale live in registry.md.
 """
 
-from .envelope import EVENT_TYPES, EventEnvelope
+from .envelope import EVENT_TYPES, EventEnvelope, actor_type_for
 from .payloads import (
     AgentInvokedPayload,
     AgentRespondedPayload,
@@ -85,4 +85,5 @@ __all__ = [
     "ToolBlockedPayload",
     "ToolInvokedPayload",
     "UIViewedPayload",
+    "actor_type_for",
 ]

@@ -12,7 +12,7 @@ import queue
 import threading
 from datetime import UTC, datetime
 
-from event_schema import EventEnvelope
+from event_schema import EventEnvelope, actor_type_for
 
 from ..config import Settings
 from .sinks.firehose import FirehoseSink
@@ -92,7 +92,10 @@ class ClickstreamEmitter:
                 plan_step=state.get("plan_step"),
                 session_id=state.get("session_id"),
                 thread_id=state.get("thread_id"),
-                actor=state.get("actor"),
+                # actor identity: the human (from state) for human-initiated acts,
+                # else the agent persona; actor_type classifies human/agent/system.
+                actor=state.get("actor") or payload.get("agent_persona"),
+                actor_type=actor_type_for(event_type),
                 correlation_id=correlation_id,  # type: ignore[arg-type]
                 payload=payload,
             )

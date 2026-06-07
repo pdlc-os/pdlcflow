@@ -255,7 +255,7 @@ class EvalScoredPayload(_P):
     dimension: str  # quality | groundedness | citation | faithful_relay | drift
     target: str  # agent persona or step id being evaluated
     trigger: str  # the step that produced the output (prd, design_docs, plan, review, ...)
-    score: float  # 0.0–1.0
+    score: float  # 0.0-1.0
     passed: bool
     threshold: float
     blocking: bool
