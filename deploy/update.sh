@@ -44,6 +44,7 @@ for f in setup.sh install.sh update.sh uninstall.sh; do
   curl -fsSL "$BASE/$f" -o "$f" && chmod +x "$f"
 done
 mkdir -p postgres-init && curl -fsSL "$BASE/postgres-init/01-app-role.sh" -o postgres-init/01-app-role.sh
+chmod +x postgres-init/01-app-role.sh  # Postgres execs init *.sh; curl -o drops the exec bit
 
 if [ -n "$VERSION" ]; then
   if [ -f .env ] && grep -q '^PDLCFLOW_VERSION=' .env; then

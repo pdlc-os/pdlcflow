@@ -42,6 +42,7 @@ for f in setup.sh update.sh uninstall.sh; do
   curl -fsSL "$BASE/$f" -o "$f" && chmod +x "$f"
 done
 curl -fsSL "$BASE/postgres-init/01-app-role.sh" -o postgres-init/01-app-role.sh
+chmod +x postgres-init/01-app-role.sh  # Postgres execs init *.sh; curl -o drops the exec bit
 
 c "⚙  Configuring"
 ./setup.sh
