@@ -34,6 +34,12 @@ All engine configuration is environment-driven through Pydantic settings with th
 | `PDLC_ANALYTICS_BACKEND` | `memory` | `memory` \| `postgres`. Backs the admin rollups. In-memory is per-process. |
 | `PDLC_CLICKSTREAM_SINK` | `jsonl` | `jsonl` \| `postgres` \| `firehose`. The durable event sink. |
 | `PDLC_FIREHOSE_STREAM_NAME` | `null` | Kinesis Firehose stream (SaaS telemetry pipeline). |
+| `PDLC_STREAM_TOKENS` | `false` | Stream live `token` frames to the Studio (the "drafting" preview). |
+| `PDLC_RUN_EVALS` | `false` | Score agent output via the eval harness (`eval.scored`/`eval.blocked`). |
+| `PDLC_EVAL_BLOCKING` | `` | Comma-separated evals that **block** on failure (else measure-only). |
+| `PDLC_JUDGE_TIER` | `premium` | Capability tier for the LLM-as-judge (`premium`\|`balanced`\|`economy`). |
+| `PDLC_AUTH_REQUIRED` | `false` | Enforce JWT auth; derive the tenant from the token. |
+| `PDLC_ENABLE_CLI_PROVIDERS` | `false` | Allow subscription-CLI providers (single-user self-host only; see below). |
 | `PDLC_CORS_ORIGINS` | `["http://localhost:5173"]` | Allowed CORS origins for the API. |
 
 > AWS credentials (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION`) are read by boto3 directly — only needed when using Bedrock, Firehose, or real S3.

@@ -11,7 +11,7 @@ admin routes, the cross-org ban, and live night-shift verdicts.
 
 ## The 40-event taxonomy
 
-Every event the clickstream emits is one of **38 typed event types in 16
+Every event the clickstream emits is one of **40 typed event types in 16
 categories**, defined in `packages/event-schema/event_schema/registry.md` (the
 source of truth) and `envelope.py` (`EVENT_TYPES`). Categories and counts:
 
@@ -152,7 +152,7 @@ takes a date window (`from`/`to`, optional `project_id`) and returns:
 
 Cross-org analytics are banned by design. Every **data** route runs its
 `org_id` through `require_org` (`app/routes/admin/_guard.py`): a missing/blank
-`org_id` emits an **`admin.access.denied`** audit event (event #38) and raises
+`org_id` emits an **`admin.access.denied`** audit event and raises
 **403** (`"org_id required — cross-org analytics are not permitted"`). The
 analytics store enforces the same invariant internally (`_require_org`), and
 every query is scoped to the single org's events.

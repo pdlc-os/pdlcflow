@@ -119,12 +119,14 @@ emits an `admin.access.denied` audit event and returns **403** (cross-org ban).
 | `GET /v1/admin/squads/scoreboard` | `org_id`, `from?`, `to?` | `{rows: [...]}` |
 | `GET /v1/admin/agents/heatmap` | `org_id?` | `{personas: [10], cells: [...]}` |
 | `GET /v1/admin/features/{roadmap_id}/timeline` | `org_id` | `{roadmap_id, events: [...]}` |
+| `GET /v1/admin/narrative` | `org_id`, `from?`, `to?`, `project_id?` | `{summary: {...}, narrative}` — work stats (human/agent/system) + LLM narrative |
+| `GET /v1/admin/evals/summary` | `org_id` | `{by_eval: {...}, by_agent: {...}}` |
 | `GET /v1/admin/exports/rollup.csv` | `org_id`, `dimension`, `from?`, `to?` | `text/csv` |
-| `GET /v1/admin/models/org-default` | — | `OrgDefault \| null` (stub) |
-| `PUT /v1/admin/models/org-default` | body `OrgDefault` | `{ok: true}` (stub) |
-| `GET /v1/admin/models/agent-overrides` | — | `[AgentOverride]` (stub) |
-| `PUT /v1/admin/models/agent-overrides/{persona}` | body `AgentOverride` | `{ok, persona}` (stub) |
-| `POST /v1/admin/models/test` | `provider` | `{provider, ok, phase}` (stub) |
+| `GET /v1/admin/models/org-default` | `org_id` | `OrgDefault \| null` |
+| `PUT /v1/admin/models/org-default` | `org_id`, body `OrgDefault` | `{ok: true}` |
+| `GET /v1/admin/models/agent-overrides` | `org_id` | `[AgentOverride]` |
+| `PUT /v1/admin/models/agent-overrides/{persona}` | `org_id`, body `AgentOverride` | `{ok, persona}` |
+| `DELETE /v1/admin/models/agent-overrides/{persona}` | `org_id` | `{ok, persona}` |
 
 Notes:
 - `from`/`to` are query aliases (mapped to `frm` internally).

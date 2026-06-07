@@ -64,7 +64,8 @@ For the Docker Compose path:
 For the dev path:
 
 - **uv** (Python 3.12 toolchain manager) for the engine + graph packages.
-- **pnpm** (Node 20) for Studio.
+- **pnpm** (Node 20) for Studio — pinned to **pnpm@9.12.0** via the root `package.json`
+  `packageManager` field; run `corepack enable` so the right version is used automatically.
 
 ## Clone
 

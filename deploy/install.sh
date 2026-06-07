@@ -37,6 +37,7 @@ cd "$DIR"
 
 c "↓ Downloading deploy files into $(pwd)"
 curl -fsSLO "$BASE/docker-compose.yml"
+curl -fsSLO "$BASE/.env.example"
 for f in setup.sh update.sh uninstall.sh; do
   curl -fsSL "$BASE/$f" -o "$f" && chmod +x "$f"
 done
