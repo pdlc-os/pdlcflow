@@ -1,94 +1,244 @@
 # pdlcflow
 
-PDLC reimagined as a **LangGraph + AWS Bedrock SaaS** with a browser UI, Chainlit-inspired design system, pluggable LLM providers (7), and clickstream telemetry feeding an admin dashboard.
+**Run your product development lifecycle as a team of AI agents — from raw idea to shipped feature.**
 
-> **Status: v1.5.0** — all phases A–J + eval framework + multi-tenant auth/RLS (FORCE) + live token streaming. See [`CHANGELOG.md`](./CHANGELOG.md) for the release notes, [`STATUS.md`](./STATUS.md) for the per-phase checklist, the [Wiki](./docs/wiki/README.md) to install/use it, and [`docs/.research/.langgraph-bedrock-saas-migration-2026-06-05.md`](./docs/.research/.langgraph-bedrock-saas-migration-2026-06-05.md) for the architecture proposal (15 sections, 5 mermaid diagrams, 40-event taxonomy, 25-table Postgres schema, 7-provider LLM factory, 8-stack CDK topology).
+pdlcflow is an open-source, multi-tenant platform that turns a structured Product Development
+Lifecycle (PDLC) into a browser-based, multi-agent system. A cast of specialized AI agents
+moves each feature through **brainstorm → build → ship**, with human approval gates, persistent
+memory, automatic quality evaluation, and full audit telemetry. It runs on **your choice of
+LLM provider**, self-hosted or on AWS, with tenant isolation enforced at the database.
 
-## Relationship to upstream `pdlc`
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
+[![Release](https://img.shields.io/github/v/release/pdlc-os/pdlcflow?sort=semver)](https://github.com/pdlc-os/pdlcflow/releases)
+[![CI](https://github.com/pdlc-os/pdlcflow/actions/workflows/ci.yml/badge.svg)](https://github.com/pdlc-os/pdlcflow/actions/workflows/ci.yml)
+[![Python 3.12](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/)
+[![Built with LangGraph](https://img.shields.io/badge/built%20with-LangGraph-1c3c3c.svg)](https://github.com/langchain-ai/langgraph)
 
-[`pdlc-os/pdlc`](https://github.com/pdlc-os/pdlc) is the existing Claude-Code-bound npm plugin (`@pdlc-os/pdlc`, v2.24.0). `pdlcflow` is a **parallel-track** reimagination that lifts PDLC off Claude Code into a stand-alone runtime — Python LangGraph engine + React UI + AWS Bedrock + admin dashboard. The two repos are maintained as **siblings, not a fork**:
+---
 
-- Upstream `pdlc` remains the simplest path to PDLC on a single dev box.
-- `pdlcflow` is the SaaS / multi-tenant / team-scale path.
+## Table of contents
 
-Both stacks share the workflow (4 phases, ~17 slash commands, 10 personas, 8 approval gates, party meetings, 3-Strike escalation, `/night-shift` autonomous loop) and the agent soul-specs (verbatim copies of the upstream `agents/*.md` files live in `packages/pdlc-graph/pdlc_graph/personas/`).
+- [Why pdlcflow](#why-pdlcflow)
+- [Highlights](#highlights)
+- [Bring your own LLM](#bring-your-own-llm)
+- [Architecture](#architecture)
+- [Quickstart](#quickstart)
+- [Configuration](#configuration)
+- [Documentation](#documentation)
+- [Relationship to upstream `pdlc`](#relationship-to-upstream-pdlc)
+- [Repository layout](#repository-layout)
+- [Testing & CI](#testing--ci)
+- [Contributing](#contributing)
+- [Security](#security)
+- [License](#license)
 
-## Repo layout
+## Why pdlcflow
 
+Most "AI coding" tools help with a single step. pdlcflow operationalizes the **whole
+lifecycle**: it encodes a proven, phase-based methodology — discovery, definition, design,
+build, review, and ship — and runs it as a coordinated team of role-specialized agents with
+the guardrails a real organization needs.
+
+- **For leaders:** a consistent, auditable path from idea to production. Every decision, gate,
+  and agent action is captured as clickstream telemetry and surfaced in an admin dashboard, so
+  you can see cost, throughput, and quality across teams — with cost controls and
+  human-in-the-loop approvals built in.
+- **For engineers:** a hackable, well-tested runtime. A Python [LangGraph](https://github.com/langchain-ai/langgraph)
+  engine, a FastAPI service, and a React UI — all behind clean, swappable ports (LLM, storage,
+  queue, telemetry) so you can run it on a laptop or scale it to a multi-tenant SaaS.
+
+## Highlights
+
+- **End-to-end lifecycle** — four phases, ~17 commands, and **10 specialized agent personas**
+  collaborating through the work, including multi-agent **"party" meetings** for divergent
+  ideation and adversarial review.
+- **Human-in-the-loop governance** — **8 approval gates**, a Socratic interaction mode, and a
+  **3-Strike escalation** protocol keep humans in control of consequential decisions.
+- **Autonomy when you want it** — a `/night-shift` loop advances work unattended within
+  guardrails, with episode reports for everything it did.
+- **Bring your own LLM** — a 7-provider factory (Bedrock, Anthropic, OpenAI, Google Gemini,
+  Vertex AI, Azure OpenAI, Ollama) selectable per deployment, with a deterministic offline
+  stub for hermetic dev and CI.
+- **Quality you can measure** — a built-in **evaluation harness** scores agent output at major
+  steps: per-agent quality, groundedness / hallucination, citation & faithful-relay, spec
+  adherence, production-safety, plus drift/regression tracking and nightly real-LLM evals.
+- **Multi-tenant by design** — JWT authentication, role-based admin, and **PostgreSQL
+  Row-Level Security (FORCE)** so tenant isolation is enforced by the database — not just the
+  app. Artifacts (PRDs, design docs, reviews) are namespaced per tenant.
+- **Observability built in** — a 40-event clickstream taxonomy feeds analytics and the **Atlas
+  Console** admin dashboard (live runs, cost/usage rollups, per-agent metrics).
+- **Live experience** — a React **Studio** with real-time WebSocket updates and live token
+  "drafting" previews.
+- **Deploy anywhere** — one-line install from published container images, Docker Compose for
+  self-host, or AWS CDK (8 stacks) for multi-tenant SaaS.
+- **Migration tooling** — a CLI to scan, map, and back-fill from an existing PDLC setup.
+
+## Bring your own LLM
+
+pdlcflow is **provider-neutral**. Persona completions, the eval judge, and token streaming all
+flow through one pluggable LLM factory; pick the backend per deployment with a single setting
+(`PDLC_DEFAULT_LLM_PROVIDER`) and supply that provider's credentials.
+
+| Provider | Key | Notes |
+| --- | --- | --- |
+| **AWS Bedrock** | `bedrock` | Default; uses your AWS credentials/region |
+| **Anthropic** | `anthropic` | Direct Claude API |
+| **OpenAI** | `openai` | GPT models |
+| **Google Gemini** | `gemini` | Gemini API |
+| **Google Vertex AI** | `vertex` | Gemini/Claude on GCP |
+| **Azure OpenAI** | `azure` | Azure-hosted OpenAI |
+| **Ollama** | `ollama` | Local / air-gapped models |
+
+Leave the LLM unwired (`PDLC_WIRE_LLM=false`, the default) and pdlcflow runs against a
+deterministic offline stub — so the full stack boots, tests, and demos with **no credentials**.
+
+## Architecture
+
+```mermaid
+flowchart LR
+  U["Browser · Studio<br/>(React + Vite)"] -->|REST + WebSocket| API["pdlc-engine<br/>FastAPI"]
+  API --> G["pdlc-graph<br/>LangGraph meta-graph"]
+  G --> P["Phase subgraphs · 10 personas<br/>party mode · Sentinel evaluator"]
+  API --> LLM{"LLM factory<br/>7 providers"}
+  LLM --> PROV["Bedrock · Anthropic · OpenAI<br/>Gemini · Vertex · Azure · Ollama"]
+  API --> EV["Eval harness<br/>LLM-as-judge"]
+  API --> PG[("PostgreSQL<br/>Row-Level Security")]
+  API --> RD[("Redis<br/>event bus + checkpoints")]
+  API --> OBJ[("S3 / MinIO<br/>tenant-namespaced artifacts")]
+  API --> CS["Clickstream<br/>40-event taxonomy"] --> AD["Atlas Console<br/>admin dashboard"]
 ```
-pdlcflow/
-├── apps/
-│   └── studio/                # React + Vite + Tailwind + shadcn/ui + Chainlit-inspired tokens
-├── packages/
-│   ├── event-schema/          # Pydantic envelope + 40-event taxonomy + registry doc
-│   └── pdlc-graph/            # LangGraph engine: meta-graph, phase subgraphs, party meetings, personas, Sentinel evaluator
-├── services/
-│   └── pdlc-engine/           # FastAPI: routes, WS, clickstream, DB models, 7-provider LLM factory, Alembic
-├── infra/
-│   ├── compose/               # Docker Compose for self-host (single-tenant)
-│   └── cdk/                   # AWS CDK for SaaS (multi-tenant), 8 stacks
-├── tools/
-│   └── pdlc-migrate/          # Typer CLI: scan / push / taxonomy / backfill
-└── docs/
-    └── .research/             # Architecture proposals
-```
 
-## Quickstart — deploy (no clone, one line)
+Every side effect sits behind an injectable port with an in-memory default, so the system is
+fully testable without external services and each backend (Postgres, Redis, S3, the LLM) can
+be swapped or stubbed independently.
 
-Run from published GHCR images — just Docker. One command downloads the deploy files,
-runs the interactive setup wizard, and brings the stack up (see [`deploy/`](./deploy/README.md)):
+## Quickstart
+
+### Deploy — no clone, one line
+
+Run from published container images with just Docker. The installer downloads the deploy
+files, runs an interactive setup wizard (prompts + generates secrets), and brings the stack up:
 
 ```bash
 bash -c "$(curl -fsSL https://raw.githubusercontent.com/pdlc-os/pdlcflow/main/deploy/install.sh)"
 ```
 
-Then open <http://localhost:8080> (Studio) / <http://localhost:8000/health> (API). Use the
-`bash -c "$(curl …)"` form (not `curl | bash`) so the wizard can read your terminal.
+Then open <http://localhost:8080> (Studio) and <http://localhost:8000/health> (API). Use the
+`bash -c "$(curl …)"` form (**not** `curl | bash`) so the wizard can read your terminal.
+Update and uninstall use the same pattern — see the [deploy guide](./deploy/README.md).
 
-## Quickstart — self-host (from source)
+### Self-host from source
 
 ```bash
 cd infra/compose
-cp .env.example .env
-# fill in PDLC_JWT_SECRET, AWS_* (if using Bedrock), etc.
+cp .env.example .env          # set PDLC_JWT_SECRET; pick a provider + creds if wiring an LLM
 docker compose up --build
 ```
 
-Open <http://localhost:8080> for Studio. The engine listens on <http://localhost:8000> with `/health` for smoke checks.
-
-## Quickstart — dev (Python)
+### Develop
 
 ```bash
+# Engine + graph (Python 3.12, uv workspace)
 uv sync
-uv run pytest                                            # round-trip tests
+uv run pytest
 uv run uvicorn app.main:app --reload --app-dir services/pdlc-engine
-```
 
-## Quickstart — dev (Studio)
-
-```bash
+# Studio (Node 20, pnpm)
 pnpm install
-pnpm --filter @pdlcflow/studio dev
+pnpm --filter @pdlcflow/studio dev   # proxies /v1 and /ws to http://localhost:8000
 ```
 
-Vite proxies `/v1/*` and `/ws/*` to `http://localhost:8000` so the engine and Studio can run side by side.
-
-## Quickstart — deploy SaaS
+### Deploy SaaS (AWS)
 
 ```bash
 cd infra/cdk
 pnpm install
-pnpm cdk bootstrap aws://<account>/us-east-1
+pnpm cdk bootstrap aws://<account>/<region>
 pnpm cdk deploy --all
 ```
 
+## Configuration
+
+pdlcflow is configured entirely through environment variables (see
+[`deploy/.env.example`](./deploy/.env.example) and the
+[configuration guide](./docs/wiki/03-configuration.md)). Highlights:
+
+| Setting | Purpose |
+| --- | --- |
+| `PDLC_DEFAULT_LLM_PROVIDER` / `PDLC_WIRE_LLM` | Choose the LLM provider; wire real models (else offline stub) |
+| `PDLC_AUTH_REQUIRED` | Enforce JWT auth; derive tenant from the token |
+| `PDLC_DB_URL` / `PDLC_MIGRATION_DB_URL` | App connects as a non-superuser role (RLS); migrations run as owner |
+| `PDLC_RUN_EVALS` / `PDLC_EVAL_BLOCKING` | Score agent output; optionally block on failures |
+| `PDLC_STREAM_TOKENS` | Live token streaming to the Studio |
+
+Sensible defaults keep dev hermetic; every backend gracefully falls back to in-memory until
+you opt in.
+
 ## Documentation
 
-- **[Wiki](./docs/wiki/README.md)** — install, launch, use & monitor pdlcflow; the core PDLC flow + specialized flows (agents, party mode, night-shift, utilities, migration, evals), with mermaid diagrams.
-- **[Deploy guide](./deploy/README.md)** — run from published images with no clone (`setup.sh` wizard).
-- [Changelog](./CHANGELOG.md) · [Phase tracker](./STATUS.md)
-- [Self-host README](./infra/compose/README.md) · [SaaS / CDK README](./infra/cdk/README.md)
-- [Architecture proposal](./docs/.research/.langgraph-bedrock-saas-migration-2026-06-05.md) — 15 sections, 5 mermaid diagrams.
+- **[Wiki](./docs/wiki/README.md)** — install, launch, use & monitor pdlcflow; the core PDLC
+  flow and the specialized flows (agents, party mode, night-shift, utilities, migration,
+  evals), with diagrams.
+- **[Deploy guide](./deploy/README.md)** — install / update / uninstall from published images.
+- **[Configuration](./docs/wiki/03-configuration.md)** · **[Changelog](./CHANGELOG.md)** · **[Phase tracker](./STATUS.md)**
+- **[Self-host README](./infra/compose/README.md)** · **[SaaS / CDK README](./infra/cdk/README.md)**
+- **[Architecture proposal](./docs/.research/.langgraph-bedrock-saas-migration-2026-06-05.md)** — the full design (15 sections, mermaid diagrams, event taxonomy, schema, provider factory, CDK topology).
+
+## Relationship to upstream `pdlc`
+
+[`pdlc-os/pdlc`](https://github.com/pdlc-os/pdlc) is the original Claude-Code-bound plugin
+(`@pdlc-os/pdlc`). **pdlcflow is a parallel-track reimagination** that lifts the same
+methodology off Claude Code into a standalone runtime — a Python LangGraph engine, a React UI,
+multi-provider LLMs, and an admin dashboard. The two are maintained as **siblings, not a fork**:
+
+- Upstream `pdlc` is the simplest path to PDLC on a single developer's machine.
+- pdlcflow is the team-scale, multi-tenant, self-hostable path.
+
+Both share the workflow (4 phases, ~17 commands, 10 personas, 8 gates, party meetings,
+3-Strike escalation, the night-shift loop) and the agent soul-specs — the persona definitions
+are carried over verbatim into `packages/pdlc-graph/pdlc_graph/personas/`.
+
+## Repository layout
+
+```
+pdlcflow/
+├── apps/
+│   └── studio/          # React + Vite + Tailwind + shadcn/ui front end
+├── packages/
+│   ├── event-schema/    # Pydantic event envelope + 40-event taxonomy
+│   └── pdlc-graph/      # LangGraph engine: meta-graph, phase subgraphs, personas, party mode, evals
+├── services/
+│   └── pdlc-engine/     # FastAPI: REST + WebSocket, clickstream, DB models, 7-provider LLM factory, Alembic
+├── infra/
+│   ├── compose/         # Docker Compose (self-host, single-tenant)
+│   └── cdk/             # AWS CDK (SaaS, multi-tenant) — 8 stacks
+├── tools/
+│   └── pdlc-migrate/    # CLI: scan / push / taxonomy / backfill
+├── deploy/              # No-clone deploy: published images + install/update/uninstall scripts
+└── docs/                # Wiki + architecture research
+```
+
+## Testing & CI
+
+- **~223 hermetic tests** (no external services) plus a live integration suite that exercises
+  the real Postgres / Redis / MinIO adapters and Row-Level Security.
+- GitHub Actions runs Python (×4 workspace members), Node (Studio + CDK), the eval suite, and
+  a docker-compose integration job on every push.
+- The full stack runs offline against in-memory backends and the deterministic LLM stub.
+
+## Contributing
+
+Issues and pull requests are welcome. Before opening a PR, run the checks CI enforces:
+`uv run pytest` and `uv run ruff check` for the Python workspace, and
+`pnpm --filter @pdlcflow/studio lint typecheck` for the Studio. CI must be green to merge.
+See the [wiki](./docs/wiki/README.md) for architecture and development guidance.
+
+## Security
+
+pdlcflow ships multi-tenant controls (JWT auth, PostgreSQL Row-Level Security, tenant-namespaced
+artifacts), all opt-in via configuration. If you discover a vulnerability, please open a
+security advisory rather than a public issue. Rotate the sample credentials in
+`deploy/.env.example` before any real deployment.
 
 ## License
 
