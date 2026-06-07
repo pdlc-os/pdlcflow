@@ -36,10 +36,21 @@ class Settings(BaseSettings):
 
     # LLM defaults
     default_llm_provider: Literal[
-        "bedrock", "anthropic", "vertex", "azure", "openai", "gemini", "ollama"
+        "bedrock", "anthropic", "vertex", "azure", "openai", "gemini", "ollama",
+        # Subscription-backed local CLIs — SINGLE-USER SELF-HOST ONLY (see below).
+        "claude_code", "codex", "gemini_cli",
     ] = "bedrock"
     bedrock_region: str = "us-east-1"
     ollama_endpoint: str = "http://localhost:11434"
+
+    # Subscription-CLI providers (claude_code / codex / gemini_cli) shell out to the
+    # locally-installed, logged-in CLI so completions bill against your Claude Max /
+    # ChatGPT / Gemini subscription. Single-user self-host ONLY: disabled by default,
+    # and the factory refuses them when auth is enabled (multi-tenant/SaaS).
+    enable_cli_providers: bool = False
+    claude_code_bin: str = "claude"
+    codex_bin: str = "codex"
+    gemini_cli_bin: str = "gemini"
 
     # Runtime adapters — off by default so dev/test stay hermetic.
     # wire_llm: route persona completions through the provider factory (needs creds).

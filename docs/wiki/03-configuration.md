@@ -54,6 +54,29 @@ Credentials are supplied as configuration and resolved per provider:
 Precedence: **per-tenant `secret_value` → provider env var**. (`PDLC_WIRE_LLM=true` uses real
 models; off uses the deterministic offline stub and needs no credentials.)
 
+### Subscription CLIs (single-user self-host only)
+
+You can bill completions against your **Claude Pro/Max**, **ChatGPT**, or **Google** subscription
+instead of an API key by routing through the locally-installed coding-agent CLI:
+
+| `PDLC_DEFAULT_LLM_PROVIDER` | CLI | Bin override | tier → `--model` |
+| --- | --- | --- | --- |
+| `claude_code` | `claude -p` | `PDLC_CLAUDE_CODE_BIN` | opus / sonnet / haiku |
+| `codex` | `codex exec` | `PDLC_CODEX_BIN` | gpt-5.5 / gpt-5.4 / gpt-5.4-mini |
+| `gemini_cli` | `gemini -m` | `PDLC_GEMINI_CLI_BIN` | gemini-3.1-pro / 3.5-flash / 3.1-flash-lite |
+
+The engine shells out to the CLI (prompt on stdin, no shell), so the CLI must be **installed and
+logged in** on the host. Enable with **`PDLC_ENABLE_CLI_PROVIDERS=true`** (default off) +
+`PDLC_WIRE_LLM=true`.
+
+> **Single-user self-host ONLY.** The factory **refuses** these providers when auth is enabled
+> (`PDLC_AUTH_REQUIRED=true`) — a personal subscription can't power multi-user / SaaS (per the
+> providers' terms), and it only bills one local seat. Intended for running the engine as a local
+> process (`uvicorn`); they are not wired into the Docker/compose or cloud deploy paths.
+
+Caveats: a subprocess per completion (CLI-startup latency) and **no live token streaming** (the
+CLI returns the full text). Per-agent tiers still apply via each CLI's `--model`.
+
 ## Per-agent model tiers (provider-neutral)
 
 Agents don't hard-code a model. Each persona declares a **provider-neutral capability

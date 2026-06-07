@@ -27,7 +27,16 @@ from .providers import (
     bedrock as bedrock_p,
 )
 from .providers import (
+    claude_code as claude_code_p,
+)
+from .providers import (
+    codex as codex_p,
+)
+from .providers import (
     gemini as gemini_p,
+)
+from .providers import (
+    gemini_cli as gemini_cli_p,
 )
 from .providers import (
     ollama as ollama_p,
@@ -41,9 +50,13 @@ from .providers import (
 from .tier_map import resolve_model_id
 
 Provider = Literal[
-    "bedrock", "anthropic", "vertex", "azure", "openai", "gemini", "ollama"
+    "bedrock", "anthropic", "vertex", "azure", "openai", "gemini", "ollama",
+    "claude_code", "codex", "gemini_cli",
 ]
 Tier = Literal["premium", "balanced", "economy"]
+
+# Subscription-backed local CLIs — single-user self-host only (see _guard_cli).
+CLI_PROVIDERS = {"claude_code", "codex", "gemini_cli"}
 
 _BUILDERS = {
     "bedrock": bedrock_p.build,
@@ -53,6 +66,9 @@ _BUILDERS = {
     "openai": openai_p.build,
     "gemini": gemini_p.build,
     "ollama": ollama_p.build,
+    "claude_code": claude_code_p.build,
+    "codex": codex_p.build,
+    "gemini_cli": gemini_cli_p.build,
 }
 
 
@@ -83,11 +99,28 @@ class LLMProviderFactory:
             or self._instance_default()
             or self._fallback()
         )
+        self._guard_cli(cfg.provider)
         model_id = cfg.model_id_override or resolve_model_id(
             cfg.provider, tier, cfg.tier_map_override
         )
         builder = _BUILDERS[cfg.provider]
         return builder(cfg, model_id)
+
+    @staticmethod
+    def _guard_cli(provider: str) -> None:
+        """Subscription CLIs are single-user self-host only: opt-in + no auth."""
+        if provider not in CLI_PROVIDERS:
+            return
+        if not getattr(settings, "enable_cli_providers", False):
+            raise ValueError(
+                f"LLM provider {provider!r} is a subscription CLI; set "
+                f"PDLC_ENABLE_CLI_PROVIDERS=true (single-user self-host only)."
+            )
+        if getattr(settings, "auth_required", False):
+            raise ValueError(
+                f"LLM provider {provider!r} is not allowed in multi-user / SaaS mode "
+                f"(PDLC_AUTH_REQUIRED is on) — it can only bill one local subscription."
+            )
 
     # ----- resolution sources -----
     # Per-tenant / per-agent config lives in org_llm_config / agent_llm_config
