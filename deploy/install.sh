@@ -37,7 +37,9 @@ cd "$DIR"
 
 c "↓ Downloading deploy files into $(pwd)"
 curl -fsSLO "$BASE/docker-compose.yml"
-curl -fsSL "$BASE/setup.sh" -o setup.sh && chmod +x setup.sh
+for f in setup.sh update.sh uninstall.sh; do
+  curl -fsSL "$BASE/$f" -o "$f" && chmod +x "$f"
+done
 curl -fsSL "$BASE/postgres-init/01-app-role.sh" -o postgres-init/01-app-role.sh
 
 c "⚙  Configuring"
