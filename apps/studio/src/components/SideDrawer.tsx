@@ -1,35 +1,98 @@
-import { Link } from 'react-router-dom';
-import { FileText, FolderOpen } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
+import { FolderOpen, MessageSquare, Plus } from 'lucide-react';
 
-const MEMORY_KINDS = [
-  'CONSTITUTION', 'STATE', 'INTENT', 'ROADMAP', 'DECISIONS',
-  'METRICS', 'OVERVIEW', 'CHANGELOG', 'DEPLOYMENTS',
-];
+import { admin, type ThreadSummary } from '@/lib/api';
+import { useProjects } from '@/store/useProjects';
+import { useThread } from '@/store/useThread';
+import { cn } from '@/lib/utils';
 
+/** Left nav: projects, each with its conversations nested beneath (click to open). */
 export function SideDrawer() {
+  const orgId = useThread((s) => s.orgId);
+  const projectId = useThread((s) => s.projectId);
+  const threadId = useThread((s) => s.threadId);
+  const setProject = useThread((s) => s.setProject);
+  const openThread = useThread((s) => s.openThread);
+  const projects = useProjects((s) => s.projects);
+  const nameFor = useProjects((s) => s.nameFor);
+  const navigate = useNavigate();
+
+  // One query for all threads; group by project so each project lists its convos.
+  const { data } = useQuery({
+    queryKey: ['allThreads', orgId, projectId, threadId],
+    queryFn: () => admin.listThreads(orgId),
+    enabled: !!orgId,
+    refetchInterval: 15_000,
+  });
+  const threads = data?.threads ?? [];
+  const byProject: Record<string, ThreadSummary[]> = {};
+  for (const t of threads) {
+    const k = t.project_id ?? 'unknown';
+    (byProject[k] ||= []).push(t);
+  }
+
+  // Projects = the local registry ∪ any project that already has conversations.
+  const ids = Array.from(
+    new Set([...projects.map((p) => p.id), ...threads.map((t) => t.project_id).filter(Boolean) as string[]])
+  );
+
+  const openProject = (id: string) => { setProject(id); navigate(`/projects/${id}`); };
+  const openConv = (pid: string, tid: string) => {
+    setProject(pid);
+    navigate(`/projects/${pid}`);
+    void openThread(tid);
+  };
+
   return (
     <aside className="w-56 shrink-0 overflow-auto border-r border-border px-3 py-3 text-sm">
-      <div className="mb-2 flex items-center gap-2 text-xs uppercase tracking-wide text-muted-fg">
-        <FolderOpen className="h-3.5 w-3.5" /> Projects
-      </div>
-      <div className="space-y-0.5">
-        <Link to="/projects/demo-project-alpha" className="block rounded px-2 py-1 hover:bg-border/60">
-          demo-project-alpha
-        </Link>
-        <Link to="/projects/demo-project-beta" className="block rounded px-2 py-1 hover:bg-border/60">
-          demo-project-beta
-        </Link>
+      <div className="mb-2 flex items-center justify-between text-xs uppercase tracking-wide text-muted-fg">
+        <span className="flex items-center gap-2"><FolderOpen className="h-3.5 w-3.5" /> Projects</span>
+        <button type="button" onClick={() => navigate('/')} title="New project" className="hover:text-fg">
+          <Plus className="h-3.5 w-3.5" />
+        </button>
       </div>
 
-      <div className="mt-5 mb-2 flex items-center gap-2 text-xs uppercase tracking-wide text-muted-fg">
-        <FileText className="h-3.5 w-3.5" /> Memory
-      </div>
-      <div className="space-y-0.5 text-muted-fg">
-        {MEMORY_KINDS.map((k) => (
-          <div key={k} className="rounded px-2 py-0.5 hover:bg-border/60 hover:text-fg">{k}</div>
-        ))}
-        <div className="rounded px-2 py-0.5 hover:bg-border/60 hover:text-fg">episodes/</div>
-      </div>
+      {ids.length === 0 ? (
+        <p className="px-2 py-1 text-xs text-muted-fg">No projects yet — create one on the home page.</p>
+      ) : (
+        <div className="space-y-1">
+          {ids.map((pid) => (
+            <div key={pid}>
+              <button
+                type="button"
+                onClick={() => openProject(pid)}
+                className={cn(
+                  'block w-full truncate rounded px-2 py-1 text-left font-medium hover:bg-border/60',
+                  pid === projectId && 'text-accent'
+                )}
+              >
+                {nameFor(pid)}
+              </button>
+              <div className="ml-2 space-y-0.5 border-l border-border pl-2">
+                {(byProject[pid] ?? []).map((t) => (
+                  <button
+                    key={t.thread_id}
+                    type="button"
+                    onClick={() => openConv(pid, t.thread_id)}
+                    title={t.label}
+                    className={cn(
+                      'flex w-full items-center gap-1 rounded px-2 py-0.5 text-left text-xs hover:bg-border/60 hover:text-fg',
+                      t.thread_id === threadId ? 'text-accent' : 'text-muted-fg'
+                    )}
+                  >
+                    <MessageSquare className="h-3 w-3 shrink-0" />
+                    <span className="truncate">{t.label}</span>
+                  </button>
+                ))}
+                {(byProject[pid] ?? []).length === 0 && (
+                  <div className="px-2 py-0.5 text-xs text-muted-fg/60">no conversations yet</div>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </aside>
   );
 }

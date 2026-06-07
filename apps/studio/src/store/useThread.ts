@@ -38,6 +38,7 @@ interface ThreadStore {
   streamToken: (f: Extract<Frame, { type: 'token' }>) => void;
   openThread: (threadId: string) => Promise<void>;
   newThread: () => void;
+  setProject: (projectId: string) => void;
   reset: () => void;
 }
 
@@ -161,6 +162,14 @@ export const useThread = create<ThreadStore>((set, get) => ({
   newThread: () => {
     _persistThread(null);
     set({ threadId: null, pending: null, status: 'idle', transcript: [], result: null, verdicts: [], streaming: null });
+  },
+
+  // Switch the active project (persisted) and clear the thread view — callers may
+  // then openThread() to load a specific conversation, or start() a fresh one.
+  setProject: (projectId) => {
+    if (typeof window !== 'undefined') localStorage.setItem('pdlcflow-project', projectId);
+    _persistThread(null);
+    set({ projectId, threadId: null, pending: null, status: 'idle', transcript: [], result: null, verdicts: [], streaming: null });
   },
 
   reset: () =>
