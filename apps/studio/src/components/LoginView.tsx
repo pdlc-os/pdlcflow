@@ -1,13 +1,24 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import { useAuth } from '@/store/useAuth';
 
-/** Modal login overlay — shown on a 401 or when the user clicks "Sign in". */
+/** Modal login overlay — shown on a 401 or when the user clicks "Sign in".
+ *  Always dismissable (Cancel / Esc / backdrop): in self-hosted simulation mode
+ *  auth is optional, so the user must be able to escape back to the app. */
 export function LoginView() {
-  const { login, error, dismissLogin, identity } = useAuth();
+  const { login, error, dismissLogin } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
+
+  // Esc closes the overlay.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') dismissLogin();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [dismissLogin]);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -17,14 +28,18 @@ export function LoginView() {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
+      onClick={dismissLogin}
+    >
       <form
         onSubmit={submit}
+        onClick={(e) => e.stopPropagation()}
         className="w-80 rounded-xl border border-border bg-bg p-5 shadow-xl"
       >
         <h2 className="mb-1 text-lg font-semibold tracking-tight">Sign in to pdlcflow</h2>
         <p className="mb-4 text-xs text-muted-fg">
-          Authentication is enabled — sign in to continue.
+          Sign in to continue. Press Esc or Cancel to dismiss.
         </p>
         <label className="mb-2 block text-xs text-muted-fg">
           Email
@@ -56,16 +71,13 @@ export function LoginView() {
           >
             {busy ? 'Signing in…' : 'Sign in'}
           </button>
-          {/* Dismiss is allowed only when there's still a valid session (manual prompt). */}
-          {identity && (
-            <button
-              type="button"
-              onClick={dismissLogin}
-              className="text-xs text-muted-fg hover:text-fg"
-            >
-              Cancel
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={dismissLogin}
+            className="text-xs text-muted-fg hover:text-fg"
+          >
+            Cancel
+          </button>
         </div>
       </form>
     </div>
