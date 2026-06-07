@@ -176,7 +176,30 @@ export const admin = {
     if (projectId) q.set('project_id', projectId);
     return json<ContextUsage>(`/admin/context?${q.toString()}`);
   },
+
+  listThreads: (orgId: string, projectId?: string) => {
+    const q = new URLSearchParams({ org_id: orgId });
+    if (projectId) q.set('project_id', projectId);
+    return json<{ threads: ThreadSummary[] }>(`/admin/threads?${q.toString()}`);
+  },
+
+  openThread: (orgId: string, threadId: string) =>
+    json<ThreadDetail>(`/admin/threads/${encodeURIComponent(threadId)}?org_id=${encodeURIComponent(orgId)}`),
 };
+
+export interface ThreadSummary {
+  thread_id: string;
+  project_id: string | null;
+  label: string;
+  turns: number;
+  last_ts: string;
+}
+
+export interface ThreadDetail {
+  thread_id: string;
+  transcript: { seq: number; role: string; text: string; ts: string }[];
+  pending: Pending | null;
+}
 
 export interface ContextUsage {
   model_id: string | null;

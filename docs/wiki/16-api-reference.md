@@ -121,6 +121,8 @@ emits an `admin.access.denied` audit event and returns **403** (cross-org ban).
 | `GET /v1/admin/features/{roadmap_id}/timeline` | `org_id` | `{roadmap_id, events: [...]}` |
 | `GET /v1/admin/narrative` | `org_id`, `from?`, `to?`, `project_id?` | `{summary: {...}, narrative}` — work stats (human/agent/system) + LLM narrative |
 | `GET /v1/admin/context` | `org_id`, `project_id?` | `{model_id, context_window, peak_prompt_tokens, pct_used, near_limit, ...}` |
+| `GET /v1/admin/threads` | `org_id`, `project_id?` | `{threads: [{thread_id, label, turns, last_ts}]}` |
+| `GET /v1/admin/threads/{thread_id}` | `org_id` | `{thread_id, transcript: [{role, text, ts}], pending}` |
 | `GET /v1/admin/evals/summary` | `org_id` | `{by_eval: {...}, by_agent: {...}}` |
 | `GET /v1/admin/exports/rollup.csv` | `org_id`, `dimension`, `from?`, `to?` | `text/csv` |
 | `GET /v1/admin/models/org-default` | `org_id` | `OrgDefault \| null` |

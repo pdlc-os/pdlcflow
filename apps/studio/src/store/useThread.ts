@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 
-import { api, type Pending } from '@/lib/api';
+import { admin, api, type Pending } from '@/lib/api';
 import type { Frame, NightShiftFrame } from '@/lib/ws';
 
 export interface TranscriptItem {
@@ -36,6 +36,8 @@ interface ThreadStore {
   setResult: (r: Record<string, unknown> | null) => void;
   appendVerdict: (v: NightShiftFrame) => void;
   streamToken: (f: Extract<Frame, { type: 'token' }>) => void;
+  openThread: (threadId: string) => Promise<void>;
+  newThread: () => void;
   reset: () => void;
 }
 
@@ -45,10 +47,28 @@ function say(role: TranscriptItem['role'], text: string): TranscriptItem {
   return { id: crypto.randomUUID(), role, text };
 }
 
+// Stable identity across reloads (so conversation history persists). A real
+// multi-user deployment sources orgId from the JWT; project/thread persist here.
+function persisted(key: string): string {
+  if (typeof window === 'undefined') return crypto.randomUUID();
+  let v = localStorage.getItem(key);
+  if (!v) {
+    v = crypto.randomUUID();
+    localStorage.setItem(key, v);
+  }
+  return v;
+}
+
+const _persistThread = (id: string | null) => {
+  if (typeof window === 'undefined') return;
+  if (id) localStorage.setItem('pdlcflow-thread', id);
+  else localStorage.removeItem('pdlcflow-thread');
+};
+
 export const useThread = create<ThreadStore>((set, get) => ({
-  orgId: crypto.randomUUID(),
-  projectId: crypto.randomUUID(),
-  threadId: null,
+  orgId: persisted('pdlcflow-org'),
+  projectId: persisted('pdlcflow-project'),
+  threadId: typeof window !== 'undefined' ? localStorage.getItem('pdlcflow-thread') : null,
   pending: null,
   status: 'idle',
   transcript: [],
@@ -87,6 +107,7 @@ export const useThread = create<ThreadStore>((set, get) => ({
         // Seed the visual flag so UX Discovery (and its companion) fires.
         seed_state: COMMANDS_WITH_VISUAL_SEED.has(command) ? { visual: true } : undefined,
       });
+      _persistThread(res.thread_id);
       set((s) => ({
         threadId: res.thread_id,
         pending: res.pending,
@@ -114,6 +135,32 @@ export const useThread = create<ThreadStore>((set, get) => ({
     if (!p) return;
     set({ status: 'running' });
     await advance(set, get, p.id, { approved, comment }, say('user', approved ? 'Approved' : 'Rejected'));
+  },
+
+  openThread: async (threadId) => {
+    const { orgId } = get();
+    set({ status: 'running', transcript: [], pending: null, result: null, streaming: null });
+    try {
+      const d = await admin.openThread(orgId, threadId);
+      _persistThread(threadId);
+      set({
+        threadId,
+        transcript: d.transcript.map((e) => ({
+          id: crypto.randomUUID(),
+          role: e.role as TranscriptItem['role'],
+          text: e.text,
+        })),
+        pending: d.pending,
+        status: d.pending ? 'awaiting' : 'complete',
+      });
+    } catch (e) {
+      set({ status: 'error', transcript: [say('system', String(e))] });
+    }
+  },
+
+  newThread: () => {
+    _persistThread(null);
+    set({ threadId: null, pending: null, status: 'idle', transcript: [], result: null, verdicts: [], streaming: null });
   },
 
   reset: () =>

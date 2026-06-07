@@ -4,6 +4,7 @@ import { ApprovalGateModal } from '@/components/ApprovalGateModal';
 import { ChatPanel } from '@/components/ChatPanel';
 import { ContextMeter } from '@/components/ContextMeter';
 import { MemoryFileViewer } from '@/components/MemoryFileViewer';
+import { ThreadSidebar } from '@/components/ThreadSidebar';
 import { NightShiftMissionControl } from '@/components/NightShiftMissionControl';
 import { QuestionCard } from '@/components/QuestionCard';
 import { StreamingPreview } from '@/components/StreamingPreview';
@@ -44,6 +45,13 @@ export function ProjectView() {
     });
   }, [threadId, setPending, setResult, appendVerdict, streamToken]);
 
+  // On load, rehydrate the persisted thread's transcript so a refresh keeps your place.
+  useEffect(() => {
+    const s = useThread.getState();
+    if (s.threadId && s.transcript.length === 0) void s.openThread(s.threadId);
+     
+  }, []);
+
   const busy = status === 'running';
   const question = pending?.kind === 'user_input_required' ? pending : null;
   const gate = pending?.kind === 'approval' ? pending : null;
@@ -76,6 +84,7 @@ export function ProjectView() {
         )}
       </div>
       <aside className="flex flex-col gap-4">
+        <ThreadSidebar />
         <ContextMeter />
         <MemoryFileViewer />
       </aside>
