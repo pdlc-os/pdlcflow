@@ -20,11 +20,12 @@ PERSONAS: tuple[str, ...] = (
     "muse", "neo", "phantom", "pulse", "sentinel",
 )
 
-# Capability tiers a persona may declare in its soul-spec frontmatter. The engine's
-# tier_map turns the tier into a concrete model per provider (opus → frontier,
-# sonnet → general-purpose, haiku → cheap/fast).
-TIERS: tuple[str, ...] = ("opus", "sonnet", "haiku")
-_DEFAULT_TIER = "opus"
+# Provider-neutral capability tiers a persona may declare in its soul-spec
+# frontmatter (`tier: premium|balanced|economy`). The engine's tier_map turns the
+# tier into a concrete model per provider (premium → highest capability,
+# balanced → general purpose, economy → low token / fast).
+TIERS: tuple[str, ...] = ("premium", "balanced", "economy")
+_DEFAULT_TIER = "premium"
 
 _PERSONA_DIR = Path(__file__).parent
 
@@ -37,10 +38,10 @@ def load_persona_spec(name: str) -> str:
 
 @functools.cache
 def persona_tier(name: str) -> str:
-    """The capability tier a persona declares (`model: opus|sonnet|haiku` in its
-    soul-spec frontmatter). Defaults to `opus` if the persona/field is missing or
-    invalid. This is the canonical, provider-neutral tier — the engine maps it to
-    a concrete model for the active provider."""
+    """The capability tier a persona declares (`tier: premium|balanced|economy`
+    in its soul-spec frontmatter). Defaults to `premium` if the persona/field is
+    missing or invalid. This is the canonical, provider-neutral tier — the engine
+    maps it to a concrete model for the active provider."""
     try:
         spec = load_persona_spec(name)
     except KeyError:
@@ -51,7 +52,7 @@ def persona_tier(name: str) -> str:
     for line in lines[1:]:
         if line.strip() == "---":  # end of frontmatter
             break
-        if line.strip().startswith("model:"):
+        if line.strip().startswith("tier:"):
             tier = line.split(":", 1)[1].strip()
             return tier if tier in TIERS else _DEFAULT_TIER
     return _DEFAULT_TIER

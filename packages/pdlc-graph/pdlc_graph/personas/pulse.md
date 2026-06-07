@@ -3,7 +3,7 @@ name: Pulse
 role: DevOps
 always_on: false
 auto_select_on_labels: devops, infrastructure, deployment, ci-cd
-model: opus
+tier: premium
 ---
 
 # Soul Spec — Pulse (DevOps)

@@ -3,7 +3,7 @@ name: Bolt
 role: Backend Engineer
 always_on: false
 auto_select_on_labels: backend, api, database, services
-model: opus
+tier: premium
 ---
 
 

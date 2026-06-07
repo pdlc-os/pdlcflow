@@ -40,23 +40,61 @@ All engine configuration is environment-driven through Pydantic settings with th
 
 ## Per-agent model tiers (provider-neutral)
 
-Agents don't hard-code a model. Each persona declares a **capability tier** in its
-soul-spec frontmatter (`model: opus | sonnet | haiku`), and the engine's `tier_map`
-resolves that tier to a concrete model **for whichever provider is active**:
+Agents don't hard-code a model. Each persona declares a **provider-neutral capability
+tier** in its soul-spec frontmatter (`tier: premium | balanced | economy`), and the engine's
+`tier_map` resolves that tier to a concrete model **for whichever provider is active**:
 
 | Tier | Meaning | Personas | Bedrock / Anthropic / Vertex | OpenAI / Azure | Gemini |
 | --- | --- | --- | --- | --- | --- |
-| `opus` | highest capability | atlas, bolt, friday, neo, pulse | Claude Opus | `gpt-5.5` | `gemini-3.1-pro` |
-| `sonnet` | general purpose | echo, jarvis, muse, phantom | Claude Sonnet | `gpt-5.4` | `gemini-3.5-flash` |
-| `haiku` | low token / fast | sentinel | Claude Haiku | `gpt-5.4-mini` | `gemini-3.1-flash-lite` |
+| `premium` | highest capability | atlas, bolt, friday, neo, pulse | Claude Opus | `gpt-5.5` | `gemini-3.1-pro` |
+| `balanced` | general purpose | echo, jarvis, muse, phantom | Claude Sonnet | `gpt-5.4` | `gemini-3.5-flash` |
+| `economy` | low token / fast | sentinel | Claude Haiku | `gpt-5.4-mini` | `gemini-3.1-flash-lite` |
 
 So switching `PDLC_DEFAULT_LLM_PROVIDER` keeps the persona→tier association and
 auto-selects each provider's equivalent — Anthropic-family providers keep the real
 Opus/Sonnet/Haiku models; OpenAI/Gemini/etc. map to their highest/general/cheap models.
 
-**Overrides** (no code change): per tenant, `org_llm_config.tier_map` replaces the whole
-table; per agent, `agent_llm_config.model_id` pins an exact model. Default model IDs drift —
-verify against your provider and override as needed. (See `app/llm/tier_map.py`.)
+### Where to change models / tiers
+
+- **Default tier → model table** — [`services/pdlc-engine/app/llm/tier_map.py`](https://github.com/pdlc-os/pdlcflow/blob/main/services/pdlc-engine/app/llm/tier_map.py) (`DEFAULT_TIER_MAP`). Edit this to change which model each tier resolves to per provider. Provider model IDs drift — verify against your account.
+- **A persona's tier** — the `tier:` field in its soul-spec, `packages/pdlc-graph/pdlc_graph/personas/<persona>.md`.
+- **Active provider** — `PDLC_DEFAULT_LLM_PROVIDER` (env).
+- **Per-tenant / per-agent overrides** — see [Per-tenant & per-agent model overrides](#per-tenant--per-agent-model-overrides) below.
+
+### Per-tenant & per-agent model overrides
+
+Beyond the defaults, each **org** can override the provider + tier→model table, and each
+**agent within an org** can be pinned to an exact model. Resolution is, in order:
+
+1. **Per-agent** — `agent_llm_config(org_id, agent_persona)` → exact `model_id`.
+2. **Per-org default** — `org_llm_config(org_id)` → provider + `tier_map`.
+3. **Instance default** — `PDLC_DEFAULT_LLM_PROVIDER` (env) + `tier_map.py`.
+4. **Fallback** — Bedrock + Claude.
+
+These take effect when the engine runs with `PDLC_WIRE_LLM=true` and a Postgres
+`PDLC_TASK_STORE` (so the factory has a DB). Both config tables are RLS-scoped to the org.
+
+**Set them two ways:**
+
+- **Admin API** (Atlas Console → Models settings), scoped to the caller's org:
+  | Method & path | Effect |
+  | --- | --- |
+  | `PUT /v1/admin/models/org-default` | set the org's provider + `tier_map` |
+  | `GET /v1/admin/models/org-default` | read it |
+  | `PUT /v1/admin/models/agent-overrides/{persona}` | pin a persona to a provider + `model_id` |
+  | `GET /v1/admin/models/agent-overrides` | list per-agent overrides |
+  | `DELETE /v1/admin/models/agent-overrides/{persona}` | clear one |
+
+  ```bash
+  curl -X PUT "$API/v1/admin/models/org-default?org_id=$ORG" -H 'content-type: application/json' \
+    -d '{"provider":"openai","tier_map":{"premium":"gpt-5.5","balanced":"gpt-5.4","economy":"gpt-5.4-mini"}}'
+  curl -X PUT "$API/v1/admin/models/agent-overrides/neo?org_id=$ORG" -H 'content-type: application/json' \
+    -d '{"agent_persona":"neo","provider":"anthropic","model_id":"claude-opus-4-8"}'
+  ```
+
+- **Directly in the DB** — tables `org_llm_config` / `agent_llm_config`.
+
+**Source files:** factory resolution [`services/pdlc-engine/app/llm/factory.py`](https://github.com/pdlc-os/pdlcflow/blob/main/services/pdlc-engine/app/llm/factory.py) · admin API [`services/pdlc-engine/app/routes/admin/models.py`](https://github.com/pdlc-os/pdlcflow/blob/main/services/pdlc-engine/app/routes/admin/models.py) · table models [`services/pdlc-engine/app/db/models.py`](https://github.com/pdlc-os/pdlcflow/blob/main/services/pdlc-engine/app/db/models.py) (`OrgLLMConfig`, `AgentLLMConfig`).
 
 ## In-memory vs real backend matrix
 

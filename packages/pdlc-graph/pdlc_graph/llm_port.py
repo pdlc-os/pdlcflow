@@ -47,7 +47,7 @@ class _StubBackend:
     ) -> str:
         digest = hashlib.sha256(f"{persona}|{prompt}".encode()).hexdigest()[:8]
         head = " ".join(prompt.split()[:24])
-        return f"[stub:{persona}:{tier or 'opus'}:{digest}] {head}"
+        return f"[stub:{persona}:{tier or 'premium'}:{digest}] {head}"
 
     def stream(
         self, persona: str, prompt: str, *, tier: str | None = None, system: str | None = None

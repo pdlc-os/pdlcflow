@@ -205,3 +205,10 @@ Delivered incrementally (one PR per bundle). Auth deferred. Every adapter is fla
 - [x] `project_id`/`path` sanitized (reject `..`/absolute), filesystem `get`/`put` pinned under the base dir (crafted `file://` uri can't escape); S3 keys org-prefixed; migrate route binds the org too.
 - [x] Tests: graph `test_artifact_isolation` (context-org, default, traversal/`project_id` rejection) + engine `test_persistence` (tenant separation, traversal block, **end-to-end** `/doctor` command writes only under `{base}/{org}/{project}/`). Full hermetic suite green (**223**); ruff clean.
 - [ ] Deeper layer (documented): projects-table `project↔org` ownership check; per-tenant KMS for S3 (SaaS).
+
+## LLM tiers — generic names + real per-tenant/per-agent overrides (✅ verified vs Postgres)
+
+- [x] **Provider-neutral tier names**: renamed opus/sonnet/haiku → **premium / balanced / economy** everywhere (persona frontmatter `tier:`, loader, `tier_map`, factory `Tier`, judge tier, stub, docs). Anthropic-family providers still resolve to Opus/Sonnet/Haiku; OpenAI/Gemini/etc. auto-map highest/general/economy.
+- [x] **Overrides wired for real** (were Phase-A stubs): the factory now reads `org_llm_config` (per-tenant provider + tier_map) and `agent_llm_config` (per-agent exact model_id) with RLS context; the completion backend resolves the tenant from the turn context (`current_org()`); the Atlas Console **Models API** (`/v1/admin/models/*`) persists + reads them.
+- [x] **Verified on real Postgres** (docker): `test_llm_overrides_resolve_from_db` (factory reads org + agent overrides) + `test_admin_models_route_persists_and_reads` (HTTP round-trip). Hermetic suite green (230); ruff clean.
+- [x] Documented in the configuration wiki with resolution order, the admin API table + curl examples, the DB tables, and **source-file paths/links** (`app/llm/tier_map.py`, `app/llm/factory.py`, `app/routes/admin/models.py`, `app/db/models.py`).

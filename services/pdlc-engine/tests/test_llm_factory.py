@@ -6,22 +6,23 @@ def test_tier_map_covers_all_providers():
     expected = {"bedrock", "anthropic", "vertex", "azure", "openai", "gemini", "ollama"}
     assert set(DEFAULT_TIER_MAP.keys()) == expected
     for m in DEFAULT_TIER_MAP.values():
-        assert set(m.keys()) == {"opus", "sonnet", "haiku"}
+        assert set(m.keys()) == {"premium", "balanced", "economy"}
 
 
 def test_resolve_model_id_default_path():
     # Anthropic family keeps Opus/Sonnet/Haiku; others auto-map the tier.
-    assert resolve_model_id("anthropic", "opus") == "claude-opus-4-8"
-    assert resolve_model_id("bedrock", "sonnet") == "anthropic.claude-sonnet-4-6"
-    assert resolve_model_id("openai", "opus") == "gpt-5.5"        # highest capability
-    assert resolve_model_id("openai", "sonnet") == "gpt-5.4"      # general purpose
-    assert resolve_model_id("openai", "haiku") == "gpt-5.4-mini"  # low token
-    assert resolve_model_id("gemini", "opus") == "gemini-3.1-pro"
-    assert resolve_model_id("gemini", "haiku") == "gemini-3.1-flash-lite"
+    assert resolve_model_id("anthropic", "premium") == "claude-opus-4-8"
+    assert resolve_model_id("bedrock", "balanced") == "anthropic.claude-sonnet-4-6"
+    assert resolve_model_id("openai", "premium") == "gpt-5.5"        # highest capability
+    assert resolve_model_id("openai", "balanced") == "gpt-5.4"       # general purpose
+    assert resolve_model_id("openai", "economy") == "gpt-5.4-mini"   # low token
+    assert resolve_model_id("gemini", "premium") == "gemini-3.1-pro"
+    assert resolve_model_id("gemini", "economy") == "gemini-3.1-flash-lite"
 
 
 def test_resolve_model_id_override_wins():
-    assert resolve_model_id("openai", "opus", {"opus": "o1", "sonnet": "x", "haiku": "y"}) == "o1"
+    override = {"premium": "o1", "balanced": "x", "economy": "y"}
+    assert resolve_model_id("openai", "premium", override) == "o1"
 
 
 def test_tiers_are_distinct_per_provider():
@@ -63,10 +64,10 @@ def test_persona_tier_flows_through_the_real_backend_to_the_factory():
 
     set_completion_backend(FactoryCompletionBackend(_SpyFactory(), org_id="t"))
     try:
-        complete("sentinel", "evaluate")   # haiku
-        complete("neo", "design")          # opus
-        complete("muse", "ux")             # sonnet
+        complete("sentinel", "evaluate")   # economy
+        complete("neo", "design")          # premium
+        complete("muse", "ux")             # balanced
     finally:
         reset_completion_backend()
 
-    assert seen == {"sentinel": "haiku", "neo": "opus", "muse": "sonnet"}
+    assert seen == {"sentinel": "economy", "neo": "premium", "muse": "balanced"}
