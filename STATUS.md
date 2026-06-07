@@ -212,3 +212,10 @@ Delivered incrementally (one PR per bundle). Auth deferred. Every adapter is fla
 - [x] **Overrides wired for real** (were Phase-A stubs): the factory now reads `org_llm_config` (per-tenant provider + tier_map) and `agent_llm_config` (per-agent exact model_id) with RLS context; the completion backend resolves the tenant from the turn context (`current_org()`); the Nexus Console **Models API** (`/v1/admin/models/*`) persists + reads them.
 - [x] **Verified on real Postgres** (docker): `test_llm_overrides_resolve_from_db` (factory reads org + agent overrides) + `test_admin_models_route_persists_and_reads` (HTTP round-trip). Hermetic suite green (230); ruff clean.
 - [x] Documented in the configuration wiki with resolution order, the admin API table + curl examples, the DB tables, and **source-file paths/links** (`app/llm/tier_map.py`, `app/llm/factory.py`, `app/routes/admin/models.py`, `app/db/models.py`).
+
+## Multi-cloud SaaS deploy — Terraform (AWS · GCP · Azure, full parity)
+
+- [x] **`infra/terraform/modules/{aws,gcp,azure}`** — parallel, full-parity Terraform mirroring the 8 AWS CDK stacks on each cloud: network, managed Postgres, managed Redis, object storage, serverless containers (api+worker), Studio CDN, managed identity, clickstream streaming, LLM access, secrets, logs. Shared variable contract (`api_image`, `db_password`, region, `app_env`).
+- [x] **Validated** with `tofu validate` (schema-correct vs real provider schemas) for all three clouds. **Not deploy-tested** (no live cloud creds here) — documented as such.
+- [x] README with the service-mapping table, deploy steps, and honest app-portability caveats (object storage S3-only → GCS via S3-compat / Azure Blob needs an adapter; cognito auth is AWS-specific → local-JWT/OIDC elsewhere; native clickstream sink only on AWS → Postgres sink default on GCP/Azure). Root README + repo layout updated.
+- [ ] Follow-ons (app adapters, not infra): Azure Blob artifact adapter; OIDC auth against Identity Platform / AD B2C; native Pub/Sub + Event Hubs clickstream sinks.
