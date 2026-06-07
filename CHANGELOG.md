@@ -3,6 +3,23 @@
 All notable changes to pdlcflow are documented here. This project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## v1.7.1 — 2026-06-07
+
+Patch: fixes a one-line-installer failure on a fresh deploy.
+
+### Fixed
+- **Installer: Postgres (and therefore the whole stack) failed to start.** `install.sh`
+  / `update.sh` fetch `postgres-init/01-app-role.sh` with `curl -o`, which drops the
+  execute bit. Postgres's entrypoint then either can't exec it (`bad interpreter:
+  Permission denied`, container exits 126) or sources it and leaks the script's
+  `set -e` into the entrypoint — so Postgres never becomes healthy and every
+  dependent service reports *"dependency … failed to start"*. Both scripts now
+  `chmod +x` the init script after download. (No image change — the deploy scripts
+  are served from `main`, so the fix reaches new installs immediately.)
+
+  Already hit this? The half-initialized data volume must be wiped before retrying:
+  `docker compose down -v` in your `pdlcflow/` dir, then re-run the installer.
+
 ## v1.7.0 — 2026-06-07
 
 Conversation history, subscription-CLI LLMs, deeper defense-in-depth, and Studio
