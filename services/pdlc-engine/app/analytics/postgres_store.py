@@ -12,11 +12,12 @@ from __future__ import annotations
 
 import logging
 
+from event_schema import actor_type_for
 from sqlalchemy import text
 
 from ..db.rls import set_org_context
 from ..db.session import get_sync_engine
-from .store import _require_org  # reuse the cross-org guard
+from .store import _require_org, summarize_work  # reuse the cross-org guard + summarizer
 
 log = logging.getLogger("pdlc.analytics.postgres")
 
@@ -132,3 +133,44 @@ class PostgresAnalyticsStore:
             r = conn.execute(sql, {"org": org_id}).mappings().one()
         return {"events": int(r["events"] or 0), "tokens": int(r["tokens"] or 0),
                 "usd": round(float(r["usd"] or 0), 6)}
+
+    def work_summary(self, *, org_id, frm=None, to=None, project_id=None) -> dict:
+        org_id = _require_org(org_id)
+        clauses = ["org_id = :org"]
+        params: dict = {"org": org_id}
+        if frm:
+            clauses.append("ts >= :frm")
+            params["frm"] = frm
+        if to:
+            clauses.append("ts <= :to")
+            params["to"] = to
+        if project_id:
+            clauses.append("project_id = :pid")
+            params["pid"] = str(project_id)
+        sql = text(
+            f"select event_type, ts, actor, roadmap_id, "
+            f"payload->>'agent_persona' as agent_persona, "
+            f"{_TOKENS} as tokens, {_USD} as usd "
+            f"from events where {' and '.join(clauses)} order by ts asc limit 20000"
+        )
+        with self._engine.begin() as conn:
+            set_org_context(conn, org_id)
+            raw = conn.execute(sql, params).mappings().all()
+        rows = [
+            {
+                "event_type": r["event_type"],
+                "ts": r["ts"].isoformat() if hasattr(r["ts"], "isoformat") else str(r["ts"]),
+                "actor": r["actor"],
+                "actor_type": actor_type_for(r["event_type"]),
+                "roadmap_id": r["roadmap_id"],
+                "agent_persona": r["agent_persona"],
+                "tokens": int(r["tokens"] or 0),
+                "usd": float(r["usd"] or 0),
+            }
+            for r in raw
+        ]
+        return {
+            "window": {"from": frm, "to": to},
+            "project_id": str(project_id) if project_id else None,
+            **summarize_work(rows),
+        }

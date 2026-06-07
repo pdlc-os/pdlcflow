@@ -65,8 +65,10 @@ the guardrails a real organization needs.
 - **Multi-tenant by design** — JWT authentication, role-based admin, and **PostgreSQL
   Row-Level Security (FORCE)** so tenant isolation is enforced by the database — not just the
   app. Artifacts (PRDs, design docs, reviews) are namespaced per tenant.
-- **Observability built in** — a 40-event clickstream taxonomy feeds analytics and the **Atlas
-  Console** admin dashboard (live runs, cost/usage rollups, per-agent metrics).
+- **Observability built in** — a 40-event clickstream taxonomy (every event tagged
+  human / agent / system) feeds analytics and the **Nexus Console** admin dashboard:
+  live runs, cost/usage rollups, per-agent metrics, and a **Work Narrative** that turns a
+  date window into stats + an LLM story of what humans vs agents did.
 - **Live experience** — a React **Studio** with real-time WebSocket updates and live token
   "drafting" previews.
 - **Deploy anywhere** — one-line install from published container images, Docker Compose for

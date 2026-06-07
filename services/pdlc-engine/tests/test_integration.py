@@ -309,3 +309,26 @@ def test_admin_models_route_persists_and_reads():
     assert r2.status_code == 200
     rows = c.get(f"/v1/admin/models/agent-overrides?org_id={org}").json()
     assert any(a["agent_persona"] == "neo" and a["model_id"] == "gpt-5.5" for a in rows)
+
+
+def test_postgres_work_summary_splits_actors():
+    """work_summary over real events: human (gate.resolved) vs agent (agent.invoked)
+    vs system (deploy.succeeded), aggregated for the org."""
+    from app.analytics.postgres_store import PostgresAnalyticsStore
+    from app.clickstream.sinks.postgres import PostgresSink
+    from event_schema import EventEnvelope
+
+    org = uuid.uuid4()
+    proj = uuid.uuid4()
+    PostgresSink(settings.db_url).write([
+        EventEnvelope(event_type="gate.resolved", org_id=org, project_id=proj, actor="dev@acme",
+                      payload={"gate_id": "g1"}),
+        EventEnvelope(event_type="agent.invoked", org_id=org, project_id=proj,
+                      payload={"agent_persona": "neo", "tokens_in": 7, "tokens_out": 3}),
+        EventEnvelope(event_type="deploy.succeeded", org_id=org, project_id=proj, payload={}),
+    ])
+    s = PostgresAnalyticsStore(settings).work_summary(org_id=str(org))
+    assert s["by_actor_type"]["human"] >= 1
+    assert s["by_actor_type"]["agent"] >= 1
+    assert s["by_actor_type"]["system"] >= 1
+    assert s["by_agent"]["neo"]["tokens"] >= 10

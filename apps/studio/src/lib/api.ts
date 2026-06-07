@@ -162,7 +162,32 @@ export const admin = {
 
   exportsCsvUrl: (orgId: string, dimension: RollupDimension) =>
     `${BASE}/admin/exports/rollup.csv?org_id=${encodeURIComponent(orgId)}&dimension=${dimension}`,
+
+  narrative: (orgId: string, opts?: { from?: string; to?: string; projectId?: string }) => {
+    const q = new URLSearchParams({ org_id: orgId });
+    if (opts?.from) q.set('from', opts.from);
+    if (opts?.to) q.set('to', opts.to);
+    if (opts?.projectId) q.set('project_id', opts.projectId);
+    return json<NarrativeResponse>(`/admin/narrative?${q.toString()}`);
+  },
 };
+
+export interface WorkSummary {
+  window: { from: string | null; to: string | null };
+  project_id: string | null;
+  total_events: number;
+  by_actor_type: { human: number; agent: number; system: number };
+  by_event_type: Record<string, number>;
+  by_agent: Record<string, { events: number; tokens: number }>;
+  tokens: number;
+  usd: number;
+  notable: AdminEvent[];
+}
+
+export interface NarrativeResponse {
+  summary: WorkSummary;
+  narrative: string;
+}
 
 export interface LoginResponse {
   access_token: string;
