@@ -3,6 +3,49 @@
 All notable changes to pdlcflow are documented here. This project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## v1.7.0 — 2026-06-07
+
+Conversation history, subscription-CLI LLMs, deeper defense-in-depth, and Studio
+UX on top of v1.6.0. All new capability is flag-gated and off by default.
+
+### Conversation history (ChatGPT/Claude-style)
+- **Durable, verbatim transcript** of every thread — an RLS-FORCEd `thread_transcript`
+  table (migration 0005, org-isolated), recorded at each turn boundary.
+- **`GET /v1/admin/threads`** + **`/threads/{id}`** to list past threads and open one.
+- A Studio **Conversations sidebar**: list, reopen (verbatim replay), continue, or start
+  new — with org/project/thread persisted across reloads.
+
+### Subscription-CLI LLM providers (single-user self-host)
+- `claude_code` / `codex` / `gemini_cli` — bill against a Claude Max / ChatGPT / Google
+  subscription via the local CLI (`PDLC_ENABLE_CLI_PROVIDERS`), refused under
+  auth/multi-tenant.
+
+### Defense-in-depth
+- **RLS-FORCE on the LangGraph checkpoint tables** (`checkpoints`/`checkpoint_writes`/
+  `checkpoint_blobs`) so thread state is DB-isolated per org, not just by `thread_id`.
+  (Also fixed a latent issue: the durable checkpointer needed `CREATE` to run as `pdlc_app`.)
+
+### Observability
+- **Context-window meter** (`GET /v1/admin/context` + a Studio gauge): peak prompt tokens
+  vs the model's window, with a near-limit flag.
+- **`/compact`** command + a meter button: distills the working log to free up context.
+
+### Studio UX
+- Slash-command **autocomplete + color-coding** in the composer, and a **Sketch ⇄ Socratic**
+  interaction-mode toggle (default Sketch — pre-filled recommended answers).
+
+### Build / CI / providers
+- **Credentials as config for all 7 providers** (env keys + cloud SDK chains); the install
+  wizard covers every provider; fixed the Bedrock-region var.
+- **Node CI now gates** (no more `|| true`) with a proper ESLint v9 flat config — which
+  immediately caught + fixed CDK stack sources that were gitignored and never committed.
+- Docs/scripts audit; README intro reflects multi-cloud (AWS/GCP/Azure).
+
+### Known limitations
+- Subscription CLIs are single-user self-host only. Multi-cloud Terraform is validated, not
+  deploy-tested. The context meter measures per-call prompt size (not a single growing
+  conversation — pdlcflow uses discrete, state-reconstructed prompts).
+
 ## v1.6.0 — 2026-06-06
 
 Distribution, multi-cloud, provider-neutral model selection, and observability on top of
