@@ -76,7 +76,7 @@ These take effect when the engine runs with `PDLC_WIRE_LLM=true` and a Postgres
 
 **Set them two ways:**
 
-- **Admin API** (Atlas Console → Models settings), scoped to the caller's org:
+- **Admin API** (Nexus Console → Models settings), scoped to the caller's org:
   | Method & path | Effect |
   | --- | --- |
   | `PUT /v1/admin/models/org-default` | set the org's provider + `tier_map` |

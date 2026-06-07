@@ -6,7 +6,7 @@ export function ProjectSwitcher() {
       <h1 className="mb-2 text-2xl font-semibold tracking-tight">Welcome to pdlcflow</h1>
       <p className="mb-6 text-muted-fg">
         Phase A scaffold — pick a project to enter the LangGraph + Bedrock-powered workflow,
-        or visit the <Link className="text-accent hover:underline" to="/admin/live">Atlas Console</Link>{' '}
+        or visit the <Link className="text-accent hover:underline" to="/admin/live">Nexus Console</Link>{' '}
         for rollups across initiatives, domains, squads, and agents.
       </p>
       <div className="grid grid-cols-2 gap-3">

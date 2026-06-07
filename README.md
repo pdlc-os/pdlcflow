@@ -113,7 +113,7 @@ flowchart LR
   API --> PG[("PostgreSQL<br/>Row-Level Security")]
   API --> RD[("Redis<br/>event bus + checkpoints")]
   API --> OBJ[("S3 / MinIO<br/>tenant-namespaced artifacts")]
-  API --> CS["Clickstream<br/>40-event taxonomy"] --> AD["Atlas Console<br/>admin dashboard"]
+  API --> CS["Clickstream<br/>40-event taxonomy"] --> AD["Nexus Console<br/>admin dashboard"]
 ```
 
 Every side effect sits behind an injectable port with an in-memory default, so the system is

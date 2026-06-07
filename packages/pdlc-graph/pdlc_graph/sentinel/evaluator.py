@@ -23,7 +23,7 @@ class Verdict(TypedDict, total=False):
 
 # Verbatim from upstream hooks/pdlc-night-shift.js — adding to this set is a
 # breaking change to the night-shift contract; coordinate with /night-shift
-# documentation and the Atlas Console mission-control filter.
+# documentation and the Nexus Console mission-control filter.
 ABORT_CONDITIONS: set[str] = {
     "critical-security",
     "p0-ux",

@@ -1,4 +1,4 @@
-"""Analytics read store — the query side of the clickstream for Atlas Console."""
+"""Analytics read store — the query side of the clickstream for Nexus Console."""
 
 from .store import (
     METRICS,

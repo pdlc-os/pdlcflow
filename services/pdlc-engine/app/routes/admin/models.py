@@ -1,4 +1,4 @@
-"""Atlas Console — Models settings: org default + per-agent overrides.
+"""Nexus Console — Models settings: org default + per-agent overrides.
 
 Persists to org_llm_config / agent_llm_config (RLS-FORCEd, scoped to the admin's
 org). The LLM factory reads these so per-tenant / per-agent model selection takes

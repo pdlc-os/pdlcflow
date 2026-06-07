@@ -7,7 +7,7 @@
 project (the file-based `docs/pdlc/memory/` methodology) into a pdlcflow tenant.
 It runs in four steps — **scan → push → taxonomy → backfill** — and lands
 everything through one engine endpoint, `POST /v1/migrate/import`. The payoff:
-**Atlas Console dashboards are non-empty on day one**, and re-running the
+**Nexus Console dashboards are non-empty on day one**, and re-running the
 migration is idempotent.
 
 ```mermaid
@@ -20,7 +20,7 @@ flowchart LR
   backfill --> imp
   imp["POST /v1/migrate/import"] --> an["analytics store\n(dedup on event_id)"]
   imp --> art["artifact store\n(memory bodies)"]
-  an --> console["Atlas Console\n(non-empty day one)"]
+  an --> console["Nexus Console\n(non-empty day one)"]
 ```
 
 ## CLI setup

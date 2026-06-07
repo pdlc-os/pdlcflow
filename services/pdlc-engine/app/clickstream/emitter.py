@@ -58,7 +58,7 @@ class ClickstreamEmitter:
     def __init__(self, sink: _Sink, analytics=None, max_queue: int = 10_000):
         self._q: queue.Queue[EventEnvelope] = queue.Queue(maxsize=max_queue)
         self._sink = sink
-        self._analytics = analytics  # read-store fan-out for Atlas Console
+        self._analytics = analytics  # read-store fan-out for Nexus Console
         threading.Thread(target=self._drain, daemon=True).start()
 
     def emit_envelope(self, e: EventEnvelope) -> None:

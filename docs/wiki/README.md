@@ -17,7 +17,7 @@ graph LR
   GRAPH -->|artifacts| OBJ[(Filesystem / S3·MinIO)]
   GRAPH -->|LLM| LLM[Bedrock / 6 other providers]
   GRAPH -->|events| AN[Analytics store]
-  AN --> ATLAS[Atlas Console]
+  AN --> ATLAS[Nexus Console]
   U --> ATLAS
 ```
 
@@ -38,7 +38,7 @@ graph LR
 | 11 | [Night-Shift](11-night-shift.md) | The autonomous runtime, contract party, Sentinel, mission control |
 | 12 | [Utility Commands](12-utilities.md) | /decide /doctor /whatif /pause /resume /abandon /release /override /rollback /hotfix |
 | 13 | [Using the Studio](13-studio.md) | The browser UI: chat, gates, visual companion, mission control |
-| 14 | [Monitoring & Analytics](14-monitoring.md) | Telemetry, the Atlas Console rollups, the cross-org ban |
+| 14 | [Monitoring & Analytics](14-monitoring.md) | Telemetry, the Nexus Console rollups, the cross-org ban |
 | 15 | [Migrating an upstream project](15-migration.md) | scan / push / taxonomy / backfill |
 | 16 | [API & WebSocket Reference](16-api-reference.md) | Every REST endpoint + the thread WebSocket |
 | 17 | [Evals Framework](17-evals.md) | Per-agent scoring, groundedness/hallucination, drift, LLM-as-judge, eval CI |

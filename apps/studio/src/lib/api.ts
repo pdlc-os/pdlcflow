@@ -91,7 +91,7 @@ export interface ResolveBody {
   answers?: string[];
 }
 
-// ── Atlas Console (admin analytics) ───────────────────────────────────────
+// ── Nexus Console (admin analytics) ───────────────────────────────────────
 // Mirrors the REST contract under /v1/admin. Every data route requires org_id
 // (a missing org_id is a 422 — the cross-org ban, plan §5.3).
 export interface RollupRow {

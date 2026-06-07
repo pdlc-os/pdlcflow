@@ -1,4 +1,4 @@
-"""Admin access guard — tenant + role enforcement for the Atlas Console routes.
+"""Admin access guard — tenant + role enforcement for the Nexus Console routes.
 
 `admin_org(label)` returns a FastAPI dependency that resolves the effective org
 for an admin data route:

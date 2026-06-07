@@ -2,7 +2,7 @@
 
 Key: `llm:{org_id}:{provider}:{tier}:rpm`. Each LLM call increments and
 checks against the configured RPM. Buckets are set at tenant onboarding; the
-Atlas Console "Quotas" page exposes the knobs (Phase H).
+Nexus Console "Quotas" page exposes the knobs (Phase H).
 """
 
 from __future__ import annotations

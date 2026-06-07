@@ -106,7 +106,7 @@ Errors: `404` if the gate id is unknown; `409` if it is already resolved.
 
 ---
 
-## Admin (Atlas Console)
+## Admin (Nexus Console)
 
 All under `/v1/admin`. **Data routes require `org_id`** — a missing/blank value
 emits an `admin.access.denied` audit event and returns **403** (cross-org ban).
