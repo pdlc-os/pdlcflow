@@ -104,6 +104,12 @@ capability level. Defaults are overridable per tenant or per agent (see the
 Leave the LLM unwired (`PDLC_WIRE_LLM=false`, the default) and pdlcflow runs against a
 deterministic offline stub — so the full stack boots, tests, and demos with **no credentials**.
 
+**Single-user self-host** can also bill against a **Claude Pro/Max, ChatGPT, or Google
+subscription** instead of an API key, by shelling out to the locally-installed `claude` / `codex`
+/ `gemini` CLI (`PDLC_DEFAULT_LLM_PROVIDER=claude_code|codex|gemini_cli`, opt-in via
+`PDLC_ENABLE_CLI_PROVIDERS=true`). Refused when auth/multi-tenant is on — see the
+[configuration guide](./docs/wiki/03-configuration.md#subscription-clis-single-user-self-host-only).
+
 ## Architecture
 
 ```mermaid

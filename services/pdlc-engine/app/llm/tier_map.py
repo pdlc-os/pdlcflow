@@ -53,6 +53,22 @@ DEFAULT_TIER_MAP: dict[str, dict[str, str]] = {
         "balanced": "qwen2.5:32b",
         "economy":  "qwen2.5:7b",
     },
+    # Subscription CLIs (single-user self-host) — the value is the CLI's --model.
+    "claude_code": {
+        "premium":  "opus",
+        "balanced": "sonnet",
+        "economy":  "haiku",
+    },
+    "codex": {
+        "premium":  "gpt-5.5",
+        "balanced": "gpt-5.4",
+        "economy":  "gpt-5.4-mini",
+    },
+    "gemini_cli": {
+        "premium":  "gemini-3.1-pro",
+        "balanced": "gemini-3.5-flash",
+        "economy":  "gemini-3.1-flash-lite",
+    },
 }
 
 
