@@ -101,7 +101,15 @@ def complete(
 
     Streams `token` frames to the thread channel when a publisher + thread
     context are active and the backend supports streaming; otherwise a plain
-    blocking completion (identical output)."""
+    blocking completion (identical output).
+
+    When no `tier` is given, it defaults to the persona's declared tier (from its
+    soul-spec frontmatter) — so each agent runs at its intended capability level,
+    and the engine's tier_map resolves that to the active provider's model."""
+    if tier is None:
+        from .personas import persona_tier
+
+        tier = persona_tier(persona)
     thread = _current_thread.get()
     pub = _token_publisher
     if pub is not None and thread and hasattr(_backend, "stream"):
