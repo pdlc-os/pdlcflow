@@ -38,6 +38,22 @@ All engine configuration is environment-driven through Pydantic settings with th
 
 > AWS credentials (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION`) are read by boto3 directly — only needed when using Bedrock, Firehose, or real S3.
 
+### Provider credentials
+
+Credentials are supplied as configuration and resolved per provider:
+
+- **Cloud SDK chains** — Bedrock (boto3) and Vertex (Google ADC) use the standard chains: env
+  vars (`AWS_*`, `GOOGLE_APPLICATION_CREDENTIALS`) **or** an attached IAM role / workload
+  identity. No PDLC-specific key fields.
+- **Direct-API keys** — Anthropic / OpenAI / Gemini / Azure OpenAI read the SDK's own env var
+  when no per-tenant secret is set: `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GOOGLE_API_KEY`,
+  `AZURE_OPENAI_API_KEY` (+ `AZURE_OPENAI_ENDPOINT`). Put them in `.env` / the container env.
+- **Per-tenant override** — a non-empty `secret_value` (from `org_llm_config` / `agent_llm_config`)
+  takes precedence over the env var for that org/agent.
+
+Precedence: **per-tenant `secret_value` → provider env var**. (`PDLC_WIRE_LLM=true` uses real
+models; off uses the deterministic offline stub and needs no credentials.)
+
 ## Per-agent model tiers (provider-neutral)
 
 Agents don't hard-code a model. Each persona declares a **provider-neutral capability
