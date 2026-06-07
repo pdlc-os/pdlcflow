@@ -96,8 +96,29 @@ def resolve(
 
     store.resolve(gate_id, status="resolved")
     next_pending = get_dispatcher().resume(rec.thread_id, _resume_value(rec, req))
+    _record_resolution(rec, req, next_pending)
     return ResolveResponse(
         ok=True,
         thread_id=rec.thread_id,
         pending=next_pending.as_dict() if next_pending else None,
     )
+
+
+def _record_resolution(rec, req: ResolveRequest, next_pending) -> None:
+    """Append the human decision + the agent's next turn to the transcript."""
+    try:
+        from ..persistence.transcript import get_transcript_store, summarize_pending
+
+        if req.answers:
+            user = "answers: " + " | ".join(req.answers)
+        elif req.approved is not None:
+            user = ("approved" if req.approved else "rejected") + (f": {req.comment}" if req.comment else "")
+        else:
+            user = "resolved"
+        store = get_transcript_store()
+        store.append(org_id=rec.org_id, thread_id=rec.thread_id, project_id=rec.project_id,
+                     role="user", text=user)
+        store.append(org_id=rec.org_id, thread_id=rec.thread_id, project_id=rec.project_id,
+                     role="agent", text=summarize_pending(next_pending))
+    except Exception:  # pragma: no cover
+        pass
