@@ -30,7 +30,7 @@ export function AppShell() {
           Inception · Discover
         </span>
         <div className="ml-auto flex items-center gap-3 text-muted-fg">
-          <Link to="/admin/live" className="hover:text-fg">Atlas Console</Link>
+          <Link to="/admin/live" className="hover:text-fg">Nexus Console</Link>
           {identity ? (
             <span className="flex items-center gap-1.5">
               <span className="text-xs text-fg" title={`${identity.email} · ${identity.role}`}>

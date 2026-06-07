@@ -122,7 +122,7 @@ The two Sentinel nodes call `emit_event("night_shift.verdict", state, {"stage":
 decorator cannot see the return value, hence the explicit emit. These frames,
 alongside `night_shift.started` / `night_shift.completed` /
 `night_shift.aborted`, are published over the thread WebSocket
-(`/ws/threads/{thread_id}`) and rendered in the Atlas Console mission-control
+(`/ws/threads/{thread_id}`) and rendered in the Nexus Console mission-control
 panel.
 
 ## Three-layer production-deploy ban

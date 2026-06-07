@@ -1,7 +1,7 @@
 """Taxonomy assignment for a migrated project.
 
 ``assign_taxonomy_core`` is the pure, prompt-free core that the import pipeline
-and the Atlas Console wizard both call. ``assign_taxonomy`` is the thin
+and the Nexus Console wizard both call. ``assign_taxonomy`` is the thin
 interactive CLI wrapper (Typer prompts) used by the bulk-import path.
 """
 

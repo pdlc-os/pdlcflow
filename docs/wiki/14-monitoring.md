@@ -5,11 +5,11 @@
 
 pdlcflow instruments every graph node with a clickstream of typed events,
 feeds them into an analytics read store, and surfaces rollups through the
-**Atlas Console** admin API + SPA. This page covers the 38-event taxonomy, the
+**Nexus Console** admin API + SPA. This page covers the 40-event taxonomy, the
 tenancy/traceability dimensions every event carries, the analytics pipeline, the
 admin routes, the cross-org ban, and live night-shift verdicts.
 
-## The 38-event taxonomy
+## The 40-event taxonomy
 
 Every event the clickstream emits is one of **38 typed event types in 16
 categories**, defined in `packages/event-schema/event_schema/registry.md` (the
@@ -66,7 +66,7 @@ flowchart LR
   em -->|fan-out| an["AnalyticsStore\n(in-memory | postgres)"]
   em -->|night_shift.* frame| bus["EventBus\nthread:{id}"]
   an --> routes["/v1/admin/* routes"]
-  routes --> console["Atlas Console SPA"]
+  routes --> console["Nexus Console SPA"]
   bus -. WS .-> mc["Night-shift mission control"]
 ```
 
@@ -104,7 +104,7 @@ store (`postgres_store.py`) is injected at boot under
 **Idempotent ingest:** the store dedups on `event_id`, so migration backfill
 (which uses deterministic uuid5 ids) can be re-run with no double-counting.
 
-## Atlas Console admin routes
+## Nexus Console admin routes
 
 Mounted under `/v1/admin` (`app/routes/admin/`). All return JSON unless noted.
 

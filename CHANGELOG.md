@@ -71,7 +71,7 @@ dashboard, autonomous runs, and an evaluation framework. Runs self-host via Dock
   evaluator, live verdict streaming to mission control, and a 3-layer production-deploy ban.
 - **Utility commands** — `/decide /doctor /whatif /pause /resume /abandon /release /override
   /rollback /hotfix`.
-- **Studio** (React + Vite) — chat, gates, visual companion, mission control, Atlas Console.
+- **Studio** (React + Vite) — chat, gates, visual companion, mission control, Nexus Console.
 - **Telemetry & analytics** — a 40-event taxonomy with tenancy + feature-traceability
   dimensions (roadmap/PRD/user-story/plan-step), org-scoped rollups, cross-org ban.
 - **Self-host production stack** — PostgresSaver checkpointer, Arq dispatch, Redis pub/sub

@@ -6,7 +6,7 @@
 Studio is the React + Vite + Tailwind single-page app in `apps/studio/`. It is
 the operator's chat-first front end to the engine: you type a slash command,
 answer the question rounds the graph raises, approve the gates, watch a
-night-shift run in mission control, and pivot to the **Atlas Console** for
+night-shift run in mission control, and pivot to the **Nexus Console** for
 analytics — all in one bundle.
 
 ## URLs
@@ -37,12 +37,12 @@ exactly as before. (Auth state: `store/useAuth.ts` + `lib/token.ts`.)
 `AppShell.tsx` is the frame: a top bar with Org / Squad / Initiative / Project
 switchers, a phase pill, a **theme toggle** that cycles **light → dark → system**
 (the `system` mode follows the OS and live-updates with it; the choice persists),
-and an **Atlas Console** link (`/admin/live`). The left
+and an **Nexus Console** link (`/admin/live`). The left
 `SideDrawer` and a bottom `StatusLine` round out the shell. Routes:
 
 - `/` — project switcher (`routes/index.tsx`).
 - `/projects/:id` — the Studio working view (`routes/projects/[id].tsx`).
-- `/admin/*` — the Atlas Console (see [Monitoring](14-monitoring.md)).
+- `/admin/*` — the Nexus Console (see [Monitoring](14-monitoring.md)).
 
 ```mermaid
 flowchart TD
@@ -158,9 +158,9 @@ default so tests + the no-stream path are byte-identical.
 Because the bus **replays** recent history on connect, a client attaching after
 a gate opened still sees it.
 
-## 6. Switching to the Atlas Console
+## 6. Switching to the Nexus Console
 
-Click **Atlas Console** in the top bar (or the link on the home page) to reach
+Click **Nexus Console** in the top bar (or the link on the home page) to reach
 `/admin/*`. The console tabs (`routes/admin/layout.tsx`) are: **Live,
 Initiatives, Domains, Squads, Agents, Features, Exports, Models** — all
 org-scoped via the session store. See [Monitoring](14-monitoring.md) for what

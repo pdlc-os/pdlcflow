@@ -1,4 +1,4 @@
-"""Atlas Console admin routes — live, initiatives, domains, squads, agents,
+"""Nexus Console admin routes — live, initiatives, domains, squads, agents,
 features (time-travel), exports, models."""
 
 from fastapi import APIRouter, Depends

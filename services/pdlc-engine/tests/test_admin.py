@@ -1,4 +1,4 @@
-"""Atlas Console admin route tests — drive each rollup/timeline/export route via
+"""Nexus Console admin route tests — drive each rollup/timeline/export route via
 TestClient against an in-memory analytics store seeded with EventEnvelopes."""
 
 from __future__ import annotations

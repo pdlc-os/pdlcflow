@@ -3,7 +3,7 @@
 
 # Overview
 
-pdlcflow is a stand-alone runtime for the **Product Development Lifecycle (PDLC)** methodology. Where the upstream `pdlc` plugin runs PDLC inside Claude Code on a single dev box, pdlcflow lifts the same workflow off the editor into a self-hostable (or SaaS) service: a Python **LangGraph engine** drives a feature through four phases — **Initialization, Inception, Construction, Operation** — pausing at **8 approval gates**, fanning work out to **10 agent personas** (and party meetings), enforcing TDD and a hard production-deploy ban, and emitting a **38-event clickstream** that powers an admin analytics console. The whole thing is driven over a REST + WebSocket API by a React Studio UI.
+pdlcflow is a stand-alone runtime for the **Product Development Lifecycle (PDLC)** methodology. Where the upstream `pdlc` plugin runs PDLC inside Claude Code on a single dev box, pdlcflow lifts the same workflow off the editor into a self-hostable (or SaaS) service: a Python **LangGraph engine** drives a feature through four phases — **Initialization, Inception, Construction, Operation** — pausing at **8 approval gates**, fanning work out to **10 agent personas** (and party meetings), enforcing TDD and a hard production-deploy ban, and emitting a **40-event clickstream** that powers an admin analytics console. The whole thing is driven over a REST + WebSocket API by a React Studio UI.
 
 ## The methodology in one paragraph
 
@@ -13,14 +13,14 @@ A feature flows through four phases. The **meta-graph** (`packages/pdlc-graph/pd
 
 | Component | Path | Role |
 |-----------|------|------|
-| **event-schema** | `packages/event-schema/` | `EventEnvelope` + the 38-event taxonomy (registry in `event_schema/registry.md`). Carries tenancy + traceability dims on every event. |
+| **event-schema** | `packages/event-schema/` | `EventEnvelope` + the 40-event taxonomy (registry in `event_schema/registry.md`). Carries tenancy + traceability dims on every event. |
 | **pdlc-graph** | `packages/pdlc-graph/` | The LangGraph engine: meta-graph router + `meta/brainstorm/build/ship/night_shift/utility` subgraphs, party orchestrator, 10 persona soul-specs, the 8 gates, and the deterministic Sentinel evaluator. |
 | **pdlc-engine** | `services/pdlc-engine/` | FastAPI service: REST (`/v1/...`) + WebSocket (`/ws/...`), runtime (GraphRunner + checkpointer + dispatcher + event bus), analytics rollups, clickstream emitter, persistence adapters, LLM provider factory, Alembic migrations. |
-| **studio** | `apps/studio/` | React + Vite + Tailwind UI — the Studio chat/feature view **and** the Atlas Console admin dashboard in one bundle. |
+| **studio** | `apps/studio/` | React + Vite + Tailwind UI — the Studio chat/feature view **and** the Nexus Console admin dashboard in one bundle. |
 | **Postgres** | compose `postgres:17` | Durable graph checkpoints, the task store, analytics events, and row-level-security tenancy. |
 | **Redis** | compose `redis:7` | Pub/sub event bus (cross-process WebSocket fan-out + live night-shift verdicts) and the Arq job queue. |
 | **Object store** | compose `minio` (S3-compatible) | Artifact store (PRD/design/review docs, memory bodies). Self-host default is the filesystem volume; MinIO/S3 is optional. |
-| **Analytics** | `services/pdlc-engine/app/analytics/` | Rollups by dimension (initiative/application/squad/domain/roadmap/user_story/agent) with events + tokens + USD, served to the Atlas Console. |
+| **Analytics** | `services/pdlc-engine/app/analytics/` | Rollups by dimension (initiative/application/squad/domain/roadmap/user_story/agent) with events + tokens + USD, served to the Nexus Console. |
 | **pdlc-migrate** | `tools/pdlc-migrate/` | `scan`/`push`/`taxonomy`/`backfill` CLI to import an upstream `pdlc` project and seed the dashboards. |
 
 ## System architecture
@@ -28,7 +28,7 @@ A feature flows through four phases. The **meta-graph** (`packages/pdlc-graph/pd
 ```mermaid
 flowchart TB
     subgraph Client
-        Studio["Studio + Atlas Console<br/>(React + Vite)"]
+        Studio["Studio + Nexus Console<br/>(React + Vite)"]
     end
 
     subgraph Engine["pdlc-engine (FastAPI)"]

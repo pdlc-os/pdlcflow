@@ -7,7 +7,7 @@ pdlcflow ships a small, extensible **evaluation harness** (Phase J) that measure
 quality of agent output at major steps of the lifecycle and guards against
 **hallucination, ungrounded claims, and drift**. Evals run *in-process* alongside the
 graph, score each meaningful output, and emit `eval.scored` / `eval.blocked` events into
-the same clickstream that powers the Atlas Console — so eval results are queryable,
+the same clickstream that powers the Nexus Console — so eval results are queryable,
 chartable, and auditable like any other telemetry.
 
 > **Default posture: measure-only.** The harness is a **strict no-op unless enabled**
