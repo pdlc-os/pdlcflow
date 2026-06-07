@@ -78,9 +78,13 @@ visual companion fires.
 commands (↑/↓ to move, Enter/Tab to complete, Esc to dismiss), each with a
 one-line summary + its argument hint. The recognized `/command` token is
 **color-coded** (accent when it's a real command, muted for an unknown one — the
-leading chevron picks up the same cue). A **Socratic ⇄ Sketch** toggle sets
-`interaction_mode`: *Socratic* = the agent asks guiding questions (Inception/
-brainstorm); *Sketch* = it drafts directly. The command list is the single
+leading chevron picks up the same cue). A **Sketch ⇄ Socratic** toggle sets
+`interaction_mode` (init/brainstorm): *Sketch* (default) = the agent pre-fills
+**recommended draft answers** you edit; *Socratic* = blank questions you answer
+from scratch. Both ask the **same** questions, and multi-option suggestions
+(visual A/B/C screens, the strike-panel approaches) + approval gates work in
+either mode — the only difference is whether the agent's draft answers are shown
+(see `interaction.py`). The command list is the single
 source of truth in `lib/commands.ts` (shared by the menu + highlighter), so it
 stays in sync with the engine's accepted commands: init, brainstorm, build,
 ship, decide, whatif, doctor, rollback, hotfix, night-shift, pause, resume,

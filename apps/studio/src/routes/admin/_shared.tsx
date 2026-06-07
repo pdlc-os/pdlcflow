@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components -- shared module: components + helpers co-located by design */
 import type { ReactNode } from 'react';
 import type { RollupRow } from '@/lib/api';
 
