@@ -11,8 +11,18 @@ Three ways to run pdlcflow:
 
 ## Deploy from published images (no clone)
 
-Run the whole stack from prebuilt **GHCR** images — you only need Docker + three files
-(not the source). This is the easiest way to stand up or distribute pdlcflow.
+Run the whole stack from prebuilt **GHCR** images — you only need Docker (not the source).
+This is the easiest way to stand up or distribute pdlcflow.
+
+**One line** — downloads the deploy files, runs the setup wizard, brings the stack up:
+
+```bash
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/pdlc-os/pdlcflow/main/deploy/install.sh)"
+```
+
+Use the `bash -c "$(curl …)"` form (**not** `curl | bash`) so the wizard can read your
+terminal. Options: `--no-start` (download + configure only) · `--dir=<path>` (install
+location). Or do it by hand:
 
 ```bash
 base=https://raw.githubusercontent.com/pdlc-os/pdlcflow/main/deploy

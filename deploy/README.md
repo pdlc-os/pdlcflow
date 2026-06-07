@@ -8,7 +8,20 @@ need Docker + these few files, not the source repo.
 > and keep the packages **private**, deployers must authenticate first:
 > `echo "$GHCR_PAT" | docker login ghcr.io -u <user> --password-stdin` (PAT with `read:packages`).
 
-## Quick start
+## Quick start (one line)
+
+```bash
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/pdlc-os/pdlcflow/main/deploy/install.sh)"
+```
+
+That downloads the deploy files into `./pdlcflow`, runs the interactive wizard
+(prompts + generates secrets → `.env`), brings the stack up, and applies the schema.
+Use the `bash -c "$(curl …)"` form (**not** `curl | bash`) so the wizard can read your
+terminal. Options: `--no-start` (download + configure only) and `--dir=<path>` /
+`PDLCFLOW_DIR=<path>` (install location, default `./pdlcflow`). Then open
+**http://localhost:8080** (Studio) and **http://localhost:8000/health** (API).
+
+## Quick start (manual, step by step)
 
 ```bash
 # 1. Grab the deploy files into an empty directory
@@ -25,8 +38,6 @@ mkdir -p postgres-init && curl -fsSL $base/postgres-init/01-app-role.sh -o postg
 docker compose up -d
 docker compose run --rm api uv run alembic upgrade head
 ```
-
-Then open **http://localhost:8080** (Studio) and **http://localhost:8000/health** (API).
 
 > Prefer not to use the wizard? `curl -fsSLO $base/.env.example`, copy it to `.env`,
 > edit by hand, then `docker compose up -d`. Everything `setup.sh` asks is just a key in `.env`.
