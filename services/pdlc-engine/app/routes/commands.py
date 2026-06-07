@@ -28,7 +28,7 @@ Command = Literal[
     "init", "brainstorm", "build", "ship",
     "decide", "whatif", "doctor", "rollback",
     "hotfix", "night-shift", "pause", "resume",
-    "abandon", "release", "override",
+    "abandon", "release", "override", "compact",
     "pdlc", "setup",
 ]
 
@@ -45,7 +45,7 @@ _PHASE_FOR_COMMAND: dict[str, str] = {
 # independent of the resting phase.
 _UTILITY_COMMANDS: set[str] = {
     "decide", "whatif", "doctor", "rollback", "hotfix",
-    "abandon", "release", "override", "pause", "resume",
+    "abandon", "release", "override", "pause", "resume", "compact",
 }
 
 

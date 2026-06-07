@@ -148,6 +148,22 @@ takes a date window (`from`/`to`, optional `project_id`) and returns:
   uses the deterministic offline stub when `PDLC_WIRE_LLM` is off and the org's
   configured provider when on.
 
+## Context-window meter + compaction
+
+Agents make **discrete prompts** (each node assembles the context it needs from the
+durable thread state), so there's no single growing conversation — the meaningful
+gauge is how close any one prompt came to the model's context window. The
+**`GET /v1/admin/context?org_id&project_id`** endpoint computes, from the
+`llm.tokens_spent` events, the **peak** single-prompt tokens vs the active model's
+window (`app/llm/context_windows.py`), the latest call, cumulative tokens, and a
+`near_limit` flag (≥ 80%). The Studio renders this as a gauge in the project view.
+
+When it nears the limit, run **`/compact`** (a utility command, also a one-click
+button on the meter): Atlas distills the accumulated `brainstorm_log` into a
+concise, fact-lossless summary (written to a `COMPACTED.md` artifact) and replaces
+the verbose log with it — the pdlcflow analogue of Claude Code's compaction, which
+shrinks subsequent node prompts.
+
 ## The cross-org ban
 
 Cross-org analytics are banned by design. Every **data** route runs its

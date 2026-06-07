@@ -88,7 +88,7 @@ either mode — the only difference is whether the agent's draft answers are sho
 source of truth in `lib/commands.ts` (shared by the menu + highlighter), so it
 stays in sync with the engine's accepted commands: init, brainstorm, build,
 ship, decide, whatif, doctor, rollback, hotfix, night-shift, pause, resume,
-abandon, release, override.
+abandon, release, override, compact.
 
 The response's `thread_id` is stored and the view subscribes to that thread's
 WebSocket channel. The transcript shows your command plus a system line

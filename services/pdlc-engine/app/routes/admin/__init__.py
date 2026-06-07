@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends
 
 from ...auth.local import require_admin
 from .agents import router as agents_router
+from .context import router as context_router
 from .domains import router as domains_router
 from .evals import router as evals_router
 from .exports import router as exports_router
@@ -27,3 +28,4 @@ router.include_router(exports_router)
 router.include_router(models_router)
 router.include_router(evals_router)
 router.include_router(narrative_router)
+router.include_router(context_router)

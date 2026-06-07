@@ -49,6 +49,8 @@ def _flatten(e: EventEnvelope) -> dict:
         "actor": e.actor,
         "actor_type": e.actor_type or actor_type_for(e.event_type),
         "agent_persona": p.get("agent_persona"),
+        "model_id": p.get("model_id"),
+        "tokens_in": int(p.get("tokens_in", 0) or 0),
         "tokens": int(p.get("tokens_in", 0) or 0) + int(p.get("tokens_out", 0) or 0),
         "usd": float(p.get("usd_estimate", 0) or 0),
         # Eval fields (present only on eval.scored events; None otherwise).
@@ -127,6 +129,34 @@ def summarize_work(rows: list[dict]) -> dict:
     }
 
 
+def context_usage_from(rows: list[dict]) -> dict:
+    """From `llm.tokens_spent` rows: how close prompts came to the model's context
+    window. Each agent call is a discrete prompt, so the meaningful gauge is the
+    PEAK single-prompt tokens vs the window (plus the latest call + cumulative)."""
+    from ..llm.context_windows import context_window_for
+
+    if not rows:
+        return {"model_id": None, "context_window": context_window_for(None),
+                "peak_prompt_tokens": 0, "last_prompt_tokens": 0, "cumulative_tokens": 0,
+                "pct_used": 0.0, "near_limit": False, "calls": 0}
+    rows_sorted = sorted(rows, key=lambda r: r["ts"])
+    last = rows_sorted[-1]
+    peak = max(int(r.get("tokens_in", 0) or 0) for r in rows_sorted)
+    model_id = last.get("model_id")
+    window = context_window_for(model_id)
+    pct = round(peak / window, 4) if window else 0.0
+    return {
+        "model_id": model_id,
+        "context_window": window,
+        "peak_prompt_tokens": peak,
+        "last_prompt_tokens": int(last.get("tokens_in", 0) or 0),
+        "cumulative_tokens": sum(int(r.get("tokens", 0) or 0) for r in rows_sorted),
+        "pct_used": pct,
+        "near_limit": pct >= 0.8,
+        "calls": len(rows_sorted),
+    }
+
+
 def _require_org(org_id: str | None) -> str:
     if not org_id:
         # Cross-org analytics are banned (plan §5.3). Surface as a hard error
@@ -143,6 +173,7 @@ class AnalyticsStore(Protocol):
     def totals(self, *, org_id) -> dict: ...
     def eval_summary(self, *, org_id) -> dict: ...
     def work_summary(self, *, org_id, frm=None, to=None, project_id=None) -> dict: ...
+    def context_usage(self, *, org_id, project_id=None) -> dict: ...
 
 
 class InMemoryAnalyticsStore:
@@ -223,6 +254,13 @@ class InMemoryAnalyticsStore:
             "project_id": str(project_id) if project_id else None,
             **summarize_work(rows),
         }
+
+    def context_usage(self, *, org_id, project_id=None) -> dict:
+        org_id = _require_org(org_id)
+        rows = [r for r in self._scope(org_id, None, None) if r["event_type"] == "llm.tokens_spent"]
+        if project_id:
+            rows = [r for r in rows if r["project_id"] == str(project_id)]
+        return context_usage_from(rows)
 
 
 _store: AnalyticsStore = InMemoryAnalyticsStore()

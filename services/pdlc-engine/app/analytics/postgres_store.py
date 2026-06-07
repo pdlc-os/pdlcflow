@@ -17,7 +17,7 @@ from sqlalchemy import text
 
 from ..db.rls import set_org_context
 from ..db.session import get_sync_engine
-from .store import _require_org, summarize_work  # reuse the cross-org guard + summarizer
+from .store import _require_org, context_usage_from, summarize_work  # cross-org guard + helpers
 
 log = logging.getLogger("pdlc.analytics.postgres")
 
@@ -174,3 +174,27 @@ class PostgresAnalyticsStore:
             "project_id": str(project_id) if project_id else None,
             **summarize_work(rows),
         }
+
+    def context_usage(self, *, org_id, project_id=None) -> dict:
+        org_id = _require_org(org_id)
+        clauses = ["org_id = :org", "event_type = 'llm.tokens_spent'"]
+        params: dict = {"org": org_id}
+        if project_id:
+            clauses.append("project_id = :pid")
+            params["pid"] = str(project_id)
+        sql = text(
+            f"select ts, payload->>'model_id' as model_id, "
+            f"coalesce((payload->>'tokens_in')::int,0) as tokens_in, {_TOKENS} as tokens "
+            f"from events where {' and '.join(clauses)} order by ts asc"
+        )
+        with self._engine.begin() as conn:
+            set_org_context(conn, org_id)
+            raw = conn.execute(sql, params).mappings().all()
+        rows = [
+            {"event_type": "llm.tokens_spent",
+             "ts": r["ts"].isoformat() if hasattr(r["ts"], "isoformat") else str(r["ts"]),
+             "model_id": r["model_id"], "tokens_in": int(r["tokens_in"] or 0),
+             "tokens": int(r["tokens"] or 0)}
+            for r in raw
+        ]
+        return context_usage_from(rows)

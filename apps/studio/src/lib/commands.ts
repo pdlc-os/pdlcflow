@@ -23,6 +23,7 @@ export const PDLC_COMMANDS: PdlcCommand[] = [
   { name: 'abandon', summary: 'Abandon the active thread' },
   { name: 'release', summary: 'Cut a release' },
   { name: 'override', summary: 'Bypass a guardrail (audited)' },
+  { name: 'compact', summary: 'Distill the working log to free up context window' },
 ];
 
 export const COMMAND_NAMES: ReadonlySet<string> = new Set(PDLC_COMMANDS.map((c) => c.name));
