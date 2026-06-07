@@ -132,6 +132,6 @@ jobs:
       - name: install
         run: pnpm install --frozen-lockfile=false
       - name: lint
-        run: pnpm --filter ./${{ matrix.package }} lint || true
+        run: pnpm --filter ./${{ matrix.package }} run --if-present lint
       - name: build
-        run: pnpm --filter ./${{ matrix.package }} build || true
+        run: pnpm --filter ./${{ matrix.package }} run build

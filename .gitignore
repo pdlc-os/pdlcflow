@@ -18,6 +18,9 @@ lib64/
 # ...but the Studio has a source dir literally named "lib" (api/ws/theme/utils).
 !apps/studio/src/lib/
 !apps/studio/src/lib/**
+# ...and the CDK app's stacks live in infra/cdk/lib (source; tsc emits to dist/).
+!infra/cdk/lib/
+!infra/cdk/lib/**
 parts/
 sdist/
 var/

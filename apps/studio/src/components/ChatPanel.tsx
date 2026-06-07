@@ -18,7 +18,7 @@ export function ChatPanel() {
   const status = useThread((s) => s.status);
   const start = useThread((s) => s.start);
   const [input, setInput] = useState('');
-  const [mode, setMode] = useState<Mode>('socratic');
+  const [mode, setMode] = useState<Mode>('sketch');
   const [menuOpen, setMenuOpen] = useState(false);
   const [active, setActive] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -187,9 +187,9 @@ function ModeToggle({ mode, setMode }: { mode: Mode; setMode: (m: Mode) => void 
   return (
     <div
       className="flex shrink-0 overflow-hidden rounded-md border border-border text-xs"
-      title="Interaction mode — Socratic: the agent asks guiding questions. Sketch: it drafts directly. (Applies to init/brainstorm.)"
+      title="Interaction mode (init/brainstorm) — Sketch: the agent pre-fills recommended draft answers you edit. Socratic: blank questions you answer from scratch. Both ask the same questions; multi-option suggestions + gates work in both."
     >
-      {(['socratic', 'sketch'] as Mode[]).map((m) => (
+      {(['sketch', 'socratic'] as Mode[]).map((m) => (
         <button
           key={m}
           type="button"
