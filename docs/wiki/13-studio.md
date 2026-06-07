@@ -70,9 +70,21 @@ command, e.g.:
 It is parsed `\/?(\w[\w-]*)\s*(.*)` into `command = "brainstorm"` and
 `feature = "dark mode"`. The store's `start()` calls
 `api.invokeCommand({ command, org_id, project_id, feature, interaction_mode })`
-(`useThread.ts`), defaulting `interaction_mode` to `socratic`. The `org_id` /
-`project_id` come from the store. For commands that drive UX Discovery, the
-store seeds `seed_state: { visual: true }` so the visual companion fires.
+(`useThread.ts`). The `org_id` / `project_id` come from the store. For commands
+that drive UX Discovery, the store seeds `seed_state: { visual: true }` so the
+visual companion fires.
+
+**Composer affordances.** As you type `/`, an **autocomplete menu** filters the
+commands (↑/↓ to move, Enter/Tab to complete, Esc to dismiss), each with a
+one-line summary + its argument hint. The recognized `/command` token is
+**color-coded** (accent when it's a real command, muted for an unknown one — the
+leading chevron picks up the same cue). A **Socratic ⇄ Sketch** toggle sets
+`interaction_mode`: *Socratic* = the agent asks guiding questions (Inception/
+brainstorm); *Sketch* = it drafts directly. The command list is the single
+source of truth in `lib/commands.ts` (shared by the menu + highlighter), so it
+stays in sync with the engine's accepted commands: init, brainstorm, build,
+ship, decide, whatif, doctor, rollback, hotfix, night-shift, pause, resume,
+abandon, release, override.
 
 The response's `thread_id` is stored and the view subscribes to that thread's
 WebSocket channel. The transcript shows your command plus a system line
