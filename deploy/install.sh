@@ -27,6 +27,24 @@ done
 c() { printf '\033[1;36m%s\033[0m\n' "$*"; }
 need() { command -v "$1" >/dev/null 2>&1 || { echo "✗ '$1' is required but not found on PATH." >&2; exit 1; }; }
 
+# --- pdlcflow CLI: PATH symlink + PDLCFLOW_HOME env (shared by install/update/uninstall) ---
+PDLCFLOW_BIN_DIR="${PDLCFLOW_BIN_DIR:-$HOME/.local/bin}"
+_rc_file() { case "${SHELL:-}" in *zsh) echo "$HOME/.zshrc";; *bash) echo "$HOME/.bashrc";; *) echo "$HOME/.profile";; esac; }
+_rc_strip() { local f="$1"; [ -f "$f" ] || return 0
+  awk 'BEGIN{s=1} /^# >>> pdlcflow >>>$/{s=0} s==1{print} /^# <<< pdlcflow <<<$/{s=1}' "$f" > "$f.pdlctmp" && mv "$f.pdlctmp" "$f"; }
+install_cli() {  # $1 = deploy dir (PDLCFLOW_HOME)
+  local home_dir="$1" rc; rc="$(_rc_file)"
+  mkdir -p "$PDLCFLOW_BIN_DIR"
+  chmod +x "$home_dir/pdlcflow" 2>/dev/null || true
+  ln -sf "$home_dir/pdlcflow" "$PDLCFLOW_BIN_DIR/pdlcflow"
+  touch "$rc"; _rc_strip "$rc"
+  { echo "# >>> pdlcflow >>>"
+    echo "export PDLCFLOW_HOME=\"$home_dir\""
+    echo "case \":\$PATH:\" in *\":$PDLCFLOW_BIN_DIR:\"*) ;; *) export PATH=\"$PDLCFLOW_BIN_DIR:\$PATH\" ;; esac"
+    echo "# <<< pdlcflow <<<"; } >> "$rc"
+  echo "$rc"
+}
+
 c "Installing pdlcflow → $DIR"
 need curl
 need docker
@@ -43,9 +61,13 @@ for f in setup.sh update.sh uninstall.sh; do
 done
 curl -fsSL "$BASE/postgres-init/01-app-role.sh" -o postgres-init/01-app-role.sh
 chmod +x postgres-init/01-app-role.sh  # Postgres execs init *.sh; curl -o drops the exec bit
+curl -fsSL "$BASE/pdlcflow" -o pdlcflow && chmod +x pdlcflow
 
 c "⚙  Configuring"
 ./setup.sh
+
+c "🔗 Installing the 'pdlcflow' command (PDLCFLOW_HOME + PATH symlink)"
+RC_FILE="$(install_cli "$(pwd)")"
 
 if [ "$START" -eq 1 ]; then
   c "🚀 Starting the stack"
@@ -59,7 +81,11 @@ if [ "$START" -eq 1 ]; then
 else
   echo
   c "✓ Ready in $(pwd)."
-  echo "   Start it with:"
-  echo "     docker compose up -d"
-  echo "     docker compose run --rm api uv run alembic upgrade head"
+  echo "   Start it with:  pdlcflow setup   (or: docker compose up -d)"
+  echo "   Then migrate:   docker compose run --rm api uv run alembic upgrade head"
 fi
+
+echo
+c "🧰 'pdlcflow' command installed → $PDLCFLOW_BIN_DIR/pdlcflow"
+echo "   Open a new terminal (or: source \"$RC_FILE\"), then control the stack with:"
+echo "     pdlcflow setup | start | stop | status | remove | wipe"

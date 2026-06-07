@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+# pdlcflow — control CLI for a local/self-hosted deployment.
+#
+# install.sh symlinks this onto your PATH and exports PDLCFLOW_HOME (the deploy
+# dir). Every subcommand is a thin wrapper over `docker compose` run in that dir.
+#
+#   pdlcflow setup     start (create) the stack        docker compose up -d
+#   pdlcflow start     start stopped containers        docker compose start
+#   pdlcflow stop      stop containers (keep data)     docker compose stop
+#   pdlcflow status    show container status           docker compose ps
+#   pdlcflow remove    remove containers + network     docker compose down
+#   pdlcflow wipe      remove containers + ALL DATA    docker compose down -v
+#
+# Extra args pass through, e.g. `pdlcflow status -a` or `pdlcflow setup studio`.
+set -euo pipefail
+
+# Resolve the deploy dir: PDLCFLOW_HOME if valid, else this script's (symlink-resolved) dir.
+home_dir="${PDLCFLOW_HOME:-}"
+if [ -z "$home_dir" ] || [ ! -f "$home_dir/docker-compose.yml" ]; then
+  src="${BASH_SOURCE[0]}"
+  while [ -L "$src" ]; do src="$(readlink "$src")"; done
+  home_dir="$(cd "$(dirname "$src")" && pwd)"
+fi
+[ -f "$home_dir/docker-compose.yml" ] || {
+  echo "✗ pdlcflow: no docker-compose.yml at '$home_dir'. Set PDLCFLOW_HOME to your deploy dir." >&2
+  exit 1
+}
+
+usage() {
+  sed -n '3,18p' "$0" | sed 's/^# \{0,1\}//'
+  echo
+  echo "deploy dir: $home_dir"
+}
+
+cmd="${1:-}"; [ "$#" -gt 0 ] && shift || true
+cd "$home_dir"
+case "$cmd" in
+  setup)        exec docker compose up -d "$@" ;;
+  start)        exec docker compose start "$@" ;;
+  stop)         exec docker compose stop "$@" ;;
+  status|ps)    exec docker compose ps "$@" ;;
+  remove|down)  exec docker compose down "$@" ;;
+  wipe)         exec docker compose down -v "$@" ;;
+  ""|-h|--help|help) usage ;;
+  *) echo "pdlcflow: unknown command '$cmd' — try: setup start stop status remove wipe" >&2; exit 2 ;;
+esac
