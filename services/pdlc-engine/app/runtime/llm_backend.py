@@ -19,19 +19,30 @@ log = logging.getLogger("pdlc.runtime.llm")
 # soul-spec frontmatter, so a real tier always arrives here; this is just the
 # safety net if a caller passes tier=None explicitly. The factory's tier_map
 # turns the tier into a concrete per-provider model.
-_DEFAULT_TIER = "opus"
+_DEFAULT_TIER = "premium"
 
 
 class FactoryCompletionBackend:
-    def __init__(self, factory: LLMProviderFactory, org_id: str) -> None:
+    def __init__(self, factory: LLMProviderFactory, org_id: str | None = None) -> None:
         self._factory = factory
         self._org_id = org_id
+
+    def _tenant(self) -> TenantCtx:
+        # The authoritative tenant for this turn (the runner binds it from the
+        # thread id). Per-tenant/per-agent LLM config in the DB keys off this, so
+        # each org's overrides apply. Falls back to the bound org for non-turn calls.
+        from pdlc_graph.ports import current_org
+
+        org = current_org()
+        if org in ("default", "self-host") and self._org_id:
+            org = self._org_id
+        return TenantCtx(org_id=org)
 
     def _model(self, persona: str, tier: str | None):
         return self._factory.get_model(
             persona=persona,
             tier=tier or _DEFAULT_TIER,  # type: ignore[arg-type]
-            tenant=TenantCtx(org_id=self._org_id),
+            tenant=self._tenant(),
         )
 
     @staticmethod
@@ -69,9 +80,14 @@ def wire_llm_backend(settings) -> bool:
     try:
         from pdlc_graph.llm_port import set_completion_backend
 
-        factory = LLMProviderFactory()
-        # org_id is resolved per-request in the full multi-tenant path; for the
-        # single-tenant self-host boot we bind the instance default.
+        # Give the factory a DB engine when Postgres is configured, so per-tenant
+        # (org_llm_config) + per-agent (agent_llm_config) overrides take effect.
+        db = None
+        if getattr(settings, "task_store", "memory") == "postgres":
+            from ..db.session import get_sync_engine
+
+            db = get_sync_engine(settings)
+        factory = LLMProviderFactory(db=db)
         set_completion_backend(FactoryCompletionBackend(factory, org_id="self-host"))
         return True
     except Exception as exc:  # never block boot on this

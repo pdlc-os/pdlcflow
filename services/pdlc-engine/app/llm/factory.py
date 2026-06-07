@@ -4,15 +4,17 @@ Resolution order:
   1. Agent-level override     — agent_llm_config(org_id, agent_persona)
   2. Org default              — org_llm_config(org_id)
   3. Instance default         — PDLC_DEFAULT_LLM_PROVIDER env var
-  4. Built-in fallback        — Bedrock with Claude opus/sonnet/haiku
+  4. Built-in fallback        — Bedrock with Claude (premium/balanced/economy)
 """
 
 from __future__ import annotations
 
+import uuid as _uuid
 from dataclasses import dataclass
 from typing import Literal
 
 from langchain_core.language_models import BaseChatModel
+from sqlalchemy import text
 
 from ..config import settings
 from .providers import (
@@ -41,7 +43,7 @@ from .tier_map import resolve_model_id
 Provider = Literal[
     "bedrock", "anthropic", "vertex", "azure", "openai", "gemini", "ollama"
 ]
-Tier = Literal["opus", "sonnet", "haiku"]
+Tier = Literal["premium", "balanced", "economy"]
 
 _BUILDERS = {
     "bedrock": bedrock_p.build,
@@ -87,12 +89,63 @@ class LLMProviderFactory:
         builder = _BUILDERS[cfg.provider]
         return builder(cfg, model_id)
 
-    # ----- resolution sources (Phase A: settings-only; B wires DB lookups) -----
-    def _agent_override(self, _org_id: str, _persona: str) -> ProviderConfig | None:
-        return None
+    # ----- resolution sources -----
+    # Per-tenant / per-agent config lives in org_llm_config / agent_llm_config
+    # (RLS-FORCEd). When the factory has a DB engine and a real org UUID, these
+    # take effect; otherwise (self-host / no DB) we fall through to the env default.
+    @staticmethod
+    def _is_org_uuid(org_id: str) -> bool:
+        try:
+            _uuid.UUID(str(org_id))
+            return True
+        except (ValueError, TypeError):
+            return False
 
-    def _org_default(self, _org_id: str) -> ProviderConfig | None:
-        return None
+    def _agent_override(self, org_id: str, persona: str) -> ProviderConfig | None:
+        if self._db is None or not self._is_org_uuid(org_id):
+            return None
+        from ..db.rls import set_org_context
+
+        with self._db.begin() as conn:
+            set_org_context(conn, org_id)
+            row = conn.execute(
+                text(
+                    "select provider, model_id, region, endpoint "
+                    "from agent_llm_config where org_id = :o and agent_persona = :p"
+                ),
+                {"o": org_id, "p": persona},
+            ).mappings().first()
+        if not row:
+            return None
+        return ProviderConfig(
+            provider=row["provider"],
+            model_id_override=row["model_id"],
+            region=row["region"],
+            endpoint=row["endpoint"],
+        )
+
+    def _org_default(self, org_id: str) -> ProviderConfig | None:
+        if self._db is None or not self._is_org_uuid(org_id):
+            return None
+        from ..db.rls import set_org_context
+
+        with self._db.begin() as conn:
+            set_org_context(conn, org_id)
+            row = conn.execute(
+                text(
+                    "select provider, region, endpoint, tier_map "
+                    "from org_llm_config where org_id = :o"
+                ),
+                {"o": org_id},
+            ).mappings().first()
+        if not row:
+            return None
+        return ProviderConfig(
+            provider=row["provider"],
+            region=row["region"],
+            endpoint=row["endpoint"],
+            tier_map_override=row["tier_map"],
+        )
 
     def _instance_default(self) -> ProviderConfig | None:
         return ProviderConfig(

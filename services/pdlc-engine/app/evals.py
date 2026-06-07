@@ -83,7 +83,7 @@ def wire_evals(settings) -> bool:
             set_judge_backend(
                 FactoryJudgeBackend(
                     LLMProviderFactory(), org_id="self-host",
-                    tier=getattr(settings, "judge_tier", "opus"),
+                    tier=getattr(settings, "judge_tier", "premium"),
                 )
             )
             log.info("evals enabled with factory-backed judge (tier=%s)", settings.judge_tier)

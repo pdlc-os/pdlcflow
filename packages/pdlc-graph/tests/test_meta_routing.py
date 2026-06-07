@@ -51,4 +51,4 @@ def test_personas_loadable():
     for p in PERSONAS:
         spec = load_persona_spec(p)
         assert spec.startswith("---")  # frontmatter
-        assert "model:" in spec  # tier declaration
+        assert "tier:" in spec  # tier declaration

@@ -247,3 +247,65 @@ def test_s3_artifact_roundtrip_against_minio():
     uri = store.put(str(uuid.uuid4()), str(uuid.uuid4()), "docs/PRD.md", "# integration")
     assert uri.startswith("s3://")
     assert store.get(uri) == "# integration"
+
+
+def test_llm_overrides_resolve_from_db():
+    """Per-tenant (org_llm_config) + per-agent (agent_llm_config) overrides are
+    read back by the factory — so model selection actually honors them."""
+    import json
+
+    from app.db.rls import set_org_context
+    from app.db.session import get_sync_engine
+    from app.llm.factory import LLMProviderFactory
+    from sqlalchemy import text
+
+    org, _ = _seed_project()
+    eng = get_sync_engine(settings)
+    with eng.begin() as c:
+        set_org_context(c, org)
+        c.execute(
+            text("insert into org_llm_config (org_id, provider, tier_map) "
+                 "values (:o, 'openai', cast(:t as jsonb))"),
+            {"o": org, "t": json.dumps(
+                {"premium": "gpt-5.5", "balanced": "gpt-5.4", "economy": "gpt-5.4-mini"})},
+        )
+        c.execute(
+            text("insert into agent_llm_config (org_id, agent_persona, provider, model_id) "
+                 "values (:o, 'neo', 'anthropic', 'claude-opus-4-8')"),
+            {"o": org},
+        )
+
+    f = LLMProviderFactory(db=eng)
+    org_cfg = f._org_default(org)
+    assert org_cfg.provider == "openai"
+    assert org_cfg.tier_map_override["premium"] == "gpt-5.5"
+
+    agent_cfg = f._agent_override(org, "neo")
+    assert agent_cfg.provider == "anthropic"
+    assert agent_cfg.model_id_override == "claude-opus-4-8"
+
+    # No row / non-uuid org → no override (falls through to instance default).
+    assert f._agent_override(org, "muse") is None
+    assert f._org_default(str(uuid.uuid4())) is None
+    assert f._org_default("self-host") is None
+
+
+def test_admin_models_route_persists_and_reads():
+    from app.main import app
+    from fastapi.testclient import TestClient
+
+    org, _ = _seed_project()
+    c = TestClient(app)
+
+    r = c.put(f"/v1/admin/models/org-default?org_id={org}", json={
+        "provider": "gemini",
+        "tier_map": {"premium": "gemini-3.1-pro", "balanced": "gemini-3.5-flash",
+                     "economy": "gemini-3.1-flash-lite"}})
+    assert r.status_code == 200
+    assert c.get(f"/v1/admin/models/org-default?org_id={org}").json()["provider"] == "gemini"
+
+    r2 = c.put(f"/v1/admin/models/agent-overrides/neo?org_id={org}", json={
+        "agent_persona": "neo", "provider": "openai", "model_id": "gpt-5.5"})
+    assert r2.status_code == 200
+    rows = c.get(f"/v1/admin/models/agent-overrides?org_id={org}").json()
+    assert any(a["agent_persona"] == "neo" and a["model_id"] == "gpt-5.5" for a in rows)

@@ -3,7 +3,7 @@ name: Neo
 role: Architect
 always_on: true
 auto_select_on_labels: N/A
-model: opus
+tier: premium
 ---
 
 # Soul Spec — Neo (Architect)

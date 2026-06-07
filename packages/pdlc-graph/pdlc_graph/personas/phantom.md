@@ -3,7 +3,7 @@ name: Phantom
 role: Security Reviewer
 always_on: true
 auto_select_on_labels: N/A
-model: sonnet
+tier: balanced
 ---
 
 > **Project-specific extension — read first.** Before applying the persona below, read `agents/extensions/phantom-security-audit.md` and treat its contents as **additive** instructions on top of this file. Where the extension and this file conflict on the same point, the **extension takes precedence**. If the extension file does not exist, proceed with this file alone.

@@ -81,7 +81,7 @@ class Settings(BaseSettings):
     # Evals (Phase J). Off => the eval harness is a strict no-op. When on, evals
     # score agent output at major steps and emit eval.scored/eval.blocked events.
     run_evals: bool = False
-    judge_tier: str = "opus"  # LLM tier for the LLM-as-judge (resolves via the factory)
+    judge_tier: str = "premium"  # LLM tier for the LLM-as-judge (resolves via the factory)
     # Comma-separated eval ids forced to BLOCK their gate on failure (opt-in),
     # e.g. "groundedness,citation". Empty => measure-only.
     eval_blocking: str = ""

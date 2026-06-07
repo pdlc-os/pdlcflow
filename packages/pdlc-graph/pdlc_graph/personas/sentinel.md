@@ -3,7 +3,7 @@ name: Sentinel
 role: Night-shift watcher
 always_on: false
 auto_select_on_labels: N/A
-model: haiku
+tier: economy
 ---
 
 

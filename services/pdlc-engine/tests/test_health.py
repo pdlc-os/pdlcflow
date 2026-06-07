@@ -16,9 +16,11 @@ def test_ready():
     assert r.json()["status"] == "ready"
 
 
-def test_models_org_default_get_returns_null_phase_a():
+def test_models_org_default_is_admin_guarded():
+    # The Models settings route is now DB-backed + tenant-scoped; with auth off it
+    # requires an org_id (the cross-org ban) rather than returning a stub.
     r = client.get("/v1/admin/models/org-default")
-    assert r.status_code == 200
+    assert r.status_code == 403  # no org context → denied
 
 
 def test_agents_heatmap_lists_10_personas():

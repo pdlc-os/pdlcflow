@@ -26,7 +26,7 @@ def test_wire_evals_toggles_harness_and_parses_blocking():
     assert evals_enabled() is False
 
     assert wire_evals(SimpleNamespace(
-        run_evals=True, eval_blocking="groundedness, citation", wire_llm=False, judge_tier="opus",
+        run_evals=True, eval_blocking="groundedness, citation", wire_llm=False, judge_tier="premium",
     )) is True
     assert evals_enabled() is True
     # blocking overrides parsed from the comma-separated env value

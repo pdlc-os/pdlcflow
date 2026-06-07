@@ -3,7 +3,7 @@ name: Atlas
 role: Product Manager
 always_on: false
 auto_select_on_labels: requirements, scope, product
-model: opus
+tier: premium
 ---
 
 
