@@ -148,10 +148,14 @@ class LLMProviderFactory:
         )
 
     def _instance_default(self) -> ProviderConfig | None:
+        # Only attach region/endpoint to the provider that uses them, so we don't
+        # leak the Ollama URL (or AWS region) into Azure/Vertex/etc., which would
+        # override their own env-based endpoint/region.
+        p = settings.default_llm_provider
         return ProviderConfig(
-            provider=settings.default_llm_provider,
-            region=settings.bedrock_region,
-            endpoint=settings.ollama_endpoint,
+            provider=p,
+            region=settings.bedrock_region if p == "bedrock" else None,
+            endpoint=settings.ollama_endpoint if p == "ollama" else None,
         )
 
     def _fallback(self) -> ProviderConfig:
