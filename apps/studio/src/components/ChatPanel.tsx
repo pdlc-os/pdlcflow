@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronRight, Loader2 } from 'lucide-react';
 
 import { useThread } from '@/store/useThread';
@@ -13,6 +13,12 @@ import {
 
 type Mode = 'socratic' | 'sketch';
 
+// Shared typography for the textarea AND its highlight overlay. They MUST match
+// exactly (font, size, line-height, padding, wrapping) or the caret drifts — the
+// highlight differs only by COLOR, never font/weight.
+const FIELD_TYPO = 'm-0 border-0 p-0 font-sans text-sm leading-6 whitespace-pre-wrap break-words';
+const MAX_H = 168; // ~7 lines, then scroll
+
 export function ChatPanel() {
   const transcript = useThread((s) => s.transcript);
   const status = useThread((s) => s.status);
@@ -21,7 +27,8 @@ export function ChatPanel() {
   const [mode, setMode] = useState<Mode>('sketch');
   const [menuOpen, setMenuOpen] = useState(false);
   const [active, setActive] = useState(0);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const taRef = useRef<HTMLTextAreaElement>(null);
+  const overlayRef = useRef<HTMLDivElement>(null);
 
   const busy = status === 'running';
 
@@ -33,10 +40,19 @@ export function ChatPanel() {
   }, [input]);
   const showMenu = menuOpen && matches.length > 0;
 
+  // Auto-grow the textarea to fit its content (capped at MAX_H, then scrolls).
+  useEffect(() => {
+    const ta = taRef.current;
+    if (!ta) return;
+    ta.style.height = 'auto';
+    ta.style.height = `${Math.min(ta.scrollHeight, MAX_H)}px`;
+    if (overlayRef.current) overlayRef.current.scrollTop = ta.scrollTop;
+  }, [input]);
+
   const accept = (cmd: PdlcCommand) => {
     setInput(`/${cmd.name} `);
     setMenuOpen(false);
-    inputRef.current?.focus();
+    taRef.current?.focus();
   };
 
   const submit = () => {
@@ -44,14 +60,27 @@ export function ChatPanel() {
     if (!text || busy) return;
     setInput('');
     setMenuOpen(false);
-    // "/brainstorm dark mode" -> command=brainstorm, feature="dark mode"
-    const m = text.match(/^\/?(\w[\w-]*)\s*(.*)$/);
+    // "/brainstorm dark mode" -> command=brainstorm, feature="dark mode" (across newlines)
+    const m = text.match(/^\/?(\w[\w-]*)\s*([\s\S]*)$/);
     const command = m ? m[1] : 'brainstorm';
-    const feature = m && m[2] ? m[2] : undefined;
+    const feature = m && m[2] ? m[2].trim() : undefined;
     void start(command, { feature, mode });
   };
 
-  const onKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+  const insertNewline = () => {
+    const ta = taRef.current;
+    if (!ta) return;
+    const s = ta.selectionStart;
+    const e = ta.selectionEnd;
+    const next = `${input.slice(0, s)}\n${input.slice(e)}`;
+    setInput(next);
+    requestAnimationFrame(() => {
+      ta.selectionStart = ta.selectionEnd = s + 1;
+    });
+  };
+
+  const onKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    const mod = e.shiftKey || e.ctrlKey || e.metaKey || e.altKey;
     if (showMenu) {
       if (e.key === 'ArrowDown') {
         e.preventDefault();
@@ -63,7 +92,7 @@ export function ChatPanel() {
         setActive((i) => (i - 1 + matches.length) % matches.length);
         return;
       }
-      if (e.key === 'Tab' || (e.key === 'Enter' && matches[active])) {
+      if (e.key === 'Tab') {
         e.preventDefault();
         accept(matches[active]);
         return;
@@ -73,11 +102,20 @@ export function ChatPanel() {
         setMenuOpen(false);
         return;
       }
+      if (e.key === 'Enter' && !mod && matches[active]) {
+        e.preventDefault();
+        accept(matches[active]);
+        return;
+      }
     }
-    if (e.key === 'Enter') submit();
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      if (mod) insertNewline(); // any modifier + Enter = newline
+      else submit(); // plain Enter = send
+    }
   };
 
-  // Inline color-coding: render a transparent input over a highlighted overlay.
+  // Inline color-coding (color only — same font as the textarea so the caret stays aligned).
   const parsed = parseCommandToken(input);
   const known = parsed ? COMMAND_NAMES.has(parsed.name) : false;
 
@@ -93,7 +131,7 @@ export function ChatPanel() {
             <Avatar role={m.role} />
             <div
               className={cn(
-                'max-w-[80ch] rounded-xl px-4 py-2 text-sm leading-relaxed',
+                'max-w-[80ch] whitespace-pre-wrap rounded-xl px-4 py-2 text-sm leading-relaxed',
                 m.role === 'user'
                   ? 'bg-accent text-accent-fg'
                   : m.role === 'system'
@@ -134,44 +172,51 @@ export function ChatPanel() {
           </ul>
         )}
 
-        <div className="flex items-center gap-2 rounded-xl border border-border px-3 py-2">
+        <div className="flex items-start gap-2 rounded-xl border border-border px-3 py-2">
           {busy ? (
-            <Loader2 className="h-4 w-4 shrink-0 animate-spin text-muted-fg" />
+            <Loader2 className="mt-0.5 h-4 w-4 shrink-0 animate-spin text-muted-fg" />
           ) : (
-            <ChevronRight className={cn('h-4 w-4 shrink-0', known ? 'text-accent' : 'text-muted-fg')} />
+            <ChevronRight className={cn('mt-0.5 h-4 w-4 shrink-0', known ? 'text-accent' : 'text-muted-fg')} />
           )}
 
-          {/* overlay (highlight) + transparent input share identical typography */}
+          {/* highlight overlay + transparent textarea share identical typography */}
           <div className="relative flex-1">
             <div
+              ref={overlayRef}
               aria-hidden
-              className="pointer-events-none absolute inset-0 flex items-center whitespace-pre overflow-hidden text-sm"
+              className={cn('pointer-events-none absolute inset-0 overflow-hidden text-fg', FIELD_TYPO)}
             >
               {parsed ? (
                 <>
-                  <span className={cn('font-mono font-medium', known ? 'text-accent' : 'text-muted-fg')}>
-                    {parsed.token}
-                  </span>
-                  <span className="text-fg">{parsed.rest}</span>
+                  <span className={known ? 'text-accent' : 'text-muted-fg'}>{parsed.token}</span>
+                  <span>{parsed.rest}</span>
                 </>
               ) : (
-                <span className="text-fg">{input}</span>
+                input
               )}
+              {'​'}
             </div>
-            <input
-              ref={inputRef}
+            <textarea
+              ref={taRef}
               value={input}
+              rows={1}
               onChange={(e) => {
                 setInput(e.target.value);
                 setMenuOpen(true);
                 setActive(0);
               }}
               onKeyDown={onKeyDown}
+              onScroll={() => {
+                if (overlayRef.current && taRef.current) overlayRef.current.scrollTop = taRef.current.scrollTop;
+              }}
               onBlur={() => setMenuOpen(false)}
               disabled={busy}
-              placeholder="Type a slash command, e.g. /brainstorm dark mode"
-              style={{ caretColor: 'var(--fg)' }}
-              className="w-full bg-transparent text-sm text-transparent outline-none placeholder:text-muted-fg disabled:opacity-60"
+              placeholder="Message, or /command — Enter to send, Shift/Ctrl/Cmd/Alt+Enter for a new line"
+              style={{ caretColor: 'var(--fg)', maxHeight: MAX_H }}
+              className={cn(
+                'block w-full resize-none overflow-y-auto bg-transparent text-transparent outline-none placeholder:text-muted-fg disabled:opacity-60',
+                FIELD_TYPO
+              )}
             />
           </div>
 
@@ -186,7 +231,7 @@ export function ChatPanel() {
 function ModeToggle({ mode, setMode }: { mode: Mode; setMode: (m: Mode) => void }) {
   return (
     <div
-      className="flex shrink-0 overflow-hidden rounded-md border border-border text-xs"
+      className="mt-0.5 flex shrink-0 overflow-hidden rounded-md border border-border text-xs"
       title="Interaction mode (init/brainstorm) — Sketch: the agent pre-fills recommended draft answers you edit. Socratic: blank questions you answer from scratch. Both ask the same questions; multi-option suggestions + gates work in both."
     >
       {(['sketch', 'socratic'] as Mode[]).map((m) => (
