@@ -16,24 +16,30 @@ log = logging.getLogger("pdlc.persistence.artifacts")
 
 
 class FilesystemArtifactStore:
-    """Writes artifact bodies under a base directory (self-host volume)."""
+    """Writes artifact bodies under a base directory (self-host volume),
+    namespaced by tenant: {base}/{org_id}/{project_id}/{path}. Every resolved
+    path is pinned under the base dir so a crafted segment can't escape it."""
 
     def __init__(self, base_dir: str) -> None:
-        self._base = Path(base_dir)
+        self._base = Path(base_dir).resolve()
 
-    def _path(self, uri: str) -> Path:
-        # uri == "file://{base}/{project_id}/{path}" -> strip scheme + base
-        rel = uri.removeprefix("file://")
-        return Path(rel)
+    def _within_base(self, p: Path) -> Path:
+        resolved = p.resolve()
+        # Defense in depth — the port already sanitizes, but never read/write
+        # outside the base dir even if a raw uri/segment slips through.
+        if self._base != resolved and self._base not in resolved.parents:
+            raise ValueError(f"artifact path escapes base dir: {p}")
+        return resolved
 
-    def put(self, project_id: str, path: str, content: str) -> str:
-        target = self._base / project_id / path
+    def put(self, org_id: str, project_id: str, path: str, content: str) -> str:
+        target = self._within_base(self._base / org_id / project_id / path)
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(content, encoding="utf-8")
         return f"file://{target}"
 
     def get(self, uri: str) -> str:
-        return self._path(uri).read_text(encoding="utf-8")
+        target = self._within_base(Path(uri.removeprefix("file://")))
+        return target.read_text(encoding="utf-8")
 
 
 class S3ArtifactStore:
@@ -55,11 +61,11 @@ class S3ArtifactStore:
             )
         return self._client
 
-    def _key(self, project_id: str, path: str) -> str:
-        return f"{project_id}/{path}"
+    def _key(self, org_id: str, project_id: str, path: str) -> str:
+        return f"{org_id}/{project_id}/{path}"
 
-    def put(self, project_id: str, path: str, content: str) -> str:
-        key = self._key(project_id, path)
+    def put(self, org_id: str, project_id: str, path: str, content: str) -> str:
+        key = self._key(org_id, project_id, path)
         self._s3().put_object(Bucket=self._bucket, Key=key, Body=content.encode("utf-8"))
         return f"s3://{self._bucket}/{key}"
 

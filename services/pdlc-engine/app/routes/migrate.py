@@ -21,7 +21,7 @@ from typing import Any
 
 from event_schema import EventEnvelope
 from fastapi import APIRouter, Depends
-from pdlc_graph.ports import put_artifact
+from pdlc_graph.ports import put_artifact, reset_current_org, set_current_org
 from pydantic import BaseModel, Field
 
 from ..analytics import get_analytics_store
@@ -134,12 +134,18 @@ def import_project(
     store.ingest(envelopes)
     after = store.totals(org_id=org_id)["events"]
 
-    for mf in payload.memory_files:
-        put_artifact(
-            payload.project_id,
-            f"migrated/{payload.project_id}/{mf.kind}.md",
-            mf.body,
-        )
+    # Bind the (authoritative) tenant so imported artifacts land under this org's
+    # prefix — same isolation as graph-driven writes.
+    org_tok = set_current_org(org_id)
+    try:
+        for mf in payload.memory_files:
+            put_artifact(
+                payload.project_id,
+                f"migrated/{payload.project_id}/{mf.kind}.md",
+                mf.body,
+            )
+    finally:
+        reset_current_org(org_tok)
 
     return {
         "events": after - before,

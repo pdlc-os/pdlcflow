@@ -10,11 +10,14 @@ import pytest
 def _reset_eval_state():
     from pdlc_graph.evals import reset_eval_config, reset_judge_backend
     from pdlc_graph.llm_port import reset_token_publisher
+    from pdlc_graph.ports import reset_artifact_store
 
     reset_eval_config()
     reset_judge_backend()
     reset_token_publisher()
+    reset_artifact_store()
     yield
     reset_eval_config()
     reset_judge_backend()
     reset_token_publisher()
+    reset_artifact_store()

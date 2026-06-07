@@ -244,6 +244,6 @@ def test_s3_artifact_roundtrip_against_minio():
     from app.persistence.artifacts import S3ArtifactStore
 
     store = S3ArtifactStore(settings.s3_artifacts_bucket, endpoint_url=settings.s3_endpoint_url)
-    uri = store.put(str(uuid.uuid4()), "docs/PRD.md", "# integration")
+    uri = store.put(str(uuid.uuid4()), str(uuid.uuid4()), "docs/PRD.md", "# integration")
     assert uri.startswith("s3://")
     assert store.get(uri) == "# integration"

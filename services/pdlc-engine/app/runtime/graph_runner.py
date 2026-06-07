@@ -25,6 +25,7 @@ from langgraph.checkpoint.memory import MemorySaver
 from langgraph.types import Command
 from pdlc_graph.graphs.meta import build_meta_graph
 from pdlc_graph.llm_port import reset_thread_context, set_thread_context
+from pdlc_graph.ports import reset_current_org, set_current_org
 
 from .ports import (
     PendingInteraction,
@@ -92,12 +93,15 @@ class GraphRunner:
     # -- internals ----------------------------------------------------------
     def _advance(self, thread_id: str, invoke_input) -> PendingInteraction | None:
         cfg = {"configurable": {"thread_id": thread_id}}
-        # Bind the thread for the duration of the turn so llm_port.complete() can
-        # stream token frames to this thread's channel (no-op if streaming is off).
+        # Bind the thread (token streaming) + the tenant (artifact namespacing) for
+        # the turn. thread_id is "org:project:session", so the org prefix is the
+        # authoritative tenant — artifacts can't be written outside it.
         tok = set_thread_context(thread_id)
+        org_tok = set_current_org(thread_id.split(":", 1)[0])
         try:
             self._graph.invoke(invoke_input, cfg)
         finally:
+            reset_current_org(org_tok)
             reset_thread_context(tok)
         return self._sync_pending(thread_id, cfg)
 

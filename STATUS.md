@@ -198,3 +198,10 @@ Delivered incrementally (one PR per bundle). Auth deferred. Every adapter is fla
 - [x] **`deploy/`**: a standalone `docker-compose.yml` (image refs, no `build:`), an interactive **`setup.sh`** (prompts for the few real choices, generates secrets, writes `.env` — with the pdlcflow/PDLC banner), `.env.example` for manual config, the env-driven `postgres-init/01-app-role.sh`, and a README. Users `curl` 3 files → `setup.sh` → `docker compose up` → migrate.
 - [x] **Verified end-to-end with real Docker**: fresh-built images boot the full standalone stack — env-driven `pdlc_app` role created (non-super), migrations 0001→0004 apply as owner, app runs as `pdlc_app` under RLS (`POST /v1/commands` → 200), `/health` ok, Studio 200, admin cross-org → 403.
 - [x] Postgres role-init converted to an **env-driven shell script** (`PDLC_APP_DB_PASSWORD`) in both compose setups — no committed-file editing. Root README + wiki updated.
+
+## Artifact tenant isolation (✅ org-namespaced + sanitized)
+
+- [x] Artifacts (PRD/design/review/episode/…) are now namespaced **`{org_id}/{project_id}/{path}`** (filesystem dir + S3 key). The **org is set per turn by the runner** from the thread id (authoritative = the JWT-bound org when auth is on) via a `set_current_org` context — NOT from the node call — so a forged `project_id` can't cross tenants. `put_artifact(project_id, path, content)` signature unchanged (org injected from context) → zero node-call churn.
+- [x] `project_id`/`path` sanitized (reject `..`/absolute), filesystem `get`/`put` pinned under the base dir (crafted `file://` uri can't escape); S3 keys org-prefixed; migrate route binds the org too.
+- [x] Tests: graph `test_artifact_isolation` (context-org, default, traversal/`project_id` rejection) + engine `test_persistence` (tenant separation, traversal block, **end-to-end** `/doctor` command writes only under `{base}/{org}/{project}/`). Full hermetic suite green (**223**); ruff clean.
+- [ ] Deeper layer (documented): projects-table `project↔org` ownership check; per-tenant KMS for S3 (SaaS).
