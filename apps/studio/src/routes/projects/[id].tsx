@@ -10,14 +10,12 @@ import { NightShiftMissionControl } from '@/components/NightShiftMissionControl'
 import { QuestionCard } from '@/components/QuestionCard';
 import { StreamingPreview } from '@/components/StreamingPreview';
 import { connect, type NightShiftFrame } from '@/lib/ws';
-import { useProjects } from '@/store/useProjects';
 import { useThread } from '@/store/useThread';
 
 export function ProjectView() {
   const { id: routeProjectId } = useParams();
   const projectId = useThread((s) => s.projectId);
   const setProject = useThread((s) => s.setProject);
-  const ensureProject = useProjects((s) => s.ensure);
   const threadId = useThread((s) => s.threadId);
   const pending = useThread((s) => s.pending);
   const status = useThread((s) => s.status);
@@ -55,10 +53,9 @@ export function ProjectView() {
   // shows in the sidebar. Switching projects clears the thread view (setProject).
   useEffect(() => {
     if (routeProjectId && routeProjectId !== projectId) {
-      ensureProject(routeProjectId);
       setProject(routeProjectId);
     }
-  }, [routeProjectId, projectId, setProject, ensureProject]);
+  }, [routeProjectId, projectId, setProject]);
 
   // On load, rehydrate the persisted thread — only if it belongs to this project.
   useEffect(() => {
