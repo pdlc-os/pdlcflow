@@ -16,6 +16,7 @@ from .routes import admin as admin_routes
 from .routes import approval_gates as approval_routes
 from .routes import auth as auth_routes
 from .routes import commands as command_routes
+from .routes import entities as entity_routes
 from .routes import health as health_routes
 from .routes import migrate as migrate_routes
 from .runtime import (
@@ -70,6 +71,7 @@ app.add_middleware(
 app.include_router(health_routes.router)
 app.include_router(auth_routes.router, prefix="/v1")
 app.include_router(command_routes.router, prefix="/v1")
+app.include_router(entity_routes.router, prefix="/v1")
 app.include_router(approval_routes.router, prefix="/v1")
 app.include_router(admin_routes.router, prefix="/v1/admin")
 app.include_router(migrate_routes.router, prefix="/v1")
