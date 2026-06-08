@@ -62,6 +62,9 @@ class Squad(Base):
     __tablename__ = "squads"
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
     org_id: Mapped[UUID] = mapped_column(ForeignKey("organizations.id", ondelete="CASCADE"))
+    # Domain → Squad (the hierarchy: Org → Domain → Squad). Nullable: a squad may be
+    # ungrouped until assigned to a domain.
+    domain_id: Mapped[UUID | None] = mapped_column(ForeignKey("domains.id", ondelete="SET NULL"))
     name: Mapped[str] = mapped_column(Text, nullable=False)
     slug: Mapped[str] = mapped_column(CITEXT, nullable=False)
     __table_args__ = (UniqueConstraint("org_id", "slug"),)
@@ -112,9 +115,73 @@ class Project(Base):
     initiative_id: Mapped[UUID | None] = mapped_column(ForeignKey("initiatives.id"))
     name: Mapped[str] = mapped_column(Text, nullable=False)
     slug: Mapped[str] = mapped_column(CITEXT, nullable=False)
-    repository: Mapped[str | None] = mapped_column(Text)
+    repository: Mapped[str | None] = mapped_column(Text)  # legacy free-form; superseded by repository_id
+    repository_id: Mapped[UUID | None] = mapped_column(ForeignKey("repositories.id", ondelete="SET NULL"))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
     __table_args__ = (UniqueConstraint("org_id", "slug"),)
+
+
+# ---------------- Repositories + hierarchy links ----------------
+class Repository(Base):
+    """A GitHub (or other VCS) repo owned by a Squad. The token is referenced via
+    `token_secret_ref` — resolved per deployment mode (encrypted DB value for
+    self-host; a Vault/cloud secrets ref for SaaS)."""
+
+    __tablename__ = "repositories"
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    org_id: Mapped[UUID] = mapped_column(ForeignKey("organizations.id", ondelete="CASCADE"))
+    squad_id: Mapped[UUID] = mapped_column(ForeignKey("squads.id", ondelete="CASCADE"))
+    name: Mapped[str] = mapped_column(Text, nullable=False)
+    url: Mapped[str] = mapped_column(Text, nullable=False)
+    default_branch: Mapped[str] = mapped_column(Text, nullable=False, server_default="main")
+    provider: Mapped[str] = mapped_column(Text, nullable=False, server_default="github")
+    token_secret_ref: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
+    __table_args__ = (
+        UniqueConstraint("squad_id", "url"),
+        CheckConstraint("provider in ('github','gitlab','bitbucket','other')"),
+    )
+
+
+class SquadInitiative(Base):
+    """Squads ↔ Initiatives (many-to-many): one or more squads work on one or more
+    initiatives."""
+
+    __tablename__ = "squad_initiatives"
+    org_id: Mapped[UUID] = mapped_column(ForeignKey("organizations.id", ondelete="CASCADE"))
+    squad_id: Mapped[UUID] = mapped_column(ForeignKey("squads.id", ondelete="CASCADE"), primary_key=True)
+    initiative_id: Mapped[UUID] = mapped_column(ForeignKey("initiatives.id", ondelete="CASCADE"), primary_key=True)
+
+
+class InitiativeRepository(Base):
+    """Initiative ↔ Repository (many-to-many): an initiative can span repos."""
+
+    __tablename__ = "initiative_repositories"
+    org_id: Mapped[UUID] = mapped_column(ForeignKey("organizations.id", ondelete="CASCADE"))
+    initiative_id: Mapped[UUID] = mapped_column(ForeignKey("initiatives.id", ondelete="CASCADE"), primary_key=True)
+    repository_id: Mapped[UUID] = mapped_column(ForeignKey("repositories.id", ondelete="CASCADE"), primary_key=True)
+
+
+class Program(Base):
+    """Cross-org umbrella. Initiatives stay org-scoped (RLS-clean); a Program links
+    them ACROSS orgs. Visible to its owning org and to any org with a linked
+    initiative (see the RLS policies in migration 0006)."""
+
+    __tablename__ = "programs"
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    owner_org_id: Mapped[UUID] = mapped_column(ForeignKey("organizations.id", ondelete="CASCADE"))
+    name: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
+
+
+class ProgramInitiative(Base):
+    """Program ↔ Initiative link, tagged with the initiative's org so each org only
+    sees its own links (RLS) while sharing the Program."""
+
+    __tablename__ = "program_initiatives"
+    org_id: Mapped[UUID] = mapped_column(ForeignKey("organizations.id", ondelete="CASCADE"))
+    program_id: Mapped[UUID] = mapped_column(ForeignKey("programs.id", ondelete="CASCADE"), primary_key=True)
+    initiative_id: Mapped[UUID] = mapped_column(ForeignKey("initiatives.id", ondelete="CASCADE"), primary_key=True)
 
 
 # ---------------- PDLC entities ----------------
