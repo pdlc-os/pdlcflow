@@ -18,7 +18,9 @@ export function AppShell() {
   return (
     <div className="flex h-full flex-col">
       <header className="flex h-12 items-center gap-2 border-b border-border px-4 text-sm">
-        <Link to="/" className="mr-1 font-semibold tracking-tight">pdlcflow</Link>
+        <Link to="/" className="mr-1 flex items-center" aria-label="pdlcflow — home" title="pdlcflow">
+          <img src="/pdlcflow.png" alt="pdlcflow" className="h-6 w-auto" />
+        </Link>
         <ScopeNav />
         <span className="ml-3 rounded-full bg-accent/10 px-2 py-0.5 text-xs text-accent">
           Inception · Discover
