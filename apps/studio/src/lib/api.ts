@@ -302,4 +302,13 @@ export const entities = {
   projects: (org: string) => json<{ projects: ServerProject[] }>(`/projects?org_id=${e(org)}`),
   createProject: (org: string, body: { name: string; squad_id: string; repository_id?: string | null }) =>
     post<ServerProject>(`/projects?org_id=${e(org)}`, body),
+
+  repoFiles: (org: string, repoId: string, path = '') =>
+    json<{ path: string; entries: RepoEntry[] }>(
+      `/repositories/${e(repoId)}/files?org_id=${e(org)}&path=${e(path)}`),
+  repoFile: (org: string, repoId: string, path: string) =>
+    json<{ path: string; name: string; content: string }>(
+      `/repositories/${e(repoId)}/file?org_id=${e(org)}&path=${e(path)}`),
 };
+
+export interface RepoEntry { name: string; path: string; type: 'file' | 'dir'; size: number }

@@ -7,9 +7,11 @@ its own rows. Repo tokens are stored via the secrets backend (never returned).
 
 from __future__ import annotations
 
+import base64
 import re
 import uuid
 
+import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy import text
@@ -154,6 +156,75 @@ def delete_repository(repo_id: str, org: str = Depends(current_org("/repositorie
     if not rows:
         raise HTTPException(status_code=404, detail="repository not found")
     return {"deleted": repo_id}
+
+
+# ---------------- Repo file browsing (GitHub) — powers the repo-backed memory panel ----------------
+def _gh_owner_repo(url: str) -> tuple[str, str]:
+    m = re.search(r"github\.com[:/]+([^/]+)/([^/]+?)(?:\.git)?/?$", url)
+    if not m:
+        raise HTTPException(status_code=400, detail="only github.com repositories are supported for file browsing")
+    return m.group(1), m.group(2)
+
+
+def _repo_row(org: str, repo_id: str) -> dict:
+    rows = _rows(org,
+                 "select url, provider, default_branch, token_secret_ref from repositories where id = :id",
+                 {"id": repo_id})
+    if not rows:
+        raise HTTPException(status_code=404, detail="repository not found")
+    return rows[0]
+
+
+def _gh_get(org: str, repo_id: str, path: str):
+    r = _repo_row(org, repo_id)
+    if r["provider"] != "github":
+        raise HTTPException(status_code=400, detail="file browsing currently supports github repos")
+    owner, name = _gh_owner_repo(r["url"])
+    token = get_secrets().resolve(r["token_secret_ref"])
+    headers = {"Accept": "application/vnd.github+json"}
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+    api = f"https://api.github.com/repos/{owner}/{name}/contents/{path.strip('/')}"
+    try:
+        resp = httpx.get(api, headers=headers, params={"ref": r["default_branch"]}, timeout=15)
+    except Exception as exc:  # pragma: no cover - network
+        raise HTTPException(status_code=502, detail=f"github unreachable: {exc}") from exc
+    return resp
+
+
+@router.get("/repositories/{repo_id}/files")
+def repo_files(
+    repo_id: str,
+    org: str = Depends(current_org("/repositories")),
+    path: str = Query(""),
+) -> dict:
+    resp = _gh_get(org, repo_id, path)
+    if resp.status_code == 404:
+        return {"path": path, "entries": []}
+    if resp.status_code >= 400:
+        raise HTTPException(status_code=502, detail=f"github error {resp.status_code}")
+    data = resp.json()
+    items = data if isinstance(data, list) else [data]
+    return {"path": path, "entries": [
+        {"name": x["name"], "path": x["path"], "type": x["type"], "size": x.get("size", 0)} for x in items]}
+
+
+@router.get("/repositories/{repo_id}/file")
+def repo_file(
+    repo_id: str,
+    org: str = Depends(current_org("/repositories")),
+    path: str = Query(...),
+) -> dict:
+    resp = _gh_get(org, repo_id, path)
+    if resp.status_code >= 400:
+        raise HTTPException(status_code=502, detail=f"github error {resp.status_code}")
+    data = resp.json()
+    if isinstance(data, list):
+        raise HTTPException(status_code=400, detail="path is a directory")
+    content = data.get("content", "")
+    if data.get("encoding") == "base64":
+        content = base64.b64decode(content).decode("utf-8", "replace")
+    return {"path": path, "name": data.get("name"), "content": content}
 
 
 # ---------------- Projects (server-backed; supersedes the Studio client registry) ----------------

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { FolderOpen, MessageSquare, Plus } from 'lucide-react';
 
 import { admin, entities, type ThreadSummary } from '@/lib/api';
+import { RepoMemory } from '@/components/RepoMemory';
 import { useThread } from '@/store/useThread';
 import { cn } from '@/lib/utils';
 
@@ -98,6 +99,8 @@ export function SideDrawer() {
           ))}
         </div>
       )}
+
+      <RepoMemory />
     </aside>
   );
 }
