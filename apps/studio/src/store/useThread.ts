@@ -38,6 +38,7 @@ interface ThreadStore {
   streamToken: (f: Extract<Frame, { type: 'token' }>) => void;
   openThread: (threadId: string) => Promise<void>;
   newThread: () => void;
+  continueThread: (prompt: string) => Promise<void>;
   setProject: (projectId: string) => void;
   reset: () => void;
 }
@@ -68,7 +69,10 @@ const _persistThread = (id: string | null) => {
 
 export const useThread = create<ThreadStore>((set, get) => ({
   orgId: persisted('pdlcflow-org'),
-  projectId: persisted('pdlcflow-project'),
+  // No random default — projectId is a REAL server project (set by the route / nav /
+  // landing). An orphan random id would file conversations under a project the panel
+  // never shows. '' until a real project is selected.
+  projectId: typeof window !== 'undefined' ? localStorage.getItem('pdlcflow-project') || '' : '',
   threadId: typeof window !== 'undefined' ? localStorage.getItem('pdlcflow-thread') : null,
   pending: null,
   status: 'idle',
@@ -163,6 +167,20 @@ export const useThread = create<ThreadStore>((set, get) => ({
   newThread: () => {
     _persistThread(null);
     set({ threadId: null, pending: null, status: 'idle', transcript: [], result: null, verdicts: [], streaming: null });
+  },
+
+  // Continue an open conversation: the engine sends the full prior transcript to the
+  // LLM as context + this prompt, and appends both turns to the same thread.
+  continueThread: async (prompt) => {
+    const { orgId, threadId } = get();
+    if (!threadId) return;
+    set((s) => ({ status: 'running', streaming: null, transcript: [...s.transcript, say('user', prompt)] }));
+    try {
+      const res = await api.continueThread({ thread_id: threadId, org_id: orgId, prompt });
+      set((s) => ({ status: 'complete', streaming: null, transcript: [...s.transcript, say('agent', res.response)] }));
+    } catch (e) {
+      set((s) => ({ status: 'error', transcript: [...s.transcript, say('system', String(e))] }));
+    }
   },
 
   // Switch the active project (persisted) and clear the thread view — callers may

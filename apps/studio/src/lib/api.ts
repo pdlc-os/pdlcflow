@@ -250,6 +250,12 @@ export const api = {
   invokeCommand: (body: InvokeBody) =>
     json<CommandResponse>('/commands', { method: 'POST', body: JSON.stringify(body) }),
 
+  continueThread: (body: { thread_id: string; org_id: string; prompt: string }) =>
+    json<{ thread_id: string; response: string }>('/commands/continue', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
   listGates: (params?: { org_id?: string; project_id?: string }) => {
     const q = new URLSearchParams();
     if (params?.org_id) q.set('org_id', params.org_id);
