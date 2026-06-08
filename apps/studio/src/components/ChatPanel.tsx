@@ -24,6 +24,9 @@ export function ChatPanel() {
   const transcript = useThread((s) => s.transcript);
   const status = useThread((s) => s.status);
   const start = useThread((s) => s.start);
+  const continueThread = useThread((s) => s.continueThread);
+  const threadId = useThread((s) => s.threadId);
+  const pending = useThread((s) => s.pending);
   const orgId = useThread((s) => s.orgId);
   const projectId = useThread((s) => s.projectId);
   const [input, setInput] = useState('');
@@ -86,6 +89,16 @@ export function ChatPanel() {
   const submit = () => {
     const text = input.trim();
     if ((!text && attachments.length === 0) || busy) return;
+
+    // Continue an open conversation: plain text (no slash-command, no attachments)
+    // while a thread is loaded and not awaiting a gate/question.
+    if (threadId && !pending && !text.startsWith('/') && attachments.length === 0) {
+      setInput('');
+      setMenuOpen(false);
+      void continueThread(text);
+      return;
+    }
+
     // "/brainstorm dark mode" -> command=brainstorm, feature="dark mode" (across newlines)
     const m = text.match(/^\/?(\w[\w-]*)\s*([\s\S]*)$/);
     const command = m ? m[1] : 'brainstorm';

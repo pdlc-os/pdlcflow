@@ -17,7 +17,7 @@ import re
 from typing import Literal
 from uuid import UUID, uuid4
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from ..auth.local import Identity, get_principal, resolve_org
@@ -130,3 +130,66 @@ def _record_turn(org_id, thread_id, project_id, *, user: str, pending) -> None:
                      role="agent", text=summarize_pending(pending))
     except Exception:  # pragma: no cover - never fail a turn on transcript
         pass
+
+
+class ContinueRequest(BaseModel):
+    thread_id: str
+    org_id: UUID | None = None
+    prompt: str
+
+
+class ContinueResponse(BaseModel):
+    thread_id: str
+    response: str
+
+
+_CONTINUE_SYSTEM = (
+    "You are Atlas, continuing an ongoing pdlcflow conversation. Use the prior "
+    "conversation below as context and respond helpfully and concisely to the new message."
+)
+
+
+def _render_history(entries: list[dict]) -> str:
+    who = {"user": "User", "agent": "Assistant"}
+    return "\n\n".join(f"{who.get(e['role'], 'System')}: {e['text']}" for e in entries)
+
+
+@router.post("/continue", response_model=ContinueResponse)
+def continue_thread(
+    req: ContinueRequest,
+    principal: Identity | None = Depends(get_principal),
+) -> ContinueResponse:
+    """Continue an existing conversation: the full prior transcript is sent to the
+    LLM as context, followed by the new prompt. Appends both turns to the thread.
+    """
+    parts = req.thread_id.split(":")
+    thread_org = parts[0] if parts else ""
+    project_id = parts[1] if len(parts) >= 2 else None
+    org_id = resolve_org(principal, str(req.org_id) if req.org_id else thread_org, "/v1/commands/continue")
+    if org_id != thread_org:
+        raise HTTPException(status_code=403, detail="thread does not belong to this org")
+
+    from pdlc_graph.llm_port import complete, reset_thread_context, set_thread_context
+    from pdlc_graph.ports import reset_current_org, set_current_org
+
+    from ..persistence.transcript import get_transcript_store
+
+    store = get_transcript_store()
+    history = _render_history(store.list_thread(org_id=org_id, thread_id=req.thread_id))
+    full = (f"Prior conversation:\n\n{history}\n\n---\n\nNew message:\n{req.prompt}"
+            if history else req.prompt)
+
+    tok_t = set_thread_context(req.thread_id)
+    tok_o = set_current_org(org_id)
+    try:
+        response = complete("atlas", full, system=_CONTINUE_SYSTEM)
+    finally:
+        reset_thread_context(tok_t)
+        reset_current_org(tok_o)
+
+    try:
+        store.append(org_id=org_id, thread_id=req.thread_id, project_id=project_id, role="user", text=req.prompt)
+        store.append(org_id=org_id, thread_id=req.thread_id, project_id=project_id, role="agent", text=response)
+    except Exception:  # pragma: no cover
+        pass
+    return ContinueResponse(thread_id=req.thread_id, response=response)
