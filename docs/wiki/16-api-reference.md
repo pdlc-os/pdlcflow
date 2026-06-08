@@ -106,6 +106,31 @@ Errors: `404` if the gate id is unknown; `409` if it is already resolved.
 
 ---
 
+## Entities
+
+Org-scoped CRUD for the [hierarchy](18-data-model.md). The org comes from the JWT
+when auth is on, else an `org_id` query param; writes go through `set_org_context`
+so RLS confines each tenant to its own rows. See the data model for how these relate.
+
+| Method · Path | Body / Query | Response |
+|---|---|---|
+| `GET /v1/domains` | `org_id` | `{domains: [{id, name}]}` |
+| `POST /v1/domains` | `{name}` | `{id, name}` |
+| `GET /v1/squads` | `org_id` | `{squads: [{id, name, slug, domain_id}]}` |
+| `POST /v1/squads` | `{name, domain_id?}` | `{id, name, slug, domain_id}` |
+| `GET /v1/initiatives` | `org_id` | `{initiatives: [{id, name, status}]}` |
+| `POST /v1/initiatives` | `{name, status?}` | `{id, name, status}` |
+| `GET /v1/repositories` | `org_id`, `squad_id?` | `{repositories: [{id, name, url, squad_id, default_branch, provider, has_token}]}` |
+| `POST /v1/repositories` | `{squad_id, name, url, token?, default_branch?, provider?}` | repo (token stored via the secrets backend, **never returned** — only `has_token`) |
+| `DELETE /v1/repositories/{id}` | `org_id` | `{deleted}` |
+| `GET /v1/repositories/{id}/files` | `org_id`, `path=""` | `{path, entries: [{name, path, type, size}]}` — GitHub contents |
+| `GET /v1/repositories/{id}/file` | `org_id`, `path` | `{path, name, content}` |
+| `GET /v1/projects` | `org_id` | `{projects: [{id, name, slug, squad_id, repository_id}]}` |
+| `POST /v1/projects` | `{name, squad_id, repository_id?}` | `{id, name, slug, squad_id, repository_id}` |
+| `POST /v1/uploads` | multipart: `file`, `project_id`, `conversation_id` | `{id, filename, stored_as, conversation_id, size, content_type, is_text, uri, text}` — chat attachment; stored at `uploads/{conversation}/{ts}-{nonce}-{name}`; `text` is the extracted content (utf-8 / pdf / docx / xlsx / pptx). 15 MB cap. |
+
+---
+
 ## Admin (Nexus Console)
 
 All under `/v1/admin`. **Data routes require `org_id`** — a missing/blank value

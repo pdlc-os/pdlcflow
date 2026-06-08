@@ -34,11 +34,16 @@ exactly as before. (Auth state: `store/useAuth.ts` + `lib/token.ts`.)
 
 ## Layout
 
-`AppShell.tsx` is the frame: a top bar with Org / Squad / Initiative / Project
-switchers, a phase pill, a **theme toggle** that cycles **light → dark → system**
-(the `system` mode follows the OS and live-updates with it; the choice persists),
-and an **Nexus Console** link (`/admin/live`). The left
-`SideDrawer` and a bottom `StatusLine` round out the shell. Routes:
+`AppShell.tsx` is the frame: the top bar opens with the **pdlcflow logo** (links home),
+then the live **hierarchy nav** — **Org · Domain · Squad · Repo · Initiative · Project**
+dropdowns (each lists its entities from `/v1/…` and creates inline; see
+[data model](18-data-model.md)). The **Repo** dropdown sits between Squad and Initiative
+and has a *Connect repository* form (url + token; the token is stored via the
+[secrets backend](03-configuration.md#secrets-per-repo-vcs-tokens), never echoed). A phase
+pill, a **theme toggle** (light → dark → system, persisted), and a **Nexus Console** link
+round out the bar. The left `SideDrawer` (projects → conversations, plus a **repo-backed
+memory** browser once a repo is selected) and a bottom `StatusLine` complete the shell.
+Routes:
 
 - `/` — project switcher (`routes/index.tsx`).
 - `/projects/:id` — the Studio working view (`routes/projects/[id].tsx`).
@@ -91,6 +96,14 @@ source of truth in `lib/commands.ts` (shared by the menu + highlighter), so it
 stays in sync with the engine's accepted commands: init, brainstorm, build,
 ship, decide, whatif, doctor, rollback, hotfix, night-shift, pause, resume,
 abandon, release, override, compact.
+
+**Multi-line + attachments.** The composer is a textarea: **Enter sends**,
+**Shift/Ctrl/Cmd/Alt+Enter** inserts a newline. **Drag & drop files** onto it (or use
+the paperclip) — images, pdf, docx, xlsx, pptx, and text/markdown/json/yaml/toml. Each
+uploads to `POST /v1/uploads` and stores under `uploads/{conversation}/{timestamp}-…`
+(so re-uploading the same name never overwrites). **Text files and extractable docs have
+their content folded into the prompt**, so the attachment reaches whichever agent runs
+the turn; other binaries are referenced by name. (See [data model](18-data-model.md#conversations-attachments--memory).)
 
 The response's `thread_id` is stored and the view subscribes to that thread's
 WebSocket channel. The transcript shows your command plus a system line
