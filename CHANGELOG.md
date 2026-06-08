@@ -3,6 +3,24 @@
 All notable changes to pdlcflow are documented here. This project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## v1.9.1 — 2026-06-07
+
+Logo, attachment hardening, and a docs refresh on top of v1.9.0.
+
+### Added / Changed
+- **Studio logo** — the top-left moniker is now the pdlcflow logo image (still links home).
+- **Chat attachments hardened** — files are stored under
+  `uploads/{conversation}/{timestamp}-{nonce}-{filename}` (per project + conversation; a
+  re-uploaded same name never overwrites), and **text is extracted from pdf/docx/xlsx/pptx**
+  (in addition to utf-8 text) and folded into the prompt, so attachments reach whichever
+  agent runs the turn. Commands accept a client `session_id` so pre-uploaded files share the
+  conversation's folder.
+- **Docs** — README gains the logo + a Release A/B review; new wiki page **Data Model &
+  Hierarchy** (Org · Domain · Squad · Repository · Initiative · Program · Project ·
+  Conversation, with the cross-org Program umbrella and RLS); API reference *Entities*
+  section; Studio + deploy docs updated for the nav, repo connect, repo-backed memory,
+  attachments, the `pdlcflow` CLI, and secrets/Vault.
+
 ## v1.9.0 — 2026-06-07
 
 "Release B" — the hierarchy redesign, GitHub repos, repo-backed memory, and chat
