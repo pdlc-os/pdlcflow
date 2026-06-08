@@ -3,8 +3,15 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate } from 'react-router-dom';
 
 import { entities } from '@/lib/api';
+import { useAuth } from '@/store/useAuth';
 import { useScope } from '@/store/useScope';
 import { useThread } from '@/store/useThread';
+
+function greeting(name: string): string {
+  const h = new Date().getHours();
+  const part = h < 5 ? 'Good evening' : h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening';
+  return name ? `${part}, ${name}` : part;
+}
 
 export function ProjectSwitcher() {
   const orgId = useThread((s) => s.orgId);
@@ -20,6 +27,8 @@ export function ProjectSwitcher() {
     enabled: !!orgId,
   });
   const projects = data?.projects ?? [];
+  const identity = useAuth((s) => s.identity);
+  const who = identity?.email?.split('@')[0] || '';
 
   const make = async () => {
     const n = name.trim();
@@ -40,7 +49,11 @@ export function ProjectSwitcher() {
 
   return (
     <div className="mx-auto max-w-3xl">
-      <h1 className="mb-2 text-2xl font-semibold tracking-tight">Welcome to pdlcflow</h1>
+      <div className="mb-8 flex flex-col items-center text-center">
+        <img src="/pdlcflow.png" alt="pdlcflow" className="mb-4 h-12 w-auto" />
+        <h1 className="text-2xl font-semibold tracking-tight">{greeting(who)}</h1>
+        <p className="mt-1 text-sm text-muted-fg">What would you like to work on today?</p>
+      </div>
       <p className="mb-6 text-muted-fg">
         Create a project to start a LangGraph-powered workflow, or open an existing one.
         Visit the{' '}
