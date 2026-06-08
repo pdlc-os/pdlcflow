@@ -326,3 +326,90 @@ def create_project(body: ProjectCreate, org: str = Depends(current_org("/project
                 "values (gen_random_uuid(), :o, :sq, :r, :n, :s, now()) returning id, name, slug, squad_id, repository_id",
                 {"o": org, "sq": body.squad_id, "r": body.repository_id, "n": body.name, "s": _slug(body.name)},
                 ensure_org=True)
+
+
+# ---------------- Rename + delete (org-scoped via RLS) ----------------
+class RenameBody(BaseModel):
+    name: str
+
+
+def _rename(org: str, table: str, entity_id: str, name: str, returning: str) -> dict:
+    rows = _rows(org, f"update {table} set name = :n where id = :id returning {returning}",
+                 {"n": name, "id": entity_id})
+    if not rows:
+        raise HTTPException(status_code=404, detail=f"{table[:-1]} not found")
+    return rows[0]
+
+
+def _tx(org: str):
+    """A single RLS-scoped transaction for multi-statement deletes."""
+    eng = get_sync_engine(settings)
+    ctx = eng.begin()
+    conn = ctx.__enter__()
+    set_org_context(conn, org)
+    return ctx, conn
+
+
+@router.patch("/domains/{entity_id}")
+def rename_domain(entity_id: str, body: RenameBody, org: str = Depends(current_org("/domains"))) -> dict:
+    return _rename(org, "domains", entity_id, body.name, "id, name")
+
+
+@router.delete("/domains/{entity_id}")
+def delete_domain(entity_id: str, org: str = Depends(current_org("/domains"))) -> dict:
+    # squads.domain_id is ON DELETE SET NULL — squads survive, just un-grouped.
+    if not _rows(org, "delete from domains where id = :id returning id", {"id": entity_id}):
+        raise HTTPException(status_code=404, detail="domain not found")
+    return {"deleted": entity_id}
+
+
+@router.patch("/squads/{entity_id}")
+def rename_squad(entity_id: str, body: RenameBody, org: str = Depends(current_org("/squads"))) -> dict:
+    return _rename(org, "squads", entity_id, body.name, "id, name, slug, domain_id")
+
+
+@router.delete("/squads/{entity_id}")
+def delete_squad(entity_id: str, org: str = Depends(current_org("/squads"))) -> dict:
+    # Cascades to the squad's projects (→ tasks/memory/gates), repositories, and links.
+    if not _rows(org, "delete from squads where id = :id returning id", {"id": entity_id}):
+        raise HTTPException(status_code=404, detail="squad not found")
+    return {"deleted": entity_id}
+
+
+@router.patch("/initiatives/{entity_id}")
+def rename_initiative(entity_id: str, body: RenameBody, org: str = Depends(current_org("/initiatives"))) -> dict:
+    return _rename(org, "initiatives", entity_id, body.name, "id, name, status")
+
+
+@router.delete("/initiatives/{entity_id}")
+def delete_initiative(entity_id: str, org: str = Depends(current_org("/initiatives"))) -> dict:
+    # projects/applications reference initiative_id without ON DELETE — null them first.
+    ctx, conn = _tx(org)
+    try:
+        conn.execute(text("update projects set initiative_id = null where initiative_id = :id"), {"id": entity_id})
+        conn.execute(text("update applications set initiative_id = null where initiative_id = :id"), {"id": entity_id})
+        gone = conn.execute(text("delete from initiatives where id = :id returning id"), {"id": entity_id}).mappings().all()
+    finally:
+        ctx.__exit__(None, None, None)
+    if not gone:
+        raise HTTPException(status_code=404, detail="initiative not found")
+    return {"deleted": entity_id}
+
+
+@router.patch("/projects/{entity_id}")
+def rename_project(entity_id: str, body: RenameBody, org: str = Depends(current_org("/projects"))) -> dict:
+    return _rename(org, "projects", entity_id, body.name, "id, name, slug, squad_id, repository_id")
+
+
+@router.delete("/projects/{entity_id}")
+def delete_project(entity_id: str, org: str = Depends(current_org("/projects"))) -> dict:
+    # Cascades tasks/memory/gates; also drop this project's conversation transcripts.
+    ctx, conn = _tx(org)
+    try:
+        conn.execute(text("delete from thread_transcript where project_id = cast(:id as uuid)"), {"id": entity_id})
+        gone = conn.execute(text("delete from projects where id = :id returning id"), {"id": entity_id}).mappings().all()
+    finally:
+        ctx.__exit__(None, None, None)
+    if not gone:
+        raise HTTPException(status_code=404, detail="project not found")
+    return {"deleted": entity_id}
