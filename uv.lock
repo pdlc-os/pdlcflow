@@ -1865,7 +1865,7 @@ wheels = [
 
 [[package]]
 name = "pdlc-engine"
-version = "1.8.0"
+version = "1.9.0"
 source = { editable = "services/pdlc-engine" }
 dependencies = [
     { name = "alembic" },
@@ -1949,7 +1949,7 @@ provides-extras = ["dev"]
 
 [[package]]
 name = "pdlc-event-schema"
-version = "1.8.0"
+version = "1.9.0"
 source = { editable = "packages/event-schema" }
 dependencies = [
     { name = "pydantic" },
@@ -1973,7 +1973,7 @@ provides-extras = ["dev"]
 
 [[package]]
 name = "pdlc-graph"
-version = "1.8.0"
+version = "1.9.0"
 source = { editable = "packages/pdlc-graph" }
 dependencies = [
     { name = "langchain-core" },
@@ -2001,7 +2001,7 @@ provides-extras = ["dev"]
 
 [[package]]
 name = "pdlc-migrate"
-version = "1.8.0"
+version = "1.9.0"
 source = { editable = "tools/pdlc-migrate" }
 dependencies = [
     { name = "httpx" },
@@ -2029,7 +2029,7 @@ provides-extras = ["dev"]
 
 [[package]]
 name = "pdlcflow"
-version = "1.8.0"
+version = "1.9.0"
 source = { virtual = "." }
 
 [[package]]

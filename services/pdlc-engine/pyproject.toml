@@ -1,6 +1,6 @@
 [project]
 name = "pdlc-engine"
-version = "1.8.0"
+version = "1.9.0"
 description = "FastAPI engine for PDLC — routes, websockets, clickstream, DB, 7-provider LLM factory"
 requires-python = ">=3.12"
 license = { text = "MIT" }

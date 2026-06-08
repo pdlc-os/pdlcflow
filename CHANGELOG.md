@@ -3,6 +3,39 @@
 All notable changes to pdlcflow are documented here. This project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## v1.9.0 — 2026-06-07
+
+"Release B" — the hierarchy redesign, GitHub repos, repo-backed memory, and chat
+attachments. (Pre-deployment schema change; no migration/backfill concerns.)
+
+### Data model (the #10 redesign)
+- **Org → Domain → Squad** (`squads.domain_id`), first-class **Repository** (owned
+  by a Squad), **Squad ↔ Initiative** and **Initiative ↔ Repository** (many-to-many),
+  and a cross-org **Program** umbrella — initiatives stay org-scoped (RLS-clean); a
+  Program links them across orgs (owner + linked-org read). `Project.repository_id`.
+- All new tables RLS-FORCEd; cross-org Program visibility verified on real Postgres.
+
+### Secrets
+- Pluggable **secrets backend** for per-repo tokens: `encrypted` (Fernet, in the DB —
+  self-host default), `vault` (HashiCorp Vault KV v2), `env` (cloud/custom managers).
+  **Vault bundled but opt-in** (`docker compose --profile vault up -d`); `setup.sh`
+  generates a Fernet `PDLC_SECRET_KEY`.
+
+### APIs
+- Entity CRUD under `/v1`: domains, squads, initiatives, repositories (token via the
+  secrets backend, never returned), and **server-backed projects**.
+- Repo file browsing: `/v1/repositories/{id}/files` + `/file` (GitHub contents API).
+- `POST /v1/uploads` — chat attachments (multipart, 15 MB cap).
+
+### Studio
+- **Real hierarchy nav** — Org · Domain · Squad · **Repo** · Initiative · Project
+  dropdowns (list + inline create), with a **GitHub repo selector** (#2) and a
+  connect form (url + token). Projects moved off the client registry onto the server.
+- **Repo-backed memory** (#3) — a left-panel browser of the connected repo's files,
+  shown only once a repo is open.
+- **Chat attachments** (#7) — drag-and-drop / paperclip; text files' content is folded
+  into the prompt, binaries are stored + referenced.
+
 ## v1.8.0 — 2026-06-07
 
 "Release A" — operational CLI + Studio UX quick wins. (The larger GitHub-repo and
