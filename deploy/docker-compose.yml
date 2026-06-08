@@ -35,6 +35,19 @@ services:
       timeout: 3s
       retries: 20
 
+  # Optional secrets store — opt-in: `docker compose --profile vault up -d`, then set
+  # PDLC_SECRETS_BACKEND=vault + PDLC_VAULT_TOKEN in .env. Dev-mode (in-memory) for
+  # eval; for production point PDLC_VAULT_ADDR at a persistent/external Vault, or use
+  # a cloud secrets manager via PDLC_SECRETS_BACKEND=env.
+  vault:
+    profiles: ["vault"]
+    image: hashicorp/vault:1.18
+    cap_add: ["IPC_LOCK"]
+    environment:
+      VAULT_DEV_ROOT_TOKEN_ID: ${PDLC_VAULT_TOKEN:-pdlc-dev-token}
+      VAULT_DEV_LISTEN_ADDRESS: "0.0.0.0:8200"
+    ports: ["8200:8200"]
+
   minio:
     image: minio/minio:latest
     command: server /data --console-address ":9001"

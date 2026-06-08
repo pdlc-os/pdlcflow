@@ -34,6 +34,21 @@ class Settings(BaseSettings):
     bootstrap_admin_email: str | None = None
     bootstrap_admin_password: str | None = None
 
+    # Secrets (e.g. per-repo VCS tokens). `secrets_backend` selects where NEW
+    # secrets are written; resolve() dispatches by ref prefix, so mixed refs work.
+    #   encrypted (default): Fernet-encrypt; the ref IS the ciphertext ("enc:…")
+    #     stored in the DB. Needs `secret_key`. Best for single-user self-host.
+    #   vault: HashiCorp Vault KV v2; ref is "vault:<path>". Bundle is opt-in
+    #     (compose `--profile vault`) or point at any Vault / a custom address.
+    #   env: ref is "env:NAME"; resolve reads that env var (cloud/custom managers
+    #     that inject secrets as env).
+    secrets_backend: Literal["encrypted", "vault", "env"] = "encrypted"
+    secret_key: str | None = None  # Fernet key for the 'encrypted' backend
+    vault_addr: str = "http://vault:8200"
+    vault_token: str | None = None
+    vault_mount: str = "secret"
+    vault_path_prefix: str = "pdlcflow/repos"
+
     # LLM defaults
     default_llm_provider: Literal[
         "bedrock", "anthropic", "vertex", "azure", "openai", "gemini", "ollama",

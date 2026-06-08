@@ -32,6 +32,8 @@ say() { printf '\033[1;36m%s\033[0m\n' "$*"; }
 ask() { local p="$1" d="${2:-}" a; if [ -n "$d" ]; then read -r -p "$p [$d]: " a; echo "${a:-$d}"; else read -r -p "$p: " a; echo "$a"; fi; }
 yn()  { local a; a="$(ask "$1 (y/n)" "${2:-n}")"; [[ "$a" =~ ^[Yy] ]]; }
 secret() { openssl rand -hex 24 2>/dev/null || head -c24 /dev/urandom | base64 | tr -dc 'a-zA-Z0-9' | head -c32; }
+# Fernet key (32 bytes, url-safe base64) for the 'encrypted' secrets backend.
+fernet_key() { { openssl rand 32 2>/dev/null || head -c32 /dev/urandom; } | openssl base64 -A | tr '+/' '-_'; }
 
 banner "${PDLCFLOW_VERSION:-}"
 
@@ -41,7 +43,7 @@ fi
 
 say "Setup — press Enter to accept the [default]."
 version="$(ask "Image version to run" "latest")"
-pg_pw="$(secret)"; app_pw="$(secret)"; jwt="$(secret)"
+pg_pw="$(secret)"; app_pw="$(secret)"; jwt="$(secret)"; secret_key="$(fernet_key)"
 
 auth=false; boot_email=""; boot_pw=""
 if yn "Require login (multi-tenant auth + RLS)?" n; then
@@ -96,6 +98,8 @@ yn "Run evals (scores agent output; uses judge LLM calls when LLM is on)?" n && 
   echo "PDLC_AUTH_REQUIRED=${auth}"
   echo "PDLC_AUTH_MODE=local"
   echo "PDLC_JWT_SECRET=${jwt}"
+  echo "PDLC_SECRETS_BACKEND=encrypted"
+  echo "PDLC_SECRET_KEY=${secret_key}"
   [ -n "$boot_email" ] && echo "PDLC_BOOTSTRAP_ADMIN_EMAIL=${boot_email}"
   [ -n "$boot_pw" ] && echo "PDLC_BOOTSTRAP_ADMIN_PASSWORD=${boot_pw}"
   echo "PDLC_WIRE_LLM=${wire_llm}"
