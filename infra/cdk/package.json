@@ -1,7 +1,7 @@
 {
   "name": "@pdlcflow/cdk",
   "private": true,
-  "version": "1.8.0",
+  "version": "1.9.0",
   "scripts": {
     "build": "tsc",
     "synth": "cdk synth",
