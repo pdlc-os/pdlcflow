@@ -1,10 +1,11 @@
 import { Link, Outlet } from 'react-router-dom';
-import { ChevronDown, ChevronRight, LogOut, Monitor, Moon, Sun } from 'lucide-react';
+import { LogOut, Monitor, Moon, Sun } from 'lucide-react';
 
 import type { Theme } from '@/lib/theme';
 import { useTheme } from '@/store/useTheme';
 import { useAuth } from '@/store/useAuth';
 import { LoginView } from '@/components/LoginView';
+import { ScopeNav } from '@/components/ScopeNav';
 import { StatusLine } from '@/components/StatusLine';
 import { SideDrawer } from '@/components/SideDrawer';
 
@@ -17,15 +18,8 @@ export function AppShell() {
   return (
     <div className="flex h-full flex-col">
       <header className="flex h-12 items-center gap-2 border-b border-border px-4 text-sm">
-        <Link to="/" className="font-semibold tracking-tight">pdlcflow</Link>
-        <ChevronRight className="h-3.5 w-3.5 text-muted-fg" />
-        <Switcher label="Org" />
-        <ChevronRight className="h-3.5 w-3.5 text-muted-fg" />
-        <Switcher label="Squad" />
-        <ChevronRight className="h-3.5 w-3.5 text-muted-fg" />
-        <Switcher label="Initiative" />
-        <ChevronRight className="h-3.5 w-3.5 text-muted-fg" />
-        <Switcher label="Project" />
+        <Link to="/" className="mr-1 font-semibold tracking-tight">pdlcflow</Link>
+        <ScopeNav />
         <span className="ml-3 rounded-full bg-accent/10 px-2 py-0.5 text-xs text-accent">
           Inception · Discover
         </span>
@@ -71,14 +65,5 @@ export function AppShell() {
 
       <StatusLine />
     </div>
-  );
-}
-
-function Switcher({ label }: { label: string }) {
-  return (
-    <button className="flex items-center gap-1 rounded-md px-2 py-0.5 text-muted-fg hover:bg-border/60 hover:text-fg">
-      {label}
-      <ChevronDown className="h-3.5 w-3.5" />
-    </button>
   );
 }

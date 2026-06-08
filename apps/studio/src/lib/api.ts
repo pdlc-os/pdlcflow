@@ -263,3 +263,43 @@ export const api = {
       body: JSON.stringify(body),
     }),
 };
+
+// ── Entity CRUD (/v1/domains|squads|initiatives|repositories|projects) ─────────
+export interface Domain { id: string; name: string }
+export interface Squad { id: string; name: string; slug: string; domain_id: string | null }
+export interface Initiative { id: string; name: string; status: string }
+export interface Repo {
+  id: string; name: string; url: string; squad_id: string;
+  default_branch: string; provider: string; has_token: boolean;
+}
+export interface ServerProject {
+  id: string; name: string; slug: string; squad_id: string; repository_id: string | null;
+}
+
+const e = encodeURIComponent;
+const post = <T>(path: string, body: unknown) =>
+  json<T>(path, { method: 'POST', body: JSON.stringify(body) });
+
+export const entities = {
+  domains: (org: string) => json<{ domains: Domain[] }>(`/domains?org_id=${e(org)}`),
+  createDomain: (org: string, name: string) => post<Domain>(`/domains?org_id=${e(org)}`, { name }),
+
+  squads: (org: string) => json<{ squads: Squad[] }>(`/squads?org_id=${e(org)}`),
+  createSquad: (org: string, name: string, domain_id?: string | null) =>
+    post<Squad>(`/squads?org_id=${e(org)}`, { name, domain_id }),
+
+  initiatives: (org: string) => json<{ initiatives: Initiative[] }>(`/initiatives?org_id=${e(org)}`),
+  createInitiative: (org: string, name: string) =>
+    post<Initiative>(`/initiatives?org_id=${e(org)}`, { name }),
+
+  repositories: (org: string, squadId?: string) =>
+    json<{ repositories: Repo[] }>(`/repositories?org_id=${e(org)}${squadId ? `&squad_id=${e(squadId)}` : ''}`),
+  createRepository: (org: string, body: { squad_id: string; name: string; url: string; token?: string; default_branch?: string; provider?: string }) =>
+    post<Repo>(`/repositories?org_id=${e(org)}`, body),
+  deleteRepository: (org: string, id: string) =>
+    json<{ deleted: string }>(`/repositories/${e(id)}?org_id=${e(org)}`, { method: 'DELETE' }),
+
+  projects: (org: string) => json<{ projects: ServerProject[] }>(`/projects?org_id=${e(org)}`),
+  createProject: (org: string, body: { name: string; squad_id: string; repository_id?: string | null }) =>
+    post<ServerProject>(`/projects?org_id=${e(org)}`, body),
+};

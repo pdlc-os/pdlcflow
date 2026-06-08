@@ -1,20 +1,39 @@
 import { useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate } from 'react-router-dom';
 
-import { useProjects } from '@/store/useProjects';
+import { entities } from '@/lib/api';
+import { useScope } from '@/store/useScope';
 import { useThread } from '@/store/useThread';
 
 export function ProjectSwitcher() {
-  const projects = useProjects((s) => s.projects);
-  const create = useProjects((s) => s.create);
+  const orgId = useThread((s) => s.orgId);
   const setProject = useThread((s) => s.setProject);
+  const { squadId, domainId, setScope } = useScope();
+  const qc = useQueryClient();
   const navigate = useNavigate();
   const [name, setName] = useState('');
 
-  const make = () => {
+  const { data } = useQuery({
+    queryKey: ['projects', orgId],
+    queryFn: () => entities.projects(orgId),
+    enabled: !!orgId,
+  });
+  const projects = data?.projects ?? [];
+
+  const make = async () => {
     const n = name.trim();
     if (!n) return;
-    const p = create(n);
+    // A project needs a squad — use the selected one, else create a default.
+    let sq = squadId;
+    if (!sq) {
+      const s = await entities.createSquad(orgId, 'General', domainId);
+      await qc.invalidateQueries({ queryKey: ['squads', orgId] });
+      setScope('squad', s.id);
+      sq = s.id;
+    }
+    const p = await entities.createProject(orgId, { name: n, squad_id: sq });
+    await qc.invalidateQueries({ queryKey: ['projects', orgId] });
     setProject(p.id);
     navigate(`/projects/${p.id}`); // straight into the chat
   };
@@ -29,18 +48,17 @@ export function ProjectSwitcher() {
         for rollups across initiatives, domains, squads, and agents.
       </p>
 
-      {/* Create a project → jump into its chat */}
       <div className="mb-6 flex gap-2">
         <input
           value={name}
           onChange={(e) => setName(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && make()}
+          onKeyDown={(e) => e.key === 'Enter' && void make()}
           placeholder="New project name, e.g. Billing revamp"
           className="flex-1 rounded-lg border border-border bg-muted/30 px-3 py-2 text-sm outline-none focus:border-accent"
         />
         <button
           type="button"
-          onClick={make}
+          onClick={() => void make()}
           disabled={!name.trim()}
           className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-accent-fg disabled:opacity-50"
         >

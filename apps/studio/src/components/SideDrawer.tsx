@@ -2,21 +2,26 @@ import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { FolderOpen, MessageSquare, Plus } from 'lucide-react';
 
-import { admin, type ThreadSummary } from '@/lib/api';
-import { useProjects } from '@/store/useProjects';
+import { admin, entities, type ThreadSummary } from '@/lib/api';
 import { useThread } from '@/store/useThread';
 import { cn } from '@/lib/utils';
 
-/** Left nav: projects, each with its conversations nested beneath (click to open). */
+/** Left nav: projects (server-backed), each with its conversations nested beneath. */
 export function SideDrawer() {
   const orgId = useThread((s) => s.orgId);
   const projectId = useThread((s) => s.projectId);
   const threadId = useThread((s) => s.threadId);
   const setProject = useThread((s) => s.setProject);
   const openThread = useThread((s) => s.openThread);
-  const projects = useProjects((s) => s.projects);
-  const nameFor = useProjects((s) => s.nameFor);
   const navigate = useNavigate();
+
+  const projectsQ = useQuery({
+    queryKey: ['projects', orgId],
+    queryFn: () => entities.projects(orgId),
+    enabled: !!orgId,
+  });
+  const projects = projectsQ.data?.projects ?? [];
+  const nameFor = (id: string) => projects.find((p) => p.id === id)?.name ?? `proj-${id.slice(0, 6)}`;
 
   // One query for all threads; group by project so each project lists its convos.
   const { data } = useQuery({
@@ -32,7 +37,7 @@ export function SideDrawer() {
     (byProject[k] ||= []).push(t);
   }
 
-  // Projects = the local registry ∪ any project that already has conversations.
+  // Projects = the server list ∪ any project that already has conversations.
   const ids = Array.from(
     new Set([...projects.map((p) => p.id), ...threads.map((t) => t.project_id).filter(Boolean) as string[]])
   );
