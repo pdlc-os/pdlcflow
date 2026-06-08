@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import pytest
-from app import secrets as S
+from app import secretstore as S
 from app.config import settings
 from cryptography.fernet import Fernet
 
