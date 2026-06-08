@@ -396,3 +396,41 @@ def test_hierarchy_tables_rls_forced():
         ).all())
     for t in tables:
         assert rows.get(t) is True, f"{t} is not RLS-forced"
+
+
+def test_entity_crud_roundtrip():
+    """domains/squads/repositories/projects CRUD over the real DB (RLS via set_org_context).
+    Repo tokens are stored via the secrets backend and never returned."""
+    from app import secretstore
+    from app.config import settings as _s
+    from app.main import app
+    from cryptography.fernet import Fernet
+    from fastapi.testclient import TestClient
+
+    _s.secret_key = Fernet.generate_key().decode()
+    _s.secrets_backend = "encrypted"
+    secretstore.reset_secrets()
+
+    c = TestClient(app)
+    org = str(uuid.uuid4())
+    q = f"?org_id={org}"
+
+    did = c.post(f"/v1/domains{q}", json={"name": "Payments"}).json()["id"]
+    assert any(x["id"] == did for x in c.get(f"/v1/domains{q}").json()["domains"])
+
+    s = c.post(f"/v1/squads{q}", json={"name": "Core", "domain_id": did}).json()
+    sid = s["id"]
+    assert s["domain_id"] == did  # Domain → Squad link
+
+    r = c.post(f"/v1/repositories{q}", json={
+        "squad_id": sid, "name": "app", "url": "https://github.com/x/app", "token": "ghp_secret"}).json()
+    rid = r["id"]
+    assert r["has_token"] is True and "token" not in r  # token stored, not echoed
+    listed = c.get(f"/v1/repositories{q}&squad_id={sid}").json()["repositories"]
+    assert any(x["id"] == rid and x["has_token"] for x in listed)
+
+    p = c.post(f"/v1/projects{q}", json={"name": "Billing revamp", "squad_id": sid, "repository_id": rid}).json()
+    assert any(x["id"] == p["id"] for x in c.get(f"/v1/projects{q}").json()["projects"])
+
+    assert c.request("DELETE", f"/v1/repositories/{rid}{q}").status_code == 200
+    secretstore.reset_secrets()
