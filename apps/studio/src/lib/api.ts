@@ -81,6 +81,7 @@ export interface InvokeBody {
   args?: string[];
   feature?: string;
   interaction_mode?: 'sketch' | 'socratic';
+  session_id?: string;
   seed_state?: Record<string, unknown>;
 }
 
@@ -319,11 +320,14 @@ export interface Upload {
 }
 
 /** Upload a chat attachment (multipart; lets the browser set the boundary). */
-export async function uploadFile(org: string, projectId: string, file: File): Promise<Upload> {
+export async function uploadFile(
+  org: string, projectId: string, conversationId: string, file: File,
+): Promise<Upload> {
   const token = getToken();
   const fd = new FormData();
   fd.append('file', file);
   fd.append('project_id', projectId);
+  fd.append('conversation_id', conversationId);
   const r = await fetch(`${BASE}/uploads?org_id=${e(org)}`, {
     method: 'POST',
     headers: token ? { authorization: `Bearer ${token}` } : {},

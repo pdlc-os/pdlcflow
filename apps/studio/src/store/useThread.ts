@@ -29,7 +29,7 @@ interface ThreadStore {
   verdicts: NightShiftFrame[];  // live night-shift Sentinel verdict stream
   streaming: Streaming | null;  // live "drafting" preview (token frames)
 
-  start: (command: string, opts?: { feature?: string; mode?: 'sketch' | 'socratic'; display?: string }) => Promise<void>;
+  start: (command: string, opts?: { feature?: string; mode?: 'sketch' | 'socratic'; display?: string; session_id?: string }) => Promise<void>;
   answer: (answers: string[]) => Promise<void>;
   resolveApproval: (approved: boolean, comment?: string) => Promise<void>;
   setPending: (p: Pending | null) => void;
@@ -105,6 +105,7 @@ export const useThread = create<ThreadStore>((set, get) => ({
         project_id: projectId,
         feature: opts?.feature,
         interaction_mode: opts?.mode ?? 'socratic',
+        session_id: opts?.session_id,
         // Seed the visual flag so UX Discovery (and its companion) fires.
         seed_state: COMMANDS_WITH_VISUAL_SEED.has(command) ? { visual: true } : undefined,
       });
