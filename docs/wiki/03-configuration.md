@@ -200,6 +200,18 @@ Wiring is defensive: `wire_persistence`, `build_checkpointer`, `wire_event_bus`,
 - Misconfiguration degrades a feature (e.g. checkpoints become non-durable) instead of taking the service down.
 - Watch the startup logs (`docker compose logs -f api`) for lines like `PostgresSaver unavailable (...); falling back to MemorySaver` to confirm a real backend actually engaged — a green boot does **not** by itself prove Postgres is wired.
 
+## Secrets (per-repo VCS tokens)
+
+Sensitive values are stored via a pluggable backend. A value is written with `put()` which returns an opaque **ref** saved in the DB column (e.g. `repositories.token_secret_ref`); `resolve(ref)` returns the plaintext. **`resolve` dispatches on the ref prefix**, so a deployment can switch backends and still read old refs.
+
+| `PDLC_SECRETS_BACKEND` | Ref shape | Where the secret lives | Use |
+| --- | --- | --- | --- |
+| `encrypted` (default) | `enc:<ciphertext>` | Fernet-encrypted **in the DB** | Single-user self-host. Needs **`PDLC_SECRET_KEY`** (a Fernet key; `setup.sh` generates one). |
+| `vault` | `vault:<path>` | HashiCorp **Vault** KV v2 | SaaS / shared. Bundled **opt-in**: `docker compose --profile vault up -d` (dev-mode; for prod point `PDLC_VAULT_ADDR` at a persistent/external Vault). Set `PDLC_VAULT_TOKEN`/`PDLC_VAULT_MOUNT`/`PDLC_VAULT_PATH_PREFIX`. |
+| `env` | `env:<NAME>` | the environment variable `NAME` | Cloud provider secrets managers (or a custom location) that inject secrets as env vars. |
+
+The bundled Vault is **off by default** to keep the stack lean. `cryptography` (Fernet) ships in the image; `hvac` (Vault) is included so `vault` works without rebuilding.
+
 
 ---
 
