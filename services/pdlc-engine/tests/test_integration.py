@@ -434,3 +434,31 @@ def test_entity_crud_roundtrip():
 
     assert c.request("DELETE", f"/v1/repositories/{rid}{q}").status_code == 200
     secretstore.reset_secrets()
+
+
+def test_entity_rename_and_delete():
+    from app.main import app
+    from fastapi.testclient import TestClient
+
+    c = TestClient(app)
+    org = str(uuid.uuid4())
+    q = f"?org_id={org}"
+    d = c.post(f"/v1/domains{q}", json={"name": "Pay"}).json()
+    s = c.post(f"/v1/squads{q}", json={"name": "Core", "domain_id": d["id"]}).json()
+    init = c.post(f"/v1/initiatives{q}", json={"name": "Q3"}).json()
+    p = c.post(f"/v1/projects{q}", json={"name": "Old", "squad_id": s["id"]}).json()
+
+    # rename each
+    assert c.patch(f"/v1/projects/{p['id']}{q}", json={"name": "New name"}).json()["name"] == "New name"
+    assert any(x["name"] == "New name" for x in c.get(f"/v1/projects{q}").json()["projects"])
+    assert c.patch(f"/v1/squads/{s['id']}{q}", json={"name": "Core2"}).json()["name"] == "Core2"
+    assert c.patch(f"/v1/initiatives/{init['id']}{q}", json={"name": "Q4"}).json()["name"] == "Q4"
+    assert c.patch(f"/v1/domains/{d['id']}{q}", json={"name": "Payments"}).json()["name"] == "Payments"
+
+    # delete (initiative null-first path; project drops its transcripts; squad cascades)
+    assert c.request("DELETE", f"/v1/initiatives/{init['id']}{q}").status_code == 200
+    assert c.request("DELETE", f"/v1/projects/{p['id']}{q}").status_code == 200
+    assert not any(x["id"] == p["id"] for x in c.get(f"/v1/projects{q}").json()["projects"])
+    assert c.request("DELETE", f"/v1/squads/{s['id']}{q}").status_code == 200
+    assert c.request("DELETE", f"/v1/domains/{d['id']}{q}").status_code == 200
+    assert c.patch(f"/v1/projects/{uuid.uuid4()}{q}", json={"name": "x"}).status_code == 404

@@ -280,6 +280,9 @@ export interface ServerProject {
 const e = encodeURIComponent;
 const post = <T>(path: string, body: unknown) =>
   json<T>(path, { method: 'POST', body: JSON.stringify(body) });
+const patch = <T>(path: string, body: unknown) =>
+  json<T>(path, { method: 'PATCH', body: JSON.stringify(body) });
+const del = <T>(path: string) => json<T>(path, { method: 'DELETE' });
 
 export const entities = {
   domains: (org: string) => json<{ domains: Domain[] }>(`/domains?org_id=${e(org)}`),
@@ -303,6 +306,12 @@ export const entities = {
   projects: (org: string) => json<{ projects: ServerProject[] }>(`/projects?org_id=${e(org)}`),
   createProject: (org: string, body: { name: string; squad_id: string; repository_id?: string | null }) =>
     post<ServerProject>(`/projects?org_id=${e(org)}`, body),
+
+  // rename + delete (org-scoped). `kind` is the route segment.
+  rename: (kind: 'domains' | 'squads' | 'initiatives' | 'projects', org: string, id: string, name: string) =>
+    patch<{ id: string; name: string }>(`/${kind}/${e(id)}?org_id=${e(org)}`, { name }),
+  remove: (kind: 'domains' | 'squads' | 'initiatives' | 'projects', org: string, id: string) =>
+    del<{ deleted: string }>(`/${kind}/${e(id)}?org_id=${e(org)}`),
 
   repoFiles: (org: string, repoId: string, path = '') =>
     json<{ path: string; entries: RepoEntry[] }>(

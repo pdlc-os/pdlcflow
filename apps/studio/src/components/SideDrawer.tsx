@@ -1,6 +1,6 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import { FolderOpen, MessageSquare, Plus } from 'lucide-react';
+import { FolderOpen, MessageSquare, Pencil, Plus, Trash2 } from 'lucide-react';
 
 import { admin, entities, type ThreadSummary } from '@/lib/api';
 import { RepoMemory } from '@/components/RepoMemory';
@@ -15,6 +15,7 @@ export function SideDrawer() {
   const setProject = useThread((s) => s.setProject);
   const openThread = useThread((s) => s.openThread);
   const navigate = useNavigate();
+  const qc = useQueryClient();
 
   const projectsQ = useQuery({
     queryKey: ['projects', orgId],
@@ -43,11 +44,26 @@ export function SideDrawer() {
     new Set([...projects.map((p) => p.id), ...threads.map((t) => t.project_id).filter(Boolean) as string[]])
   );
 
+  const isReal = (pid: string) => projects.some((p) => p.id === pid);
   const openProject = (id: string) => { setProject(id); navigate(`/projects/${id}`); };
   const openConv = (pid: string, tid: string) => {
     setProject(pid);
     navigate(`/projects/${pid}`);
     void openThread(tid);
+  };
+  const renameProject = async (pid: string, current: string) => {
+    const next = window.prompt('Rename project to:', current);
+    if (next && next.trim() && next.trim() !== current) {
+      await entities.rename('projects', orgId, pid, next.trim());
+      await qc.invalidateQueries({ queryKey: ['projects', orgId] });
+    }
+  };
+  const deleteProject = async (pid: string, name: string) => {
+    if (!window.confirm(`Delete "${name}"?\n\nThis also deletes its conversations.\n\nThis cannot be undone.`)) return;
+    await entities.remove('projects', orgId, pid);
+    await qc.invalidateQueries({ queryKey: ['projects', orgId] });
+    await qc.invalidateQueries({ queryKey: ['allThreads', orgId] });
+    if (projectId === pid) navigate('/');
   };
 
   return (
@@ -65,16 +81,28 @@ export function SideDrawer() {
         <div className="space-y-1">
           {ids.map((pid) => (
             <div key={pid}>
-              <button
-                type="button"
-                onClick={() => openProject(pid)}
-                className={cn(
-                  'block w-full truncate rounded px-2 py-1 text-left font-medium hover:bg-border/60',
-                  pid === projectId && 'text-accent'
+              <div className="group flex items-center rounded hover:bg-border/60">
+                <button
+                  type="button"
+                  onClick={() => openProject(pid)}
+                  className={cn('flex-1 truncate rounded px-2 py-1 text-left font-medium',
+                    pid === projectId && 'text-accent')}
+                >
+                  {nameFor(pid)}
+                </button>
+                {isReal(pid) && (
+                  <>
+                    <button type="button" title="Rename project" onClick={() => void renameProject(pid, nameFor(pid))}
+                      className="px-1 text-muted-fg opacity-0 hover:text-fg group-hover:opacity-100">
+                      <Pencil className="h-3 w-3" />
+                    </button>
+                    <button type="button" title="Delete project" onClick={() => void deleteProject(pid, nameFor(pid))}
+                      className="px-1 text-muted-fg opacity-0 hover:text-red-500 group-hover:opacity-100">
+                      <Trash2 className="h-3 w-3" />
+                    </button>
+                  </>
                 )}
-              >
-                {nameFor(pid)}
-              </button>
+              </div>
               <div className="ml-2 space-y-0.5 border-l border-border pl-2">
                 {(byProject[pid] ?? []).map((t) => (
                   <button

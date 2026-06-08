@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import { ChevronDown, ChevronRight } from 'lucide-react';
+import { ChevronDown, ChevronRight, Pencil, Trash2 } from 'lucide-react';
 
 import { entities } from '@/lib/api';
 import { useScope } from '@/store/useScope';
@@ -10,15 +10,17 @@ import { cn } from '@/lib/utils';
 
 interface Item { id: string; name: string }
 
-/** A nav dropdown: pick an item or create one inline. */
+/** A nav dropdown: pick an item, create one inline, or rename/delete it. */
 function Dropdown({
-  label, items, value, onSelect, onCreate, createPlaceholder, disabled,
+  label, items, value, onSelect, onCreate, onRename, onDelete, createPlaceholder, disabled,
 }: {
   label: string;
   items: Item[];
   value: string | null;
   onSelect: (id: string) => void;
   onCreate?: (name: string) => void;
+  onRename?: (id: string, current: string) => void;
+  onDelete?: (id: string, name: string) => void;
   createPlaceholder?: string;
   disabled?: boolean;
 }) {
@@ -44,15 +46,27 @@ function Dropdown({
         >
           {items.length === 0 && <div className="px-2 py-1 text-xs text-muted-fg">none yet</div>}
           {items.map((i) => (
-            <button
-              key={i.id}
-              type="button"
-              onClick={() => { onSelect(i.id); setOpen(false); }}
-              className={cn('block w-full truncate rounded px-2 py-1 text-left text-sm hover:bg-border/60',
-                i.id === value && 'text-accent')}
-            >
-              {i.name}
-            </button>
+            <div key={i.id} className="group flex items-center rounded hover:bg-border/60">
+              <button
+                type="button"
+                onClick={() => { onSelect(i.id); setOpen(false); }}
+                className={cn('flex-1 truncate rounded px-2 py-1 text-left text-sm', i.id === value && 'text-accent')}
+              >
+                {i.name}
+              </button>
+              {onRename && (
+                <button type="button" title="Rename" onClick={() => { onRename(i.id, i.name); setOpen(false); }}
+                  className="px-1 text-muted-fg opacity-0 hover:text-fg group-hover:opacity-100">
+                  <Pencil className="h-3 w-3" />
+                </button>
+              )}
+              {onDelete && (
+                <button type="button" title="Delete" onClick={() => { onDelete(i.id, i.name); setOpen(false); }}
+                  className="px-1 text-muted-fg opacity-0 hover:text-red-500 group-hover:opacity-100">
+                  <Trash2 className="h-3 w-3" />
+                </button>
+              )}
+            </div>
           ))}
           {onCreate && (
             <input
@@ -169,6 +183,21 @@ export function ScopeNav() {
     return sq.id;
   };
 
+  type Kind = 'domains' | 'squads' | 'initiatives' | 'projects';
+  const renameEntity = async (kind: Kind, id: string, current: string) => {
+    const next = window.prompt('Rename to:', current);
+    if (next && next.trim() && next.trim() !== current) {
+      await entities.rename(kind, orgId, id, next.trim());
+      await refresh(kind);
+    }
+  };
+  const deleteEntity = async (kind: Kind, id: string, name: string, warn: string, after?: () => void) => {
+    if (!window.confirm(`Delete "${name}"?\n\n${warn}\n\nThis cannot be undone.`)) return;
+    await entities.remove(kind, orgId, id);
+    await refresh(kind);
+    after?.();
+  };
+
   return (
     <>
       <span className="text-muted-fg">Org</span>
@@ -177,6 +206,9 @@ export function ScopeNav() {
         label="Domain" value={domainId} items={domains.data?.domains ?? []}
         onSelect={(id) => setScope('domain', id)}
         onCreate={async (name) => { const d = await entities.createDomain(orgId, name); await refresh('domains'); setScope('domain', d.id); }}
+        onRename={(id, cur) => void renameEntity('domains', id, cur)}
+        onDelete={(id, name) => void deleteEntity('domains', id, name, 'Its squads are kept (just un-grouped).',
+          () => { if (domainId === id) setScope('domain', null); })}
         createPlaceholder="+ New domain…"
       />
       <Sep />
@@ -184,6 +216,10 @@ export function ScopeNav() {
         label="Squad" value={squadId} items={squads.data?.squads ?? []}
         onSelect={(id) => setScope('squad', id)}
         onCreate={async (name) => { const s = await entities.createSquad(orgId, name, domainId); await refresh('squads'); setScope('squad', s.id); }}
+        onRename={(id, cur) => void renameEntity('squads', id, cur)}
+        onDelete={(id, name) => void deleteEntity('squads', id, name,
+          'This also deletes the squad’s projects (and their conversations), repos, and links.',
+          () => { if (squadId === id) { setScope('squad', null); setScope('repo', null); } })}
         createPlaceholder="+ New squad…"
       />
       <Sep />
@@ -193,6 +229,9 @@ export function ScopeNav() {
         label="Initiative" value={initiativeId} items={inits.data?.initiatives ?? []}
         onSelect={(id) => setScope('initiative', id)}
         onCreate={async (name) => { const i = await entities.createInitiative(orgId, name); await refresh('initiatives'); setScope('initiative', i.id); }}
+        onRename={(id, cur) => void renameEntity('initiatives', id, cur)}
+        onDelete={(id, name) => void deleteEntity('initiatives', id, name, 'Projects linked to it are kept (just un-linked).',
+          () => { if (initiativeId === id) setScope('initiative', null); })}
         createPlaceholder="+ New initiative…"
       />
       <Sep />
@@ -206,6 +245,9 @@ export function ScopeNav() {
           setProject(p.id);
           navigate(`/projects/${p.id}`);
         }}
+        onRename={(id, cur) => void renameEntity('projects', id, cur)}
+        onDelete={(id, name) => void deleteEntity('projects', id, name, 'This also deletes its conversations.',
+          () => { if (projectId === id) navigate('/'); })}
         createPlaceholder="+ New project…"
       />
     </>
