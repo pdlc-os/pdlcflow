@@ -379,3 +379,20 @@ def test_thread_transcript_rls_and_roundtrip():
     s.append(org_id=org, thread_id=tid, project_id=None, role="agent", text="(completed)")
     assert any(t["thread_id"] == tid and "doctor" in t["label"] for t in s.list_threads(org_id=org))
     assert len(s.list_thread(org_id=org, thread_id=tid)) == 2
+
+
+def test_hierarchy_tables_rls_forced():
+    """The Release-B hierarchy tables (repos + M:N joins + programs) are RLS-FORCEd.
+    (Cross-org Program visibility is verified on docker as the non-owner role.)"""
+    from app.db.session import get_sync_engine
+    from sqlalchemy import text
+
+    tables = ("repositories", "squad_initiatives", "initiative_repositories",
+              "program_initiatives", "programs")
+    with get_sync_engine(settings).begin() as c:
+        rows = dict(c.execute(
+            text("select relname, relforcerowsecurity from pg_class where relname = any(:t)"),
+            {"t": list(tables)},
+        ).all())
+    for t in tables:
+        assert rows.get(t) is True, f"{t} is not RLS-forced"
