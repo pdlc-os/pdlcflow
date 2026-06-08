@@ -3,6 +3,28 @@
 All notable changes to pdlcflow are documented here. This project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## v1.10.0 — 2026-06-08
+
+Studio conversation & entity-management improvements.
+
+### Added
+- **Landing greeting** — the logo (centered) replaces the "Welcome" text, with a
+  time-of-day greeting (Good morning/afternoon/evening) that uses the signed-in
+  user's handle when auth is on.
+- **Rename + delete** for domains, squads, initiatives, and projects — from the top-nav
+  dropdowns and the left Projects panel, each guarded by a confirmation. Org-scoped
+  (RLS); deletes handle FKs (initiative un-links its projects/applications; project
+  delete drops its conversations; squad cascades).
+- **Continue a conversation** — clicking a thread loads its transcript, and a plain
+  message continues it: `POST /v1/commands/continue` sends the **entire prior
+  transcript to the LLM as context + the new prompt** (via Atlas) and appends both
+  turns; tokens stream live.
+
+### Fixed
+- **Conversations now group under their project.** The Studio's `projectId` no longer
+  defaults to a random orphan id, so conversations are filed under the real server
+  project (and show in the Projects panel) instead of an unmatched id.
+
 ## v1.9.1 — 2026-06-07
 
 Logo, attachment hardening, and a docs refresh on top of v1.9.0.
