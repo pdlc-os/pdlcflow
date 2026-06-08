@@ -25,6 +25,11 @@ dependencies = [
     "websockets>=12.0",
     "httpx>=0.27",
     "python-multipart>=0.0.9",  # FastAPI file uploads (chat attachments)
+    # Extract text from uploaded docs so attachments reach the LLM as context.
+    "pypdf>=5.0",
+    "python-docx>=1.1",
+    "openpyxl>=3.1",
+    "python-pptx>=1.0",
     "hvac>=2.1",  # HashiCorp Vault client (secrets_backend=vault)
     "pdlc-event-schema",
     "pdlc-graph",

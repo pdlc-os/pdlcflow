@@ -13,6 +13,7 @@ immediately exercisable.
 
 from __future__ import annotations
 
+import re
 from typing import Literal
 from uuid import UUID, uuid4
 
@@ -56,6 +57,9 @@ class InvokeCommandRequest(BaseModel):
     args: list[str] = []
     feature: str | None = None
     interaction_mode: Literal["sketch", "socratic"] = "sketch"
+    # Client-supplied conversation/session id, so chat attachments uploaded before
+    # the turn land under this same conversation's folder. Sanitized; else generated.
+    session_id: str | None = None
     # Optional seed for the initial graph state — lets a client start a phase
     # mid-lifecycle (e.g. /build with a known task list). Tenancy + phase keys
     # are always re-asserted from the command and cannot be overridden.
@@ -96,7 +100,10 @@ def invoke(
     principal: Identity | None = Depends(get_principal),
 ) -> InvokeCommandResponse:
     org_id = resolve_org(principal, str(req.org_id) if req.org_id else None, "/v1/commands")
-    session_id = str(uuid4())
+    # Use the client's conversation id (so pre-uploaded attachments match this
+    # conversation's folder), sanitized to keep thread_id's "org:project:session" shape.
+    session_id = re.sub(r"[^A-Za-z0-9_-]", "", req.session_id)[:64] if req.session_id else ""
+    session_id = session_id or str(uuid4())
     thread_id = f"{org_id}:{req.project_id}:{session_id}"
     state = _initial_state(req, thread_id, session_id, org_id)
 

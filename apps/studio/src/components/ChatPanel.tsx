@@ -36,6 +36,9 @@ export function ChatPanel() {
   const taRef = useRef<HTMLTextAreaElement>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  // The conversation id this composer's uploads + the next send share, so files
+  // land under the same conversation folder. Reset after each send.
+  const sessionRef = useRef<string>(crypto.randomUUID());
 
   const busy = status === 'running';
 
@@ -46,7 +49,7 @@ export function ChatPanel() {
     try {
       for (const f of list) {
         try {
-          const up = await uploadFile(orgId, projectId, f);
+          const up = await uploadFile(orgId, projectId, sessionRef.current, f);
           setAttachments((a) => [...a, up]);
         } catch {
           /* skip a failed file; others still upload */
@@ -87,18 +90,21 @@ export function ChatPanel() {
     const m = text.match(/^\/?(\w[\w-]*)\s*([\s\S]*)$/);
     const command = m ? m[1] : 'brainstorm';
     let feature = m && m[2] ? m[2].trim() : '';
-    // Fold attachments into the prompt: text files inline their content; binaries are noted.
+    // Fold attachments into the prompt: any extracted text (utf-8 OR doc) is inlined
+    // so the working agent gets it as context; non-text files are noted by name.
     for (const a of attachments) {
-      feature += a.is_text && a.text
+      feature += a.text
         ? `\n\n--- attached: ${a.filename} ---\n${a.text}`
         : `\n\n[attached file: ${a.filename}]`;
     }
     const names = attachments.map((a) => a.filename);
     const display = (text || '(attachment)') + (names.length ? `  📎 ${names.join(', ')}` : '');
+    const session_id = sessionRef.current;
     setInput('');
     setMenuOpen(false);
     setAttachments([]);
-    void start(command, { feature: feature.trim() || undefined, mode, display });
+    sessionRef.current = crypto.randomUUID(); // next conversation gets a fresh id
+    void start(command, { feature: feature.trim() || undefined, mode, display, session_id });
   };
 
   const insertNewline = () => {

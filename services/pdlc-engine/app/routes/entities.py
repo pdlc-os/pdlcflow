@@ -10,6 +10,7 @@ from __future__ import annotations
 import base64
 import re
 import uuid
+from datetime import UTC, datetime
 
 import httpx
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
@@ -245,36 +246,76 @@ def list_projects(org: str = Depends(current_org("/projects"))) -> dict:
 _MAX_UPLOAD = 15_000_000  # 15 MB
 
 
+def _extract_doc_text(raw: bytes, name: str) -> str | None:
+    """Pull text out of common binary docs so attachments reach the LLM."""
+    import io
+    ext = name.rsplit(".", 1)[-1].lower() if "." in name else ""
+    try:
+        if ext == "pdf":
+            from pypdf import PdfReader
+            return "\n".join((p.extract_text() or "") for p in PdfReader(io.BytesIO(raw)).pages)
+        if ext == "docx":
+            import docx
+            return "\n".join(p.text for p in docx.Document(io.BytesIO(raw)).paragraphs)
+        if ext in ("xlsx", "xlsm"):
+            from openpyxl import load_workbook
+            out: list[str] = []
+            for ws in load_workbook(io.BytesIO(raw), read_only=True, data_only=True).worksheets:
+                out.append(f"# {ws.title}")
+                out += ["\t".join("" if c is None else str(c) for c in row)
+                        for row in ws.iter_rows(values_only=True)]
+            return "\n".join(out)
+        if ext == "pptx":
+            from pptx import Presentation
+            out2: list[str] = []
+            for i, slide in enumerate(Presentation(io.BytesIO(raw)).slides, 1):
+                out2.append(f"# Slide {i}")
+                out2 += [s.text_frame.text for s in slide.shapes if s.has_text_frame]
+            return "\n".join(out2)
+    except Exception:  # pragma: no cover - malformed doc
+        return None
+    return None
+
+
 @router.post("/uploads")
 async def upload_file(
     file: UploadFile = File(...),
     project_id: str = Form(...),
+    conversation_id: str = Form(...),
     org: str = Depends(current_org("/uploads")),
 ) -> dict:
-    """Store a chat attachment (image / doc / text) under the tenant's artifact
-    namespace. Text-like files are stored + their text returned so the agent can
-    use the content; binaries are stored base64 and referenced by name."""
+    """Store a chat attachment under the tenant's artifact namespace, in a folder
+    per project + conversation, with a timestamped filename (so re-uploading the
+    same name in the same conversation never overwrites). Text-like files and
+    extractable docs (pdf/docx/xlsx/pptx) return their text so the agent can use it.
+    """
     raw = await file.read()
     if len(raw) > _MAX_UPLOAD:
         raise HTTPException(status_code=413, detail="file too large (max 15 MB)")
-    name = (file.filename or "upload").replace("/", "_")
-    uid = uuid.uuid4().hex[:12]
+    name = (file.filename or "upload").replace("/", "_").replace("\\", "_")
+    conv = re.sub(r"[^A-Za-z0-9_.-]", "", conversation_id) or "unfiled"
+    stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%S")
+    stored = f"{stamp}-{uuid.uuid4().hex[:6]}-{name}"  # timestamp + nonce => no overwrite
+
     try:
         text_content: str | None = raw.decode("utf-8")
         is_text = True
     except UnicodeDecodeError:
         text_content, is_text = None, False
+    if text_content is None:
+        text_content = _extract_doc_text(raw, name)  # pdf/docx/xlsx/pptx
 
     tok = set_current_org(org)
     try:
         if is_text:
-            uri = put_artifact(project_id, f"uploads/{uid}/{name}", text_content or "")
+            uri = put_artifact(project_id, f"uploads/{conv}/{stored}", raw.decode("utf-8"))
         else:
-            uri = put_artifact(project_id, f"uploads/{uid}/{name}.b64", base64.b64encode(raw).decode())
+            uri = put_artifact(project_id, f"uploads/{conv}/{stored}.b64", base64.b64encode(raw).decode())
     finally:
         reset_current_org(tok)
 
-    return {"id": uid, "filename": name, "size": len(raw), "content_type": file.content_type,
+    return {"id": uuid.uuid4().hex[:12], "filename": name, "stored_as": stored,
+            "conversation_id": conv, "size": len(raw), "content_type": file.content_type,
             "is_text": is_text, "uri": uri, "text": (text_content[:20000] if text_content else None)}
 
 
