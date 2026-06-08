@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ChevronRight, Loader2 } from 'lucide-react';
+import { ChevronRight, Loader2, Paperclip, X } from 'lucide-react';
 
+import { uploadFile, type Upload } from '@/lib/api';
 import { useThread } from '@/store/useThread';
 import { cn } from '@/lib/utils';
 import {
@@ -23,14 +24,38 @@ export function ChatPanel() {
   const transcript = useThread((s) => s.transcript);
   const status = useThread((s) => s.status);
   const start = useThread((s) => s.start);
+  const orgId = useThread((s) => s.orgId);
+  const projectId = useThread((s) => s.projectId);
   const [input, setInput] = useState('');
   const [mode, setMode] = useState<Mode>('sketch');
   const [menuOpen, setMenuOpen] = useState(false);
   const [active, setActive] = useState(0);
+  const [attachments, setAttachments] = useState<Upload[]>([]);
+  const [dragging, setDragging] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const taRef = useRef<HTMLTextAreaElement>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   const busy = status === 'running';
+
+  const addFiles = async (files: FileList | File[]) => {
+    const list = Array.from(files);
+    if (list.length === 0) return;
+    setUploading(true);
+    try {
+      for (const f of list) {
+        try {
+          const up = await uploadFile(orgId, projectId, f);
+          setAttachments((a) => [...a, up]);
+        } catch {
+          /* skip a failed file; others still upload */
+        }
+      }
+    } finally {
+      setUploading(false);
+    }
+  };
 
   // Autocomplete: while typing the first `/token`, suggest matching commands.
   const matches = useMemo<PdlcCommand[]>(() => {
@@ -57,14 +82,23 @@ export function ChatPanel() {
 
   const submit = () => {
     const text = input.trim();
-    if (!text || busy) return;
-    setInput('');
-    setMenuOpen(false);
+    if ((!text && attachments.length === 0) || busy) return;
     // "/brainstorm dark mode" -> command=brainstorm, feature="dark mode" (across newlines)
     const m = text.match(/^\/?(\w[\w-]*)\s*([\s\S]*)$/);
     const command = m ? m[1] : 'brainstorm';
-    const feature = m && m[2] ? m[2].trim() : undefined;
-    void start(command, { feature, mode });
+    let feature = m && m[2] ? m[2].trim() : '';
+    // Fold attachments into the prompt: text files inline their content; binaries are noted.
+    for (const a of attachments) {
+      feature += a.is_text && a.text
+        ? `\n\n--- attached: ${a.filename} ---\n${a.text}`
+        : `\n\n[attached file: ${a.filename}]`;
+    }
+    const names = attachments.map((a) => a.filename);
+    const display = (text || '(attachment)') + (names.length ? `  📎 ${names.join(', ')}` : '');
+    setInput('');
+    setMenuOpen(false);
+    setAttachments([]);
+    void start(command, { feature: feature.trim() || undefined, mode, display });
   };
 
   const insertNewline = () => {
@@ -145,7 +179,31 @@ export function ChatPanel() {
         ))
       )}
 
-      <div className="relative mt-2">
+      <div
+        className="relative mt-2"
+        onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
+        onDragLeave={(e) => { e.preventDefault(); setDragging(false); }}
+        onDrop={(e) => {
+          e.preventDefault();
+          setDragging(false);
+          if (e.dataTransfer.files?.length) void addFiles(e.dataTransfer.files);
+        }}
+      >
+        {/* Attachment chips */}
+        {(attachments.length > 0 || uploading) && (
+          <div className="mb-1 flex flex-wrap gap-1">
+            {attachments.map((a) => (
+              <span key={a.id} className="flex items-center gap-1 rounded-md border border-border bg-muted/30 px-2 py-0.5 text-xs">
+                <Paperclip className="h-3 w-3 text-muted-fg" />
+                <span className="max-w-[20ch] truncate">{a.filename}</span>
+                <button type="button" onClick={() => setAttachments((x) => x.filter((y) => y.id !== a.id))}
+                  className="text-muted-fg hover:text-fg"><X className="h-3 w-3" /></button>
+              </span>
+            ))}
+            {uploading && <span className="px-1 text-xs text-muted-fg">uploading…</span>}
+          </div>
+        )}
+
         {/* Autocomplete menu (above the input) */}
         {showMenu && (
           <ul className="absolute bottom-full mb-1 max-h-64 w-full overflow-auto rounded-xl border border-border bg-bg py-1 shadow-lg">
@@ -172,7 +230,8 @@ export function ChatPanel() {
           </ul>
         )}
 
-        <div className="flex items-start gap-2 rounded-xl border border-border px-3 py-2">
+        <div className={cn('flex items-start gap-2 rounded-xl border px-3 py-2',
+          dragging ? 'border-accent ring-1 ring-accent' : 'border-border')}>
           {busy ? (
             <Loader2 className="mt-0.5 h-4 w-4 shrink-0 animate-spin text-muted-fg" />
           ) : (
@@ -219,6 +278,23 @@ export function ChatPanel() {
               )}
             />
           </div>
+
+          {/* attach files */}
+          <input
+            ref={fileRef}
+            type="file"
+            multiple
+            className="hidden"
+            onChange={(e) => { if (e.target.files) void addFiles(e.target.files); e.target.value = ''; }}
+          />
+          <button
+            type="button"
+            onClick={() => fileRef.current?.click()}
+            title="Attach files (or drag & drop)"
+            className="mt-0.5 shrink-0 rounded-md p-1 text-muted-fg hover:bg-border/60 hover:text-fg"
+          >
+            <Paperclip className="h-4 w-4" />
+          </button>
 
           {/* sketch ⇄ socratic interaction mode */}
           <ModeToggle mode={mode} setMode={setMode} />

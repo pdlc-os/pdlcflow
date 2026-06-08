@@ -12,7 +12,8 @@ import re
 import uuid
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
+from pdlc_graph.ports import put_artifact, reset_current_org, set_current_org
 from pydantic import BaseModel
 from sqlalchemy import text
 
@@ -239,6 +240,42 @@ def list_projects(org: str = Depends(current_org("/projects"))) -> dict:
     return {"projects": _rows(org,
             "select id, name, slug, squad_id, repository_id from projects where org_id = :o order by created_at desc",
             {"o": org})}
+
+
+_MAX_UPLOAD = 15_000_000  # 15 MB
+
+
+@router.post("/uploads")
+async def upload_file(
+    file: UploadFile = File(...),
+    project_id: str = Form(...),
+    org: str = Depends(current_org("/uploads")),
+) -> dict:
+    """Store a chat attachment (image / doc / text) under the tenant's artifact
+    namespace. Text-like files are stored + their text returned so the agent can
+    use the content; binaries are stored base64 and referenced by name."""
+    raw = await file.read()
+    if len(raw) > _MAX_UPLOAD:
+        raise HTTPException(status_code=413, detail="file too large (max 15 MB)")
+    name = (file.filename or "upload").replace("/", "_")
+    uid = uuid.uuid4().hex[:12]
+    try:
+        text_content: str | None = raw.decode("utf-8")
+        is_text = True
+    except UnicodeDecodeError:
+        text_content, is_text = None, False
+
+    tok = set_current_org(org)
+    try:
+        if is_text:
+            uri = put_artifact(project_id, f"uploads/{uid}/{name}", text_content or "")
+        else:
+            uri = put_artifact(project_id, f"uploads/{uid}/{name}.b64", base64.b64encode(raw).decode())
+    finally:
+        reset_current_org(tok)
+
+    return {"id": uid, "filename": name, "size": len(raw), "content_type": file.content_type,
+            "is_text": is_text, "uri": uri, "text": (text_content[:20000] if text_content else None)}
 
 
 @router.post("/projects")

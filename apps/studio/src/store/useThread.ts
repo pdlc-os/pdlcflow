@@ -29,7 +29,7 @@ interface ThreadStore {
   verdicts: NightShiftFrame[];  // live night-shift Sentinel verdict stream
   streaming: Streaming | null;  // live "drafting" preview (token frames)
 
-  start: (command: string, opts?: { feature?: string; mode?: 'sketch' | 'socratic' }) => Promise<void>;
+  start: (command: string, opts?: { feature?: string; mode?: 'sketch' | 'socratic'; display?: string }) => Promise<void>;
   answer: (answers: string[]) => Promise<void>;
   resolveApproval: (approved: boolean, comment?: string) => Promise<void>;
   setPending: (p: Pending | null) => void;
@@ -96,7 +96,7 @@ export const useThread = create<ThreadStore>((set, get) => ({
       result: null,
       verdicts: [],
       streaming: null,
-      transcript: [say('user', `/${command}${opts?.feature ? ` ${opts.feature}` : ''}`)],
+      transcript: [say('user', opts?.display ?? `/${command}${opts?.feature ? ` ${opts.feature}` : ''}`)],
     });
     try {
       const res = await api.invokeCommand({
