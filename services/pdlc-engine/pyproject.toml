@@ -24,6 +24,7 @@ dependencies = [
     "bcrypt>=4.1",
     "websockets>=12.0",
     "httpx>=0.27",
+    "python-multipart>=0.0.9",  # FastAPI file uploads (chat attachments)
     "hvac>=2.1",  # HashiCorp Vault client (secrets_backend=vault)
     "pdlc-event-schema",
     "pdlc-graph",

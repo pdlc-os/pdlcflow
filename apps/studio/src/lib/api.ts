@@ -312,3 +312,23 @@ export const entities = {
 };
 
 export interface RepoEntry { name: string; path: string; type: 'file' | 'dir'; size: number }
+
+export interface Upload {
+  id: string; filename: string; size: number; content_type: string | null;
+  is_text: boolean; uri: string; text: string | null;
+}
+
+/** Upload a chat attachment (multipart; lets the browser set the boundary). */
+export async function uploadFile(org: string, projectId: string, file: File): Promise<Upload> {
+  const token = getToken();
+  const fd = new FormData();
+  fd.append('file', file);
+  fd.append('project_id', projectId);
+  const r = await fetch(`${BASE}/uploads?org_id=${e(org)}`, {
+    method: 'POST',
+    headers: token ? { authorization: `Bearer ${token}` } : {},
+    body: fd,
+  });
+  if (!r.ok) throw new Error(`${r.status} upload failed`);
+  return r.json() as Promise<Upload>;
+}
