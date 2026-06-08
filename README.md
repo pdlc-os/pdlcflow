@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="apps/studio/public/pdlcflow.png" alt="pdlcflow" width="440" />
+</p>
+
 # pdlcflow
 
 **Run your product development lifecycle as a team of AI agents — from raw idea to shipped feature.**
@@ -72,9 +76,19 @@ the guardrails a real organization needs.
   date window into stats + an LLM story of what humans vs agents did.
 - **Live experience** — a React **Studio** with real-time WebSocket updates and live token
   "drafting" previews.
-- **Deploy anywhere** — one-line install from published container images, Docker Compose for
-  self-host, or multi-tenant SaaS on **AWS, GCP, or Azure** (full-parity Terraform modules;
-  plus an AWS-native CDK).
+- **Organized like a real org** — a first-class hierarchy: **Org → Domain → Squad → GitHub
+  repos**, squads ↔ initiatives (many-to-many), cross-org **Programs**, and **projects** that
+  group **conversations**, all tenant-isolated. ([data model](./docs/wiki/18-data-model.md))
+- **Feels like a chat app** — a multi-line composer with slash-command autocomplete,
+  **conversation history**, **drag-and-drop file attachments** (text/pdf/docx/xlsx/pptx have
+  their content folded into the working agent's context), and a **repo-backed memory** browser
+  that reads the connected repository's files.
+- **Secrets done right** — per-repo VCS tokens via a pluggable backend: encrypted-in-DB
+  (self-host default) or **HashiCorp Vault** (bundled, opt-in) / cloud secrets managers.
+- **Deploy anywhere** — one-line install from published container images, a `pdlcflow` control
+  CLI (`setup`/`start`/`stop`/`status`/`remove`/`wipe`), Docker Compose for self-host, or
+  multi-tenant SaaS on **AWS, GCP, or Azure** (full-parity Terraform modules; plus an
+  AWS-native CDK).
 - **Migration tooling** — a CLI to scan, map, and back-fill from an existing PDLC setup.
 
 ## Bring your own LLM
@@ -120,8 +134,8 @@ flowchart LR
   API --> LLM{"LLM factory<br/>7 providers"}
   LLM --> PROV["Bedrock · Anthropic · OpenAI<br/>Gemini · Vertex · Azure · Ollama"]
   API --> EV["Eval harness<br/>LLM-as-judge"]
-  API --> PG[("PostgreSQL<br/>Row-Level Security")]
-  API --> RD[("Redis<br/>event bus + checkpoints")]
+  API --> PG[("PostgreSQL<br/>RLS + graph checkpoints")]
+  API --> RD[("Redis<br/>event bus + job queue")]
   API --> OBJ[("S3 / MinIO<br/>tenant-namespaced artifacts")]
   API --> CS["Clickstream<br/>40-event taxonomy"] --> AD["Nexus Console<br/>admin dashboard"]
 ```
@@ -143,7 +157,9 @@ bash -c "$(curl -fsSL https://raw.githubusercontent.com/pdlc-os/pdlcflow/main/de
 
 Then open <http://localhost:8080> (Studio) and <http://localhost:8000/health> (API). Use the
 `bash -c "$(curl …)"` form (**not** `curl | bash`) so the wizard can read your terminal.
-Update and uninstall use the same pattern — see the [deploy guide](./deploy/README.md).
+The installer also adds a **`pdlcflow`** command to control the stack from anywhere —
+`pdlcflow setup | start | stop | status | remove | wipe`. Update and uninstall use the same
+one-line pattern — see the [deploy guide](./deploy/README.md).
 
 ### Self-host from source
 

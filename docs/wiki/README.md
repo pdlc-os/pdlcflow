@@ -1,8 +1,9 @@
 # pdlcflow Wiki
 
 **pdlcflow** is PDLC (the Product Development Lifecycle) reimagined as a stand-alone
-**LangGraph + AWS Bedrock SaaS** with a browser UI, pluggable LLM providers, clickstream
-telemetry, and an admin dashboard — runnable self-host via Docker Compose.
+**LangGraph + multi-provider-LLM** platform with a browser UI, clickstream telemetry,
+and an admin dashboard — runnable self-host via Docker Compose or as multi-tenant SaaS
+on AWS, GCP, or Azure.
 
 This wiki walks you through installing, launching, using, and monitoring the infrastructure,
 the **core PDLC flow** (Inception → Construction → Operation), and the **specialized flows**
@@ -42,6 +43,7 @@ graph LR
 | 15 | [Migrating an upstream project](15-migration.md) | scan / push / taxonomy / backfill |
 | 16 | [API & WebSocket Reference](16-api-reference.md) | Every REST endpoint + the thread WebSocket |
 | 17 | [Evals Framework](17-evals.md) | Per-agent scoring, groundedness/hallucination, drift, LLM-as-judge, eval CI |
+| 18 | [Data Model & Hierarchy](18-data-model.md) | Org · Domain · Squad · Repo · Initiative · Program · Project · Conversation — and RLS |
 
 ---
 

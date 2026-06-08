@@ -42,12 +42,35 @@ docker compose run --rm api uv run alembic upgrade head
 > Prefer not to use the wizard? `curl -fsSLO $base/.env.example`, copy it to `.env`,
 > edit by hand, then `docker compose up -d`. Everything `setup.sh` asks is just a key in `.env`.
 
+## Control the stack — the `pdlcflow` command
+
+The installer exports `PDLCFLOW_HOME` (your deploy dir) and puts a `pdlcflow` command on
+your PATH (open a new terminal, or `source` your shell rc, after install). Each subcommand
+wraps `docker compose` in that dir:
+
+| Command | Action |
+|---|---|
+| `pdlcflow setup` | `docker compose up -d` (create + start) |
+| `pdlcflow start` / `stop` | start / stop containers (data kept) |
+| `pdlcflow status` | `docker compose ps` |
+| `pdlcflow remove` | `docker compose down` (keeps volumes) |
+| `pdlcflow wipe` | `docker compose down -v` (⚠ deletes data) |
+
+## Secrets (per-repo VCS tokens)
+
+`setup.sh` generates `PDLC_SECRET_KEY` and defaults `PDLC_SECRETS_BACKEND=encrypted` —
+repo tokens are Fernet-encrypted in the DB. To use **HashiCorp Vault** instead, it's bundled
+but **opt-in**: `docker compose --profile vault up -d`, then set `PDLC_SECRETS_BACKEND=vault`
++ `PDLC_VAULT_TOKEN` in `.env` (for production, point `PDLC_VAULT_ADDR` at a persistent/external
+Vault). Or use a cloud secrets manager via `PDLC_SECRETS_BACKEND=env`. See the
+[configuration guide](../docs/wiki/03-configuration.md#secrets-per-repo-vcs-tokens).
+
 ## What `setup.sh` asks (everything else is defaulted)
 - **Image version** (pin a release, e.g. `1.5.0`, or `latest`).
 - **Require login?** — turns on multi-tenant auth + RLS; if yes, it takes a bootstrap admin
   email/password (password auto-generated if blank).
 - **Use real LLM models?** — else the deterministic offline stub. If yes: provider
-  (Bedrock/Anthropic/OpenAI/Gemini) + that provider's credentials.
+  (bedrock/anthropic/openai/gemini/azure/vertex/ollama) + that provider's credentials.
 - **Run evals?**
 
 It auto-generates the JWT secret + the Postgres/app-role passwords and writes `.env`
@@ -75,7 +98,8 @@ Stops + removes the stack. **By default it keeps your data and files**, then ask
 *No*) before each irreversible step. Flags: `--data` (delete the Postgres/MinIO/artifacts
 volumes — irreversible), `--images` (remove the pulled images), `--purge` (all of those +
 remove the deploy directory), `--yes` (no prompts; only flagged actions run). `--dir=<path>`
-selects the deployment.
+selects the deployment. It also removes the `pdlcflow` command + the `PDLCFLOW_HOME` line
+from your shell rc.
 
 ## Notes
 - Pin the version in `.env` (`PDLCFLOW_VERSION=1.5.0`) for reproducible deploys; `latest`
