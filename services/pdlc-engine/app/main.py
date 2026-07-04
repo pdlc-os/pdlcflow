@@ -33,6 +33,13 @@ from .websocket.handler import ws_router
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
+    # Observability first: stand up OpenTelemetry (traces + metrics) and inject
+    # the OTel tracer into pdlc-graph's port BEFORE the graph runs, so node/turn/
+    # LLM spans are captured. No-op unless PDLC_OTEL_ENABLED (dev/test stay hermetic).
+    from .observability.tracing import instrument_fastapi, wire_tracing
+
+    wire_tracing(settings)
+    instrument_fastapi(_app, settings)
     # Event bus first: the emitter fans night-shift frames out through it.
     wire_event_bus(settings)
     # Persistence before the emitter so it grabs the configured analytics store,

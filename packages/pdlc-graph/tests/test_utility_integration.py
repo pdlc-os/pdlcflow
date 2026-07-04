@@ -20,10 +20,11 @@ def _hermetic():
     yield
 
 
-def test_all_ten_commands_registered():
+def test_all_utility_commands_registered():
     assert set(UTILITY_NODES) == {
         "pause", "resume", "abandon", "release", "decide",
         "doctor", "whatif", "override", "rollback", "hotfix",
+        "compact",
     }
 
 

@@ -4,15 +4,30 @@
 # install.sh symlinks this onto your PATH and exports PDLCFLOW_HOME (the deploy
 # dir). Every subcommand is a thin wrapper over `docker compose` run in that dir.
 #
-#   pdlcflow setup     start (create) the stack        docker compose up -d
-#   pdlcflow start     start stopped containers        docker compose start
-#   pdlcflow stop      stop containers (keep data)     docker compose stop
-#   pdlcflow status    show container status           docker compose ps
-#   pdlcflow remove    remove containers + network     docker compose down
-#   pdlcflow wipe      remove containers + ALL DATA    docker compose down -v
+#   pdlcflow setup           start (create) the stack        docker compose up -d
+#   pdlcflow start           start stopped containers        docker compose start
+#   pdlcflow stop            stop containers (keep data)     docker compose stop
+#   pdlcflow status          show container status           docker compose ps
+#   pdlcflow remove          remove containers + network     docker compose down
+#   pdlcflow wipe            remove containers + ALL DATA     docker compose down -v
+#   pdlcflow observability up|down|status   OTel + Grafana + Nexus dashboard
 #
 # Extra args pass through, e.g. `pdlcflow status -a` or `pdlcflow setup studio`.
 set -euo pipefail
+
+# Set KEY=VALUE in ./.env (update in place, else append). Used to flip PDLC_OTEL_ENABLED.
+_set_env() {
+  local key="$1" val="$2" f=".env"
+  touch "$f"
+  if grep -q "^${key}=" "$f"; then
+    # portable in-place edit (BSD + GNU sed)
+    sed "s|^${key}=.*|${key}=${val}|" "$f" > "$f.tmp" && mv "$f.tmp" "$f"
+  else
+    printf '%s=%s\n' "$key" "$val" >> "$f"
+  fi
+}
+
+OBS_SERVICES="otel-collector tempo prometheus grafana nexus-dashboard"
 
 # Resolve the deploy dir: PDLCFLOW_HOME if valid, else this script's (symlink-resolved) dir.
 home_dir="${PDLCFLOW_HOME:-}"
@@ -27,9 +42,38 @@ fi
 }
 
 usage() {
-  sed -n '3,18p' "$0" | sed 's/^# \{0,1\}//'
+  sed -n '3,19p' "$0" | sed 's/^# \{0,1\}//'
   echo
   echo "deploy dir: $home_dir"
+}
+
+# `pdlcflow observability <up|down|status>` — the OTel + Grafana + Streamlit stack.
+observability() {
+  local sub="${1:-up}"
+  case "$sub" in
+    up|on)
+      _set_env PDLC_OTEL_ENABLED true
+      echo "→ PDLC_OTEL_ENABLED=true; starting observability stack (recreates api/worker to pick it up)…"
+      docker compose --profile observability up -d
+      echo
+      echo "✓ Observability up."
+      echo "   Grafana:          http://localhost:3000"
+      echo "   Nexus dashboard:  http://localhost:8501"
+      echo "   Prometheus:       http://localhost:9090"
+      ;;
+    down|off)
+      _set_env PDLC_OTEL_ENABLED false
+      echo "→ Stopping observability services + disabling OTel export…"
+      # shellcheck disable=SC2086
+      docker compose stop $OBS_SERVICES 2>/dev/null || true
+      docker compose up -d api worker   # recreate api/worker without OTel
+      echo "✓ Observability stopped (data volumes retained)."
+      ;;
+    status|ps)
+      # shellcheck disable=SC2086
+      docker compose ps $OBS_SERVICES ;;
+    *) echo "pdlcflow observability: use up | down | status" >&2; exit 2 ;;
+  esac
 }
 
 cmd="${1:-}"; [ "$#" -gt 0 ] && shift || true
@@ -41,6 +85,7 @@ case "$cmd" in
   status|ps)    exec docker compose ps "$@" ;;
   remove|down)  exec docker compose down "$@" ;;
   wipe)         exec docker compose down -v "$@" ;;
+  observability|obs) observability "$@" ;;
   ""|-h|--help|help) usage ;;
-  *) echo "pdlcflow: unknown command '$cmd' — try: setup start stop status remove wipe" >&2; exit 2 ;;
+  *) echo "pdlcflow: unknown command '$cmd' — try: setup start stop status remove wipe observability" >&2; exit 2 ;;
 esac

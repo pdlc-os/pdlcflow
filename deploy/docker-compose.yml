@@ -80,6 +80,61 @@ services:
     depends_on: [api]
     ports: ["8080:80"]
 
+  # ── Observability stack (opt-in) ─────────────────────────────────────────
+  # Enable with:  set PDLC_OTEL_ENABLED=true in .env, then
+  #   docker compose --profile observability up -d
+  # Traces → Tempo, metrics → Prometheus; Grafana on :3000, Streamlit Nexus
+  # dashboard on :8501. See docs/wiki/19-observability.md. The install script
+  # fetches the ./observability config files alongside this compose file.
+  otel-collector:
+    profiles: ["observability"]
+    image: otel/opentelemetry-collector-contrib:0.111.0
+    command: ["--config=/etc/otel/config.yaml"]
+    volumes:
+      - ./observability/otel-collector-config.yaml:/etc/otel/config.yaml:ro
+    ports: ["4317:4317", "4318:4318", "8889:8889"]
+
+  tempo:
+    profiles: ["observability"]
+    image: grafana/tempo:2.6.1
+    command: ["-config.file=/etc/tempo/tempo.yaml"]
+    volumes:
+      - ./observability/tempo.yaml:/etc/tempo/tempo.yaml:ro
+      - tempodata:/var/tempo
+
+  prometheus:
+    profiles: ["observability"]
+    image: prom/prometheus:v2.54.1
+    command: ["--config.file=/etc/prometheus/prometheus.yml"]
+    volumes:
+      - ./observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - promdata:/prometheus
+    ports: ["9090:9090"]
+
+  grafana:
+    profiles: ["observability"]
+    image: grafana/grafana:11.2.2
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: "Admin"
+      GF_SECURITY_ALLOW_EMBEDDING: "true"
+    volumes:
+      - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafanadata:/var/lib/grafana
+    ports: ["3000:3000"]
+    depends_on: [prometheus, tempo]
+
+  nexus-dashboard:
+    profiles: ["observability"]
+    image: ghcr.io/pdlc-os/pdlcflow-nexus-dashboard:${PDLCFLOW_VERSION:-latest}
+    environment:
+      PROMETHEUS_URL: http://prometheus:9090
+      TEMPO_URL: http://tempo:3200
+      GRAFANA_URL: http://localhost:3000
+    ports: ["8501:8501"]
+    depends_on: [prometheus, tempo]
+
   # One-shot: score the eval golden suite with the real judge (needs PDLC_WIRE_LLM
   # + creds in .env).  docker compose --profile evals run --rm evals
   evals:
@@ -96,3 +151,6 @@ volumes:
   pgdata:
   miniodata:
   artifacts:
+  tempodata:
+  promdata:
+  grafanadata:

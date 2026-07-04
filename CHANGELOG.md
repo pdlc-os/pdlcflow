@@ -3,6 +3,31 @@
 All notable changes to pdlcflow are documented here. This project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## Unreleased
+
+Observability — OpenTelemetry traces + metrics, Grafana, and a Streamlit ops dashboard.
+
+### Added
+- **OpenTelemetry instrumentation** (opt-in, `PDLC_OTEL_ENABLED`). One trace per
+  graph turn → a span per LangGraph node → a leaf span per `complete()` call with
+  GenAI semantic-convention attributes (model, provider, token usage, estimated
+  cost). Metrics for turns, LLM calls/tokens/cost, latency histograms, and gate
+  activity. FastAPI request spans. Exports OTLP to a collector.
+- **Dep-free tracer port** in `pdlc-graph` (`pdlc_graph/tracing.py`) — an injectable
+  seam mirroring `set_emitter`/`set_completion_backend`; the engine injects the
+  OTel-backed tracer at boot, so the graph package keeps zero OpenTelemetry deps and
+  CI/dev stay hermetic (byte-identical, no-op when disabled).
+- **Observability compose profile** (`observability`) for both the self-host and
+  standalone stacks: OTel Collector → **Tempo** (traces) + **Prometheus** (metrics),
+  a provisioned **Grafana** dashboard, and the **Nexus Dashboard** — a Streamlit ops
+  console (`services/nexus-dashboard`) with agent-activity, token/cost, gate, and a
+  per-thread **trace explorer**.
+- **`pdlcflow observability up|down|status`** control-CLI command; install/update
+  scripts fetch the `observability/` configs; `pdlcflow-nexus-dashboard` added to the
+  released image set.
+- Docs: new [Observability](docs/wiki/19-observability.md) wiki page, plus config +
+  monitoring cross-links.
+
 ## v1.10.0 — 2026-06-08
 
 Studio conversation & entity-management improvements.

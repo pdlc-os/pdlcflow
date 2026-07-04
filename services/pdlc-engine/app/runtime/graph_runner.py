@@ -20,6 +20,7 @@ other processes resume the same thread; see `build_checkpointer`.
 from __future__ import annotations
 
 import logging
+import time
 
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.types import Command
@@ -27,6 +28,7 @@ from pdlc_graph.graphs.meta import build_meta_graph
 from pdlc_graph.llm_port import reset_thread_context, set_thread_context
 from pdlc_graph.ports import reset_current_org, set_current_org
 
+from .. import observability
 from .ports import (
     PendingInteraction,
     get_event_bus,
@@ -136,14 +138,27 @@ class GraphRunner:
         # Bind the thread (token streaming) + the tenant (artifact namespacing) for
         # the turn. thread_id is "org:project:session", so the org prefix is the
         # authoritative tenant — artifacts can't be written outside it.
+        parts = thread_id.split(":")
+        org = parts[0] if parts else ""
+        project = parts[1] if len(parts) >= 2 else ""
         tok = set_thread_context(thread_id)
-        org_tok = set_current_org(thread_id.split(":", 1)[0])
+        org_tok = set_current_org(org)
+        # Root OTel span for the turn — node/LLM spans nest under it. No-op unless
+        # observability is wired. One trace per turn (a thread spans many turns +
+        # human pauses; see app/observability/tracing.py).
+        t0 = time.perf_counter()
         try:
-            self._graph.invoke(invoke_input, cfg)
+            with observability.turn_span(thread_id, org, project):
+                self._graph.invoke(invoke_input, cfg)
+        except Exception:
+            observability.record_turn("error", (time.perf_counter() - t0) * 1000)
+            raise
         finally:
             reset_current_org(org_tok)
             reset_thread_context(tok)
-        return self._sync_pending(thread_id, cfg)
+        pending = self._sync_pending(thread_id, cfg)
+        observability.record_turn("paused" if pending else "completed", (time.perf_counter() - t0) * 1000)
+        return pending
 
     def _pending_interrupt(self, cfg) -> dict | None:
         state = self._graph.get_state(cfg)
@@ -178,6 +193,7 @@ class GraphRunner:
 
         values = self._graph.get_state(cfg).values
         kind = intr.get("kind", "user_input_required")
+        observability.record_gate(intr.get("gate") or kind, "opened")
         rec = store.open(
             PendingInteraction(
                 thread_id=thread_id,

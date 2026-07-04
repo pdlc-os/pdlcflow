@@ -31,6 +31,12 @@ dependencies = [
     "openpyxl>=3.1",
     "python-pptx>=1.0",
     "hvac>=2.1",  # HashiCorp Vault client (secrets_backend=vault)
+    # Observability — OpenTelemetry traces + metrics (PDLC_OTEL_ENABLED). The SDK
+    # + OTLP/gRPC exporter push to the collector; FastAPI instrumentation adds
+    # server request spans. Inert unless enabled at boot.
+    "opentelemetry-sdk>=1.27",
+    "opentelemetry-exporter-otlp-proto-grpc>=1.27",
+    "opentelemetry-instrumentation-fastapi>=0.48b0",
     "pdlc-event-schema",
     "pdlc-graph",
     # LLM provider SDKs — installed at boot per active provider config

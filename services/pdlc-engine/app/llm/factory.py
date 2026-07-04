@@ -93,6 +93,12 @@ class LLMProviderFactory:
         self._secrets = secrets
 
     def get_model(self, persona: str, tier: Tier, tenant: TenantCtx) -> BaseChatModel:
+        model, _provider, _model_id = self.resolve(persona, tier, tenant)
+        return model
+
+    def resolve(self, persona: str, tier: Tier, tenant: TenantCtx) -> tuple[BaseChatModel, str, str]:
+        """Like get_model but also returns the resolved (provider, model_id) so
+        callers (e.g. observability spans, cost estimation) can label the call."""
         cfg = (
             self._agent_override(tenant.org_id, persona)
             or self._org_default(tenant.org_id)
@@ -104,7 +110,7 @@ class LLMProviderFactory:
             cfg.provider, tier, cfg.tier_map_override
         )
         builder = _BUILDERS[cfg.provider]
-        return builder(cfg, model_id)
+        return builder(cfg, model_id), cfg.provider, model_id
 
     @staticmethod
     def _guard_cli(provider: str) -> None:

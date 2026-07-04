@@ -63,6 +63,18 @@ curl -fsSL "$BASE/postgres-init/01-app-role.sh" -o postgres-init/01-app-role.sh
 chmod +x postgres-init/01-app-role.sh  # Postgres execs init *.sh; curl -o drops the exec bit
 curl -fsSL "$BASE/pdlcflow" -o pdlcflow && chmod +x pdlcflow
 
+# Observability configs (used only by the opt-in `observability` compose profile).
+mkdir -p observability/grafana/provisioning/datasources observability/grafana/provisioning/dashboards observability/grafana/dashboards
+for f in \
+  observability/otel-collector-config.yaml \
+  observability/tempo.yaml \
+  observability/prometheus.yml \
+  observability/grafana/provisioning/datasources/datasources.yaml \
+  observability/grafana/provisioning/dashboards/dashboards.yaml \
+  observability/grafana/dashboards/pdlcflow.json; do
+  curl -fsSL "$BASE/$f" -o "$f"
+done
+
 c "⚙  Configuring"
 ./setup.sh
 
