@@ -62,7 +62,7 @@ PII rule: payloads carry **references** (S3 keys, UUIDs, route names), never raw
 
 | Event | When | Payload | Consumed by |
 |---|---|---|---|
-| `gate.opened` | A graph hits `interrupt()` for one of the 8 gates | `GateOpenedPayload` | Approval queue, cycle-time |
+| `gate.opened` | A graph hits `interrupt()` for one of the 9 gates | `GateOpenedPayload` | Approval queue, cycle-time |
 | `gate.resolved` | User resolves the gate | `GateResolvedPayload` | Approval-rate per agent |
 
 ## Party meeting (3)

@@ -79,7 +79,7 @@ List open interactions (approval gates + question rounds), optionally scoped.
     "kind": "approval", "gate_kind": "prd_approve", "payload": { }, "status": "open" } ]
 ```
 
-`kind` is `approval` (the 8 gates) or `user_input_required` (Socratic/Bloom's
+`kind` is `approval` (the 9 gates) or `user_input_required` (Socratic/Bloom's
 question rounds). `gate_kind` is set for approvals.
 
 ### `POST /v1/approval-gates/{gate_id}/resolve`
@@ -275,7 +275,7 @@ Both REST (`pending`) and the `interaction.opened` frame use this shape
 
 - `kind` — `approval` (resolve with `{approved, comment, edit}`) or
   `user_input_required` (resolve with `{answers:[…]}`).
-- `gate_kind` — for approvals, one of the **8 gates**: `discover_summary`,
+- `gate_kind` — for approvals, one of the **9 gates**: `init_approve`, `discover_summary`,
   `prd_approve`, `design_docs_approve`, `beads_tasklist_approve`,
   `review_md_approve`, `merge_and_deploy_approve`, `smoke_signoff`,
   `episode_approve` (plus the night-shift `night_shift_contract`).

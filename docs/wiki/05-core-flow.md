@@ -6,14 +6,14 @@
 pdlcflow runs every feature through one deterministic state machine: a **meta-graph**
 that routes to a phase subgraph based on `state.phase` (and a few override flags). The
 methodology is four phases — **Initialization → Inception → Construction → Operation** —
-punctuated by **8 human approval gates**. This page is the map: how routing works, what
+punctuated by **9 human approval gates**. This page is the map: how routing works, what
 each phase does, and exactly what a human approves at each gate.
 
 ## The four phases
 
 | Phase | Subgraph | What happens | Gates owned |
 |---|---|---|---|
-| **Initialization** | `init` | One-time project setup (CONSTITUTION, memory scaffold). | — |
+| **Initialization** | `init` | One-time genesis: CONSTITUTION, INTENT, seed ROADMAP via an interactive flow. | init_approve |
 | **Inception** | `brainstorm` | Discover → Define → Design → Plan: turn an idea into an approved, decomposed task plan. | discover_summary, prd_approve, design_docs_approve, beads_tasklist_approve |
 | **Construction** | `build` | Preflight → wave/TDD build loop → review → 7 test layers. | review_md_approve |
 | **Operation** | `ship` | Ship (merge + deploy) → Verify (smoke) → Reflect (episode). | merge_and_deploy_approve, smoke_signoff, episode_approve |
@@ -60,7 +60,7 @@ are compiled **without** their own checkpointer so their `interrupt()` calls bub
 the top-level checkpointer — that is how a gate deep inside, say, Design pauses the whole
 run and resumes cleanly.
 
-## The 8 approval gates
+## The 9 approval gates
 
 Every gate is an `interrupt()` site created by `gates.approval_gate(state, gate_kind,
 payload)` (`packages/pdlc-graph/pdlc_graph/gates.py`). The engine turns each interrupt
@@ -72,14 +72,15 @@ The canonical order (`GATE_KINDS`):
 
 | # | Gate kind | Phase | Subgraph node | What the human approves |
 |---|---|---|---|---|
-| 1 | `discover_summary` | Inception | `discover` → `discover_gate` | The synthesized discovery summary (problem, user, success metric, scope, risks) before any PRD is written. |
-| 2 | `prd_approve` | Inception | `define` → `prd_gate` | The drafted PRD (requirements, user stories, acceptance criteria). |
-| 3 | `design_docs_approve` | Inception | `design` → `design_gate` | The 5-artifact design package: ARCHITECTURE, data-model, api-contracts, threat-model, ux-review. |
-| 4 | `beads_tasklist_approve` | Inception | `plan` → `plan_gate` | The decomposed task list + dependency/wave tree (rendered as a Mermaid companion). |
-| 5 | `review_md_approve` | Construction | `build` → `review_gate` | The as-built REVIEW.md from the Party Review (architecture/tests/security/docs). |
-| 6 | `merge_and_deploy_approve` | Operation | `ship` → `merge_deploy_gate` | The version bump, CHANGELOG, and the chosen deploy target — before merge to main + deploy. |
-| 7 | `smoke_signoff` | Operation | `verify` → `smoke_gate` | The post-deploy security sweep + smoke results against the live environment. |
-| 8 | `episode_approve` | Operation | `reflect` → `episode_gate` | The retrospective episode file, before it is committed and the roadmap claim is released. |
+| 1 | `init_approve` | Initialization | `init` → `init_gate` | The genesis artifacts — CONSTITUTION, INTENT, seed ROADMAP — before Inception begins. |
+| 2 | `discover_summary` | Inception | `discover` → `discover_gate` | The synthesized discovery summary (problem, user, success metric, scope, risks) before any PRD is written. |
+| 3 | `prd_approve` | Inception | `define` → `prd_gate` | The drafted PRD (requirements, user stories, acceptance criteria). |
+| 4 | `design_docs_approve` | Inception | `design` → `design_gate` | The 5-artifact design package: ARCHITECTURE, data-model, api-contracts, threat-model, ux-review. |
+| 5 | `beads_tasklist_approve` | Inception | `plan` → `plan_gate` | The decomposed task list + dependency/wave tree (rendered as a Mermaid companion). |
+| 6 | `review_md_approve` | Construction | `build` → `review_gate` | The as-built REVIEW.md from the Party Review (architecture/tests/security/docs). |
+| 7 | `merge_and_deploy_approve` | Operation | `ship` → `merge_deploy_gate` | The version bump, CHANGELOG, and the chosen deploy target — before merge to main + deploy. |
+| 8 | `smoke_signoff` | Operation | `verify` → `smoke_gate` | The post-deploy security sweep + smoke results against the live environment. |
+| 9 | `episode_approve` | Operation | `reflect` → `episode_gate` | The retrospective episode file, before it is committed and the roadmap claim is released. |
 
 ### Gate verdict shape
 
@@ -92,15 +93,22 @@ The canonical order (`GATE_KINDS`):
 Under `state.night_shift_active`, gates do **not** block. `approval_gate` calls
 `_auto_decision`, which approves unless the payload carries a `blocking` field (a hard
 blocker — e.g. a critical review finding or a failed required smoke check), in which case
-it refuses and records why. This is how the autonomous loop walks all 8 gates with no
+it refuses and records why. This is how the autonomous loop walks all 9 gates with no
 human turn while still bailing out on real problems. (The night-shift Contract Party is a
-separate, raw `interrupt()` — the one human gate — and is *not* one of these 8.)
+separate, raw `interrupt()` — the one human gate — and is *not* one of these 9.)
 
 ## A feature through the gates
 
 ```mermaid
 stateDiagram-v2
-  [*] --> Inception
+  [*] --> Initialization
+  state Initialization {
+    [*] --> Genesis
+    Genesis --> g0
+    g0 : init_approve
+    g0 --> [*]
+  }
+  Initialization --> Inception
   state Inception {
     [*] --> Discover
     Discover --> g1
@@ -142,8 +150,8 @@ stateDiagram-v2
 ```
 
 At each gate the run pauses; the human approves (or rejects/edits) in Studio; the engine
-resumes the graph. Gates 1–4 belong to Inception, gate 5 to Construction, gates 6–8 to
-Operation. Between phases the subgraph writes a `handoff` patch (`phase_completed`,
+resumes the graph. Gate 1 belongs to Initialization, gates 2–5 to Inception, gate 6 to
+Construction, gates 7–9 to Operation. Between phases the subgraph writes a `handoff` patch (`phase_completed`,
 `next_phase`, `key_outputs`, `next_action`) so the next command picks up exactly where the
 last left off.
 
@@ -156,7 +164,7 @@ cover identical depth (set in CONSTITUTION §8, read from `state.interaction_mod
   the human edits. The drafts ride the interrupt payload.
 - **Socratic** — one open question at a time, answered from scratch.
 
-Approval gates (the 8 above) are distinct from question rounds: gates approve an artifact;
+Approval gates (the 9 above) are distinct from question rounds: gates approve an artifact;
 `ask` collects answers. Both are `interrupt()` sites and both auto-resolve under
 night-shift (Sketch drafts are auto-accepted).
 

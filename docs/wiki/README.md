@@ -33,7 +33,7 @@ graph LR
 | 2 | [Installation](02-installation.md) | Prerequisites, Docker Compose, migrations, MinIO |
 | 3 | [Configuration & Backends](03-configuration.md) | Env flags, in-memory vs Postgres/Redis/S3, self-host vs SaaS |
 | 4 | [Launching & Health](04-launching.md) | Bringing the stack up, dev mode, health checks |
-| 5 | [Core PDLC Flow](05-core-flow.md) | The 4 phases, the 8 approval gates, meta-graph routing |
+| 5 | [Core PDLC Flow](05-core-flow.md) | The 4 phases, the 9 approval gates, meta-graph routing |
 | 6 | [The Agents (Personas)](06-agents.md) | The 10 personas, roles, model tiers, auto-selection |
 | 7 | [Party Mode](07-party-mode.md) | The party orchestrator + every party type, triage, MOM |
 | 8 | [Inception](08-inception.md) | Discover → Define → Design → Plan, Socratic/Sketch, visual companion |

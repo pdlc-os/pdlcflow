@@ -133,7 +133,7 @@ interrupt payload — there is no separate companion server.
 
 ## 3. Approval gates — ApprovalGateModal
 
-When the graph opens one of the 8 approval gates, the pending interaction has
+When the graph opens one of the 9 approval gates, the pending interaction has
 `kind: "approval"` and a `gate_kind` (e.g. `prd_approve`, `review_md_approve`,
 `merge_and_deploy_approve`). `ApprovalGateModal.tsx` is a centered modal showing
 the `gate_kind`, an optional `payload.summary`, and **Approve / Reject**
