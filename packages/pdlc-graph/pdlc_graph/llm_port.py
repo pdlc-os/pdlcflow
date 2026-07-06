@@ -100,6 +100,26 @@ def current_thread() -> str | None:
     return _current_thread.get()
 
 
+def _effective_system(persona: str, system: str | None) -> str | None:
+    """The persona's soul-spec becomes the system prompt (M0, PRD-10): the
+    active org override via the injected resolver, else the packaged spec.
+    A caller-provided `system` is a TASK ROLE — appended under the identity
+    rather than replacing it. Unknown personas / resolution failures leave the
+    caller's `system` untouched. The offline stub hashes (persona, prompt)
+    only, so CI output stays byte-identical."""
+    try:
+        from .personas import resolve_persona_prompt
+
+        spec = resolve_persona_prompt(persona)
+    except Exception:
+        return system
+    if not spec:
+        return system
+    if system:
+        return f"{spec}\n\n## Task role\n{system}"
+    return spec
+
+
 def complete(
     persona: str, prompt: str, *, tier: str | None = None, system: str | None = None
 ) -> str:
@@ -111,11 +131,14 @@ def complete(
 
     When no `tier` is given, it defaults to the persona's declared tier (from its
     soul-spec frontmatter) — so each agent runs at its intended capability level,
-    and the engine's tier_map resolves that to the active provider's model."""
+    and the engine's tier_map resolves that to the active provider's model.
+    The system prompt is always the persona's soul-spec (org override or
+    packaged), with any caller `system` appended as the task role."""
     if tier is None:
         from .personas import persona_tier
 
         tier = persona_tier(persona)
+    system = _effective_system(persona, system)
     thread = _current_thread.get()
     pub = _token_publisher
     if pub is not None and thread and hasattr(_backend, "stream"):

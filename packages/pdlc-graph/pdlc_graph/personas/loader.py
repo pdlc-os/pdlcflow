@@ -13,6 +13,7 @@ the real implementation. sentinel.md is its contract/character spec
 from __future__ import annotations
 
 import functools
+from collections.abc import Callable
 from pathlib import Path
 
 PERSONAS: tuple[str, ...] = (
@@ -56,3 +57,37 @@ def persona_tier(name: str) -> str:
             tier = line.split(":", 1)[1].strip()
             return tier if tier in TIERS else _DEFAULT_TIER
     return _DEFAULT_TIER
+
+
+# ---- prompt resolution seam (PRD-10) ---------------------------------------
+# Mirrors the llm_port/tracing port idiom: the engine injects a DB-backed
+# resolver at boot (org override lookup keyed off the turn's org context);
+# until then — and whenever the resolver returns None — the packaged soul-spec
+# is the answer, so CI/dev stay hermetic and byte-identical.
+
+_prompt_resolver: Callable[[str], str | None] | None = None
+
+
+def set_prompt_resolver(fn: Callable[[str], str | None]) -> None:
+    """Engine boot injects the org-override lookup here."""
+    global _prompt_resolver
+    _prompt_resolver = fn
+
+
+def reset_prompt_resolver() -> None:
+    global _prompt_resolver
+    _prompt_resolver = None
+
+
+def resolve_persona_prompt(name: str) -> str:
+    """The persona's effective system prompt: active org override (via the
+    injected resolver) or the packaged soul-spec. Resolver failures fall back
+    to the packaged default — prompt resolution must never break a turn."""
+    if _prompt_resolver is not None:
+        try:
+            body = _prompt_resolver(name)
+        except Exception:
+            body = None
+        if body:
+            return body
+    return load_persona_spec(name)

@@ -276,7 +276,67 @@ export const admin = {
       method: 'PUT',
       body: JSON.stringify(body),
     }),
+
+  // ── Persona prompt overrides (PRD-10) ────────────────────────────────────
+  listPersonaPrompts: (orgId: string) =>
+    json<{ personas: PromptSummary[] }>(`/admin/prompts?org_id=${encodeURIComponent(orgId)}`),
+
+  getPersonaPrompt: (orgId: string, persona: string) =>
+    json<PromptDetail>(
+      `/admin/prompts/${encodeURIComponent(persona)}?org_id=${encodeURIComponent(orgId)}`,
+    ),
+
+  getPromptVersion: (orgId: string, persona: string, version: number) =>
+    json<{ version: number; status: string; body: string }>(
+      `/admin/prompts/${encodeURIComponent(persona)}/versions/${version}?org_id=${encodeURIComponent(orgId)}`,
+    ),
+
+  createPromptDraft: (orgId: string, persona: string, body: string) =>
+    json<{ ok: boolean; version: number }>(
+      `/admin/prompts/${encodeURIComponent(persona)}?org_id=${encodeURIComponent(orgId)}`,
+      { method: 'POST', body: JSON.stringify({ body }) },
+    ),
+
+  activatePromptVersion: (orgId: string, persona: string, version: number) =>
+    json<{ ok: boolean; active_version: number }>(
+      `/admin/prompts/${encodeURIComponent(persona)}/versions/${version}/activate?org_id=${encodeURIComponent(orgId)}`,
+      { method: 'POST' },
+    ),
+
+  deactivatePrompt: (orgId: string, persona: string) =>
+    json<{ ok: boolean }>(
+      `/admin/prompts/${encodeURIComponent(persona)}/deactivate?org_id=${encodeURIComponent(orgId)}`,
+      { method: 'POST' },
+    ),
+
+  exportPromptPack: (orgId: string) =>
+    json<PromptPack>(`/admin/prompts/export?org_id=${encodeURIComponent(orgId)}`),
+
+  importPromptPack: (orgId: string, pack: object, dryRun = false) =>
+    json<{ plan?: Record<string, string>; created?: Record<string, number> }>(
+      `/admin/prompts/import?org_id=${encodeURIComponent(orgId)}${dryRun ? '&dry_run=true' : ''}`,
+      { method: 'POST', body: JSON.stringify(pack) },
+    ),
 };
+
+export interface PromptSummary {
+  persona: string;
+  versions: number;
+  active_version: number | null;
+  overridden: boolean;
+}
+
+export interface PromptDetail {
+  persona: string;
+  packaged_default: string;
+  versions: { version: number; status: string; created_at: string; activated_at: string | null }[];
+}
+
+export interface PromptPack {
+  format: string;
+  exported_at: string;
+  prompts: Record<string, { body: string; source_version: number }>;
+}
 
 export interface PriceInOut {
   in: number;

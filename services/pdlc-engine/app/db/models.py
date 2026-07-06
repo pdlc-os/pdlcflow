@@ -327,6 +327,32 @@ class OrgBudgetAlert(Base):
     fired_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=text("now()"))
 
 
+class PersonaPrompt(Base):
+    """Org persona soul-spec override, immutable per version (PRD-10). ≤1
+    active per (org, persona) via a partial unique index; sentinel excluded
+    (deterministic evaluator, no LLM)."""
+
+    __tablename__ = "persona_prompts"
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    org_id: Mapped[UUID] = mapped_column(ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False)
+    persona: Mapped[str] = mapped_column(Text, nullable=False)
+    version: Mapped[int] = mapped_column(Integer, nullable=False)
+    body: Mapped[str] = mapped_column(Text, nullable=False)
+    status: Mapped[str] = mapped_column(Text, nullable=False, server_default="draft")
+    created_by: Mapped[UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=text("now()"))
+    activated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    __table_args__ = (
+        CheckConstraint(
+            "persona in ('atlas','bolt','echo','friday','jarvis','muse','neo','phantom','pulse')"
+        ),
+        CheckConstraint("status in ('draft','active','archived')"),
+        UniqueConstraint("org_id", "persona", "version"),
+        Index("persona_prompts_one_active", "org_id", "persona", unique=True,
+              postgresql_where=text("status = 'active'")),
+    )
+
+
 class LLMConfigVersion(Base):
     """Append-only history of org/agent LLM config mutations (PRD-06). The
     snapshot is the PRIOR row state (null = didn't exist); rollback writes a

@@ -7,9 +7,34 @@ All notable changes to pdlcflow are documented here. This project adheres to
 
 Cost analytics — pricing overrides, versioned price catalog, budgets, and real
 spend events (Wave 3 of the cc-switch gap roadmap, PRD-07)
-+ egress network controls: explicit proxy/CA/headers for LLM calls (PRD-08).
++ egress network controls: explicit proxy/CA/headers for LLM calls (PRD-08)
++ persona prompt overrides & packs (PRD-10).
+
+### Changed
+- **Persona soul-specs now actually reach models** (PRD-10 M0). The persona
+  markdown files were documented as each agent's system prompt but had no
+  consumer — nodes passed ad-hoc strings like "PDLC PRD author". `complete()`
+  now always carries the persona's effective soul-spec as the system prompt,
+  with any caller-provided `system` appended as a task role.
+  **Behavior change for `wire_llm` deployments**: real-model outputs shift
+  (personas finally get their intended identities) and per-call input tokens
+  rise by the spec length (~2–4 KiB, visible in the spend stream). Hermetic
+  CI/stub outputs are byte-identical (the stub hashes persona+prompt only).
 
 ### Added
+- **Org persona prompt overrides** — edit any LLM persona's soul-spec per org
+  (new Nexus → Prompts page + `/v1/admin/prompts/*` API). Versions are
+  immutable (draft → active → archived, ≤1 active per persona via a partial
+  unique index, migration `0013`); activation switches instantly (60 s TTL
+  cache), deactivation returns to the packaged spec. Guardrails: 32 KiB cap,
+  frontmatter-tier validation (tier itself stays in `agent_llm_config`), no
+  templating (plain text — cross-tenant render-time leakage structurally
+  impossible), sentinel excluded (deterministic evaluator). `prompt.activated`
+  / `.deactivated` audit events.
+- **Prompt packs** — export active overrides as a portable JSON pack (plain
+  text, no secrets/org ids); import always lands as **drafts** (never
+  auto-activated — backfill protection), with dry-run validation. The
+  template-org → client-orgs rollout flow.
 - **Egress network controls** — `PDLC_EGRESS_PROXY_URL` / `PDLC_EGRESS_NO_PROXY`
   / `PDLC_EGRESS_CA_BUNDLE` are threaded explicitly into every provider builder
   (httpx passthrough for the OpenAI/Anthropic family + gateways, client_kwargs

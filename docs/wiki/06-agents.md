@@ -31,6 +31,19 @@ as an LLM at runtime — see [Sentinel is not an LLM](#sentinel-is-not-an-llm).
 The table values are taken directly from the YAML frontmatter at the top of each
 persona file (`always_on`, `auto_select_on_labels`, `model`).
 
+## Customizing persona prompts (org overrides)
+
+The soul-spec is each persona's **system prompt**: every `complete()` call
+carries it (an explicit task role from the calling node is appended under it,
+never replacing the identity). Orgs can override any LLM persona's prompt from
+**Nexus Console → Prompts** (or `/v1/admin/prompts/*`): versions are immutable
+drafts you explicitly activate; deactivating returns to the packaged spec
+instantly. **Prompt packs** export active overrides as portable JSON (plain
+text, no secrets) and import into other orgs as drafts — the template-org →
+client-orgs rollout flow. Sentinel is excluded (deterministic evaluator, no
+LLM). Guardrails: 32 KiB cap, no templating; a `tier:` in override frontmatter
+is validated but informational — model tier stays in `agent_llm_config`.
+
 ## Identities
 
 Each persona's soul spec opens with an identity statement, a core belief, and a

@@ -170,6 +170,12 @@ emits an `admin.access.denied` audit event and returns **403** (cross-org ban).
 | `PUT /v1/admin/pricing/overrides` | `org_id`, body `{"provider/model": {in, out}}` | `{ok, keys}` — full-replace of the org's override sheet (409 until a provider is configured) |
 | `GET /v1/admin/budget` | `org_id` | `{monthly_limit_usd, alert_pcts, month_to_date_usd, fired} \| null` |
 | `PUT /v1/admin/budget` | `org_id`, body `{monthly_limit_usd, alert_pcts?}` | `{ok}` — soft monthly budget; thresholds emit `budget.threshold` events |
+| `GET /v1/admin/prompts` | `org_id` | `{personas: [{persona, versions, active_version, overridden}]}` (9 LLM personas; sentinel excluded) |
+| `GET /v1/admin/prompts/{persona}` | `org_id` | `{persona, packaged_default, versions: [{version, status, …}]}` |
+| `POST /v1/admin/prompts/{persona}` | `org_id`, body `{body}` | `{version}` — new immutable draft (≤32 KiB) |
+| `POST /v1/admin/prompts/{persona}/versions/{v}/activate` | `org_id` | `{ok, active_version}` — archives the prior active |
+| `POST /v1/admin/prompts/{persona}/deactivate` | `org_id` | `{ok}` — back to the packaged soul-spec |
+| `GET /v1/admin/prompts/export` · `POST …/import` | `org_id`, `dry_run?` | prompt-pack JSON (`pdlcflow.prompt-pack/v1`); imports land as drafts |
 
 Notes:
 - `from`/`to` are query aliases (mapped to `frm` internally).
