@@ -1,4 +1,4 @@
-"""Clickstream — emitter + sinks + LangChain callbacks."""
+"""Clickstream — emitter + sinks."""
 
 from .emitter import ClickstreamEmitter, get_emitter, wire_emitter
 

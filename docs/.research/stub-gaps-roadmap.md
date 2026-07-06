@@ -34,8 +34,8 @@
 | T3-4 | MemoryFileViewer is a live mockup in every project sidebar | studio | 🟡 Feature | M |
 | T3-5 | Per-org RPM quota overrides ("Quotas page") never shipped | engine + studio | 🟡 Feature | M |
 | T3-6 | RoadmapBoard + SettingsDrawer orphan scaffolds; SketchSocraticToggle unpersisted | studio | 🟡 Feature | M–L |
-| T4-1 | Event-schema drift: registry.md missing 17+ types, no new payload classes, no check script | event-schema | 🟢 Hygiene | S |
-| T4-2 | Dead code sweep (LLMTokenTallyCallback, pdlc_graph/tools/*, orphaned Studio components) | multi | 🟢 Hygiene | S |
+| ~~T4-1~~ ✅ | Event-schema sync: registry backfilled (57 types), payloads added/fixed, check script + CI test — **done** | event-schema | 🟢 Hygiene | S |
+| ~~T4-2~~ ✅ | Dead code deleted (LLMTokenTallyCallback, pdlc_graph/tools/*, 3 orphaned Studio components) — **done** | multi | 🟢 Hygiene | S |
 | ~~T4-3~~ ✅ | Docstring truth (azure, analytics) — **done** (quick-wins) | engine | 🟢 Hygiene | S |
 | T4-4 | Terraform modules validate-only (never deploy-tested) | infra | 🟢 Note | — |
 

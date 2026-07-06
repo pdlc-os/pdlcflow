@@ -1,11 +1,14 @@
-# Event registry — source of truth for the 40-event taxonomy
+# Event registry — source of truth for the 57-event taxonomy
 
 Every event the PDLC clickstream emits is listed here. Adding a new event type requires:
 
 1. A new entry in `EVENT_TYPES` in `event_schema/envelope.py`.
-2. A new typed payload class in `event_schema/payloads.py`.
+2. Either a typed payload class in `event_schema/payloads.py`, or — for loose
+   audit/telemetry families — a "generic dict" row here (like `admin.access.denied`).
 3. A new row in this registry with semantics, payload shape, and the admin views that consume it.
-4. A CI check (`pdlc-engine/scripts/check_event_registry.py`) confirming the three are in sync.
+4. The CI check (`event-schema/scripts/check_event_registry.py`, run by
+   `tests/test_event_registry_sync.py` in the blocking event-schema job)
+   confirming registry.md and `EVENT_TYPES` stay in sync.
 
 Backwards-compatible additions (new optional payload fields) bump nothing. Breaking changes require `schema_version` bump + dual-write window + a ClickHouse view that unions versions.
 
@@ -116,11 +119,13 @@ PII rule: payloads carry **references** (S3 keys, UUIDs, route names), never raw
 | `decision.recorded` | `/decide` writes a row to DECISIONS.md | `DecisionRecordedPayload` | Decision registry |
 | `override.invoked` | `/override` bypasses a guardrail | `OverrideInvokedPayload` | Override audit |
 
-## LLM (1)
+## LLM (3)
 
 | Event | When | Payload | Consumed by |
 |---|---|---|---|
 | `llm.tokens_spent` | An LLM call completes | `LLMTokensSpentPayload` | Cost rollups by provider × agent × initiative × domain |
+| `llm.failover` | A retriable provider error rolls to the next failover-chain candidate (PRD-05) | `LLMFailoverPayload` | Resilience dashboard, provider health |
+| `llm.rate_limited` | A completion is rejected by the per-org RPM limit (PRD-05) | `LLMRateLimitedPayload` | Resilience dashboard, quota analytics |
 
 ## Context / UI / error (3)
 
@@ -130,11 +135,53 @@ PII rule: payloads carry **references** (S3 keys, UUIDs, route names), never raw
 | `ui.viewed` | User opens a route or component | `UIViewedPayload` | Adoption analytics |
 | `error` | An exception is caught in a node | `ErrorPayload` | Error budget |
 
-## Admin / audit (1)
+## Admin / audit (5)
+
+Provider-console audit events — loose reference dicts (no rigid payload class),
+validated by `event_type` only, references never content.
 
 | Event | When | Payload | Consumed by |
 |---|---|---|---|
 | `admin.access.denied` | An admin query is attempted without an org filter (cross-org ban) | generic dict (`path`, `reason`) | Security audit |
+| `admin.llm_key.set` | A tenant BYOK key is stored for an org/agent scope (PRD-01) | generic dict (`scope`, `persona?`, `provider`) | Provider-config audit |
+| `admin.llm_key.cleared` | A stored tenant key is removed (PRD-01) | generic dict (`scope`, `persona?`) | Provider-config audit |
+| `admin.provider.probed` | A provider connectivity/health probe runs (PRD-03) | generic dict (`provider`, `scope?`, `ok`, `error_class?`, `latency_ms?`) | Provider health |
+| `admin.preset.applied` | A catalog preset is applied to an org (PRD-04) | generic dict (`preset`, `provider`) | Provider-config audit |
+
+## Provider config lifecycle (4)
+
+Immutable-history audit events (PRD-06) — loose reference dicts.
+
+| Event | When | Payload | Consumed by |
+|---|---|---|---|
+| `llm_config.changed` | Org/agent model config (or pricing/headers) mutated | generic dict (`scope`, `change_kind`, …) | Config history, audit |
+| `llm_config.rolled_back` | A config version is restored | generic dict (`scope`, `version_id`, `secret_requires_reentry`) | Config history, audit |
+| `llm_config.imported` | A provider set is imported into the org | generic dict (`strategy`, `applied`) | Config history, audit |
+| `llm_config.exported` | A provider set is exported | generic dict (`agent_overrides`, `has_org_default`) | Config history, audit |
+
+## Budget (2)
+
+| Event | When | Payload | Consumed by |
+|---|---|---|---|
+| `budget.configured` | An org sets/updates its monthly budget (PRD-07) | generic dict (`monthly_limit_usd`, `alert_pcts`) | Cost dashboard |
+| `budget.threshold` | Month-to-date spend crosses a 50/80/100% threshold (fires once per org/month/pct) | `BudgetThresholdPayload` | Cost dashboard, budget banner |
+
+## Persona prompts (4)
+
+Prompt-override audit events (PRD-10) — loose reference dicts.
+
+| Event | When | Payload | Consumed by |
+|---|---|---|---|
+| `prompt.activated` | An org activates a persona prompt override version | generic dict (`persona`, `version`) | Prompt history, audit |
+| `prompt.deactivated` | An org reverts a persona to the packaged spec | generic dict (`persona`) | Prompt history, audit |
+| `prompt_pack.exported` | Active prompt overrides are exported as a pack | generic dict (`personas`) | Prompt history, audit |
+| `prompt_pack.imported` | A prompt pack is imported (as drafts) | generic dict (`personas`) | Prompt history, audit |
+
+## MCP tools (1)
+
+| Event | When | Payload | Consumed by |
+|---|---|---|---|
+| `tool.called` | An agent invokes a bound MCP tool (PRD-09) | `ToolCalledPayload` | Tool-use analytics, `pdlc.tool.*` spans |
 
 ## Evaluation (2)
 

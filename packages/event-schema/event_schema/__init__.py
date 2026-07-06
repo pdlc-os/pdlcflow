@@ -1,21 +1,29 @@
-"""PDLC clickstream event schema — envelope + 37 typed payloads.
+"""PDLC clickstream event schema — envelope + typed payloads.
 
 Public API is the EventEnvelope plus the typed payload classes per event type.
-The taxonomy and rationale live in registry.md.
+The full taxonomy (EVENT_TYPES) and per-event semantics live in registry.md,
+kept in sync by scripts/check_event_registry.py. Some audit/telemetry families
+(admin.*, llm_config.*, prompt*.*) carry generic reference dicts rather than a
+rigid payload class — see registry.md.
 """
 
 from .envelope import EVENT_TYPES, EventEnvelope, actor_type_for
 from .payloads import (
     AgentInvokedPayload,
     AgentRespondedPayload,
+    BudgetThresholdPayload,
     ContextWarningPayload,
     DecisionRecordedPayload,
     DeployBlockedPayload,
     DeployRequestedPayload,
     DeploySucceededPayload,
     ErrorPayload,
+    EvalBlockedPayload,
+    EvalScoredPayload,
     GateOpenedPayload,
     GateResolvedPayload,
+    LLMFailoverPayload,
+    LLMRateLimitedPayload,
     LLMTokensSpentPayload,
     NightShiftAbortedPayload,
     NightShiftCompletedPayload,
@@ -41,6 +49,7 @@ from .payloads import (
     TestPassedPayload,
     TestRunPayload,
     ToolBlockedPayload,
+    ToolCalledPayload,
     ToolInvokedPayload,
     UIViewedPayload,
 )
@@ -49,15 +58,20 @@ __all__ = [
     "EVENT_TYPES",
     "AgentInvokedPayload",
     "AgentRespondedPayload",
+    "BudgetThresholdPayload",
     "ContextWarningPayload",
     "DecisionRecordedPayload",
     "DeployBlockedPayload",
     "DeployRequestedPayload",
     "DeploySucceededPayload",
     "ErrorPayload",
+    "EvalBlockedPayload",
+    "EvalScoredPayload",
     "EventEnvelope",
     "GateOpenedPayload",
     "GateResolvedPayload",
+    "LLMFailoverPayload",
+    "LLMRateLimitedPayload",
     "LLMTokensSpentPayload",
     "NightShiftAbortedPayload",
     "NightShiftCompletedPayload",
@@ -83,6 +97,7 @@ __all__ = [
     "TestPassedPayload",
     "TestRunPayload",
     "ToolBlockedPayload",
+    "ToolCalledPayload",
     "ToolInvokedPayload",
     "UIViewedPayload",
     "actor_type_for",

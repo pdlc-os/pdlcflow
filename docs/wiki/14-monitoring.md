@@ -18,9 +18,11 @@ admin routes, the cross-org ban, and live night-shift verdicts.
 
 ## The 50+-event taxonomy
 
-Every event the clickstream emits is one of **50+ typed event types across ~20
+Every event the clickstream emits is one of **57 typed event types across ~24
 categories**, defined in `packages/event-schema/event_schema/registry.md` (the
-source of truth) and `envelope.py` (`EVENT_TYPES`). Categories and counts:
+source of truth) and `envelope.py` (`EVENT_TYPES`), kept in sync by
+`event-schema/scripts/check_event_registry.py` (run in the blocking
+event-schema CI job). Categories and counts:
 
 | Category | Count | Examples |
 |---|---|---|
@@ -48,7 +50,9 @@ source of truth) and `envelope.py` (`EVENT_TYPES`). Categories and counts:
 | MCP tools (PRD-09) | 1 | `tool.called` |
 
 Adding an event requires a synced change across `EVENT_TYPES`, a typed payload
-class, this registry, and a CI check (`scripts/check_event_registry.py`).
+class (or a documented generic-dict family), this registry, and the CI check
+(`event-schema/scripts/check_event_registry.py`, enforced by
+`tests/test_event_registry_sync.py`).
 
 **PII rule:** payloads carry **references** (S3 keys, UUIDs, route names),
 never raw prompts, messages, or artifact contents.
