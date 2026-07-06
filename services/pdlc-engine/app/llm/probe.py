@@ -124,12 +124,13 @@ class EndpointNotAllowed(ValueError):
     """Endpoint rejected by the egress policy (message is safe to surface)."""
 
 
-def validate_endpoint(url: str | None) -> None:
+def validate_endpoint(url: str | None, *, allow_private: bool | None = None) -> None:
     """Raise EndpointNotAllowed unless `url` passes the egress policy.
 
     Policy: http(s) only; the host must not resolve to loopback / RFC-1918 /
-    link-local (cloud metadata) / reserved space — unless
-    PDLC_ALLOW_PRIVATE_LLM_ENDPOINTS is on (self-host with a local Ollama).
+    link-local (cloud metadata) / reserved space — unless the caller's escape
+    hatch applies (default: PDLC_ALLOW_PRIVATE_LLM_ENDPOINTS; MCP passes its
+    own PDLC_MCP_ALLOW_PRIVATE_NETWORKS flag).
     """
     if not url:
         return
@@ -139,7 +140,9 @@ def validate_endpoint(url: str | None) -> None:
     host = parsed.hostname
     if not host:
         raise EndpointNotAllowed("endpoint has no host")
-    if getattr(settings, "allow_private_llm_endpoints", False):
+    if allow_private is None:
+        allow_private = getattr(settings, "allow_private_llm_endpoints", False)
+    if allow_private:
         return
     try:
         infos = socket.getaddrinfo(host, None)

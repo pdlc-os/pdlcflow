@@ -12,6 +12,7 @@ const ROUTES = [
   { to: 'exports',     label: 'Exports' },
   { to: 'models',      label: 'Models' },
   { to: 'prompts',     label: 'Prompts' },
+  { to: 'mcp',         label: 'Tools' },
 ];
 
 export function AdminLayout() {

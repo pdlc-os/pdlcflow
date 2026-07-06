@@ -57,6 +57,20 @@ EVENT_TYPES: set[str] = {
     "context.warning", "ui.viewed", "error",
     # Admin / audit
     "admin.access.denied",
+    "admin.llm_key.set", "admin.llm_key.cleared",
+    "admin.provider.probed", "admin.preset.applied",
+    # Provider-config lifecycle (PRD-06)
+    "llm_config.changed", "llm_config.rolled_back",
+    "llm_config.imported", "llm_config.exported",
+    # Resilient routing (PRD-05)
+    "llm.failover", "llm.rate_limited",
+    # Budgets (PRD-07)
+    "budget.configured", "budget.threshold",
+    # Persona prompts (PRD-10)
+    "prompt.activated", "prompt.deactivated",
+    "prompt_pack.exported", "prompt_pack.imported",
+    # MCP tool calls (PRD-09)
+    "tool.called",
     # Evaluation (Phase J)
     "eval.scored", "eval.blocked",
 }
@@ -67,10 +81,19 @@ EVENT_TYPES: set[str] = {
 _HUMAN_EVENTS: set[str] = {
     "session.opened", "session.resumed", "session.closed",
     "gate.resolved", "decision.recorded", "override.invoked", "ui.viewed",
+    # Admin-driven config lifecycle
+    "admin.llm_key.set", "admin.llm_key.cleared",
+    "admin.provider.probed", "admin.preset.applied",
+    "llm_config.changed", "llm_config.rolled_back",
+    "llm_config.imported", "llm_config.exported",
+    "budget.configured",
+    "prompt.activated", "prompt.deactivated",
+    "prompt_pack.exported", "prompt_pack.imported",
 }
 _SYSTEM_EVENTS: set[str] = {
     "error", "context.warning", "admin.access.denied",
     "deploy.requested", "deploy.succeeded", "deploy.blocked",
+    "llm.failover", "llm.rate_limited", "budget.threshold",
 }
 
 

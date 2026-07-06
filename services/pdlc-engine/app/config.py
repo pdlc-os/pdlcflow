@@ -83,6 +83,17 @@ class Settings(BaseSettings):
     egress_no_proxy: str = ""             # comma-separated host suffixes (in-cluster Ollama etc.)
     egress_ca_bundle: str | None = None   # PEM bundle path for TLS-inspecting proxies
 
+    # MCP tool servers (PRD-09). wire_mcp gates execution entirely (registry
+    # data is inert without it). stdio transport executes commands on the
+    # engine host → single-user self-host only, mirroring CLI providers.
+    wire_mcp: bool = False
+    enable_stdio_mcp: bool = False
+    mcp_timeout_s: float = 30.0
+    mcp_max_result_bytes: int = 64 * 1024
+    mcp_calls_per_turn: int = 20
+    # SSRF escape hatch for VPC-internal MCP servers in enterprise SaaS mode.
+    mcp_allow_private_networks: bool = False
+
     # LLM defaults
     default_llm_provider: Literal[
         "bedrock", "anthropic", "vertex", "azure", "openai", "gemini", "ollama",

@@ -176,6 +176,10 @@ emits an `admin.access.denied` audit event and returns **403** (cross-org ban).
 | `POST /v1/admin/prompts/{persona}/versions/{v}/activate` | `org_id` | `{ok, active_version}` — archives the prior active |
 | `POST /v1/admin/prompts/{persona}/deactivate` | `org_id` | `{ok}` — back to the packaged soul-spec |
 | `GET /v1/admin/prompts/export` · `POST …/import` | `org_id`, `dry_run?` | prompt-pack JSON (`pdlcflow.prompt-pack/v1`); imports land as drafts |
+| `GET/POST /v1/admin/mcp/servers` · `PUT/DELETE …/{id}` | `org_id`, body `{name, transport, url\|command+args, auth_token? (write-only), allowed_tools, enabled}` | MCP server registry — reads expose only `has_auth`; stdio rejected outside single-user self-host; URLs SSRF-checked |
+| `POST /v1/admin/mcp/servers/{id}/test` | `org_id` | `{ok, latency_ms, tools: [{name, description}]}` — live tools/list probe |
+| `PUT /v1/admin/mcp/servers/{id}/bindings` | `org_id`, body `{bindings: [{persona, phase?}]}` | Bind a server to personas (optionally per phase); unbound = inert |
+| `GET /v1/admin/mcp/templates` | `org_id` | Static server presets (stdio hidden in multi-user mode) |
 
 Notes:
 - `from`/`to` are query aliases (mapped to `frm` internally).

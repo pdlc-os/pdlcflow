@@ -12,6 +12,7 @@ from .exports import router as exports_router
 from .features import router as features_router
 from .initiatives import router as initiatives_router
 from .live import router as live_router
+from .mcp import router as mcp_router
 from .models import router as models_router
 from .models_versions import router as models_versions_router
 from .narrative import router as narrative_router
@@ -35,6 +36,7 @@ router.include_router(models_versions_router)
 router.include_router(pricing_router)
 router.include_router(budget_router)
 router.include_router(prompts_router)
+router.include_router(mcp_router)
 router.include_router(evals_router)
 router.include_router(narrative_router)
 router.include_router(context_router)

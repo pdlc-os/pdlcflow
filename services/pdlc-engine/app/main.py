@@ -57,6 +57,9 @@ async def lifespan(_app: FastAPI):
     from .runtime.prompt_backend import wire_prompt_resolver
 
     wire_prompt_resolver(settings)  # org persona-prompt overrides (PRD-10)
+    from .runtime.mcp_backend import wire_mcp_backend
+
+    wire_mcp_backend(settings)  # org MCP tool servers (PRD-09, flag-gated)
     wire_token_streaming(settings)  # live "drafting" preview frames (off by default)
     wire_evals(settings)  # after LLM wiring so the judge can use the factory
     wire_auth(settings)  # select user store + bootstrap the env admin

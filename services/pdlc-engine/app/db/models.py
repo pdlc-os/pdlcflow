@@ -327,6 +327,51 @@ class OrgBudgetAlert(Base):
     fired_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=text("now()"))
 
 
+class MCPServer(Base):
+    """Org-scoped MCP tool server (PRD-09). allowed_tools = [] means DENY ALL;
+    auth is a write-only secretstore ref; stdio transport is single-user
+    self-host only (guarded at write AND call time)."""
+
+    __tablename__ = "mcp_servers"
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    org_id: Mapped[UUID] = mapped_column(ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False)
+    name: Mapped[str] = mapped_column(Text, nullable=False)
+    transport: Mapped[str] = mapped_column(Text, nullable=False)
+    url: Mapped[str | None] = mapped_column(Text)
+    command: Mapped[str | None] = mapped_column(Text)
+    args: Mapped[list] = mapped_column(JSONB, nullable=False, server_default=text("'[]'::jsonb"))
+    auth_secret_ref: Mapped[str | None] = mapped_column(Text)
+    allowed_tools: Mapped[list] = mapped_column(JSONB, nullable=False, server_default=text("'[]'::jsonb"))
+    enabled: Mapped[bool] = mapped_column(nullable=False, server_default=text("true"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=text("now()"))
+    __table_args__ = (
+        UniqueConstraint("org_id", "name"),
+        CheckConstraint("transport in ('http','stdio')"),
+        CheckConstraint("(transport = 'http' and url is not null) "
+                        "or (transport = 'stdio' and command is not null)"),
+    )
+
+
+class MCPBinding(Base):
+    """Server x persona (x optional phase) binding; unbound servers are inert."""
+
+    __tablename__ = "mcp_bindings"
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    org_id: Mapped[UUID] = mapped_column(ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False)
+    server_id: Mapped[UUID] = mapped_column(ForeignKey("mcp_servers.id", ondelete="CASCADE"), nullable=False)
+    persona: Mapped[str] = mapped_column(Text, nullable=False)
+    phase: Mapped[str | None] = mapped_column(Text)
+    __table_args__ = (
+        CheckConstraint(
+            "persona in ('atlas','bolt','echo','friday','jarvis','muse','neo',"
+            "'phantom','pulse','sentinel')"),
+        CheckConstraint(
+            "phase in ('Initialization','Inception','Construction','Operation')"),
+        Index("mcp_bindings_unique", "server_id", "persona",
+              text("coalesce(phase, '')"), unique=True),
+    )
+
+
 class PersonaPrompt(Base):
     """Org persona soul-spec override, immutable per version (PRD-10). ≤1
     active per (org, persona) via a partial unique index; sentinel excluded
