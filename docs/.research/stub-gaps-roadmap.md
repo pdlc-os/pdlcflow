@@ -28,11 +28,11 @@
 | ~~T2-3~~ ✅ | Sentinel `_stalled` real (progress-fingerprint) + smoke-failed marker reachable — **done** | pdlc-graph | 🟠 Operational | M |
 | T2-4 (partial ✅) | `PDLC_AUTH_MODE` boot-guard done (no longer inert); real OIDC still open | engine | 🟠 Operational | L |
 | ~~T2-5~~ ✅ | CDK image from context w/ GHCR default — **done** (quick-wins) | infra | 🟠 Operational | S |
-| T3-1 | MCP stdio execution stub (registration works, every call fails) | engine | 🟡 Feature | M |
+| ~~T3-1~~ ✅ | MCP stdio execution (stdio_client dispatch, double-gated) — **done** | engine | 🟡 Feature | M |
 | T3-2 | Initialization phase is a passthrough (no Constitution/Intent/Roadmap flow) | pdlc-graph | 🟡 Feature | L |
 | ~~T3-3~~ ✅ | Migrate entity resolution (names → UUIDs, idempotent, DB-gated) — **done** | migrate + engine | 🟡 Feature | M |
 | T3-4 | MemoryFileViewer is a live mockup in every project sidebar | studio | 🟡 Feature | M |
-| T3-5 | Per-org RPM quota overrides ("Quotas page") never shipped | engine + studio | 🟡 Feature | M |
+| ~~T3-5~~ ✅ | Per-org RPM quotas (org_quotas + resolver + console control) — **done** | engine + studio | 🟡 Feature | M |
 | T3-6 | RoadmapBoard + SettingsDrawer orphan scaffolds; SketchSocraticToggle unpersisted | studio | 🟡 Feature | M–L |
 | ~~T4-1~~ ✅ | Event-schema sync: registry backfilled (57 types), payloads added/fixed, check script + CI test — **done** | event-schema | 🟢 Hygiene | S |
 | ~~T4-2~~ ✅ | Dead code deleted (LLMTokenTallyCallback, pdlc_graph/tools/*, 3 orphaned Studio components) — **done** | multi | 🟢 Hygiene | S |

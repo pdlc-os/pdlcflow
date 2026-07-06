@@ -772,6 +772,7 @@ function PricingBudgetPanel({ orgId }: { orgId: string }) {
           </button>
           <span className="text-muted-fg">Alerts at 50 / 80 / 100% — soft, never blocking.</span>
         </div>
+        <QuotaControl orgId={orgId} />
       </div>
 
       {/* Effective price sheet */}
@@ -874,6 +875,59 @@ function PricingBudgetPanel({ orgId }: { orgId: string }) {
         Models not on this sheet report as <span className="font-medium">unpriced</span> (not
         $0) in dashboards — add an override to price them.
       </div>
+    </div>
+  );
+}
+
+function QuotaControl({ orgId }: { orgId: string }) {
+  const qc = useQueryClient();
+  const quota = useQuery({
+    queryKey: ['admin', 'quota', orgId],
+    queryFn: () => admin.getQuota(orgId),
+    refetchOnWindowFocus: false,
+  });
+  const [rpm, setRpm] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  const save = async (value: number | null) => {
+    setBusy(true);
+    try {
+      await admin.putQuota(orgId, value);
+      setRpm('');
+      await qc.invalidateQueries({ queryKey: ['admin', 'quota', orgId] });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const q = quota.data;
+  return (
+    <div className="mt-1.5 flex items-center gap-2 border-t border-border pt-1.5">
+      <span className="text-muted-fg">LLM rate limit</span>
+      <span className="font-medium">
+        {q?.rpm_limit != null ? `${q.rpm_limit} rpm` : `default (${q?.rpm_default ?? 60} rpm)`}
+      </span>
+      {q && !q.enforced ? (
+        <span className="text-muted-fg">— set PDLC_RATE_LIMIT_ENABLED to enforce</span>
+      ) : null}
+      <input
+        value={rpm}
+        onChange={(e) => setRpm(e.target.value)}
+        placeholder="override rpm"
+        className={`${inputCls} w-28`}
+      />
+      <button
+        onClick={() => save(rpm ? Math.max(0, parseInt(rpm, 10)) : null)}
+        disabled={busy || !rpm}
+        className={btnCls}
+      >
+        Set
+      </button>
+      {q?.rpm_limit != null ? (
+        <button onClick={() => save(null)} disabled={busy} className={btnCls}>
+          Clear
+        </button>
+      ) : null}
     </div>
   );
 }

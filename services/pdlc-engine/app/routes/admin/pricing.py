@@ -16,6 +16,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import text
 
 from ...auth.local import Identity, get_principal
+from ...config import settings
 from ...db.rls import set_org_context
 from ...llm.factory import invalidate_pricing_cache
 from ...llm.presets import load_catalog
@@ -136,6 +137,42 @@ def get_budget(org_id: str = Depends(admin_org("/admin/budget"))) -> dict | None
         "month_to_date_usd": round(float(spent), 4),
         "fired": list(fired),
     }
+
+
+class Quota(BaseModel):
+    rpm_limit: int | None = Field(None, ge=0)  # None → clear override (global default)
+
+
+@budget_router.get("/quota")
+def get_quota(org_id: str = Depends(admin_org("/admin/budget"))) -> dict:
+    with _engine().begin() as conn:
+        set_org_context(conn, org_id)
+        rpm = conn.execute(
+            text("select rpm_limit from org_quotas where org_id = :o"),
+            {"o": org_id},
+        ).scalar()
+    return {"rpm_limit": rpm, "rpm_default": getattr(settings, "llm_rpm_default", 60),
+            "enforced": getattr(settings, "rate_limit_enabled", False)}
+
+
+@budget_router.put("/quota")
+def put_quota(
+    quota: Quota,
+    org_id: str = Depends(admin_org("/admin/budget")),
+) -> dict:
+    from ...llm.rate_limit import invalidate_quota_cache
+
+    with _engine().begin() as conn:
+        set_org_context(conn, org_id)
+        conn.execute(
+            text("insert into org_quotas (org_id, rpm_limit, updated_at) "
+                 "values (:o, :r, now()) on conflict (org_id) do update set "
+                 "rpm_limit = excluded.rpm_limit, updated_at = now()"),
+            {"o": org_id, "r": quota.rpm_limit},
+        )
+    invalidate_quota_cache(org_id)
+    _audit("budget.configured", org_id, {"what": "rpm_quota", "rpm_limit": quota.rpm_limit})
+    return {"ok": True, "rpm_limit": quota.rpm_limit}
 
 
 @budget_router.put("")

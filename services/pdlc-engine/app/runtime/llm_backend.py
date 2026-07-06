@@ -108,10 +108,11 @@ class FactoryCompletionBackend:
             return
         rl = get_rate_limit()
         if not rl.acquire(org, provider, eff_tier):
+            rpm = rl.effective_rpm(org)  # the org's actual limit (override or default)
             observability.record_rate_limited(provider, eff_tier)
             _emit_resilience("llm.rate_limited", org,
-                             {"provider": provider, "tier": eff_tier, "rpm": rl.rpm})
-            raise RateLimited(org, provider, eff_tier, rl.rpm)
+                             {"provider": provider, "tier": eff_tier, "rpm": rpm})
+            raise RateLimited(org, provider, eff_tier, rpm)
 
     @staticmethod
     def _messages(system: str | None, prompt: str) -> list:
