@@ -133,17 +133,30 @@ identical list.
 }
 ```
 
-The route:
+The route persists **everything** (earlier versions echoed task/decision/
+deployment counts without storing them — that gap is closed):
 
-1. Turns each `events[]` entry into an `EventEnvelope`. Its `event_id` is a
-   **deterministic uuid5** (seeded from the supplied `event_id`, else
-   `event_type|ts`), and the taxonomy `domains` ride onto every envelope. The
-   envelopes are `ingest`ed into the analytics store.
-2. Persists each `memory_files[]` body via the artifact port at
+1. **Entity resolution** — the taxonomy `initiative` / `application` names are
+   upserted (by name, per org) into the `initiatives` / `applications` tables
+   and their UUIDs stamped onto every event, so migrated history shows up in
+   the initiative + application rollups, not just `domains`. (DB-gated: skipped
+   when no Postgres backend is configured; fail-soft — a resolution error never
+   fails the import.)
+2. Turns each `events[]` entry into an `EventEnvelope` (deterministic uuid5
+   `event_id` from the supplied id, else `event_type|ts`; `domains` +
+   `initiative_id` + `application_id` ride onto every envelope) and `ingest`s
+   them into the analytics store.
+3. Persists each `memory_files[]` body via the artifact port at
    `migrated/{project_id}/{kind}.md`.
-3. Returns per-kind counts:
-   `{events, memory_files, tasks, decisions, deployments}` — where `events` is
-   the **net new** count (`after - before` totals).
+4. Writes `tasks[]` to the **durable task store**, preserving each
+   `external_id` (`bd-NN`); duplicates on re-import are skipped, not errored.
+5. Renders `decisions[]` into the **Decision Registry** artifact
+   (`docs/pdlc/memory/DECISIONS.md`) and `deployments[]` into the deployment
+   record (`docs/pdlc/memory/DEPLOYMENTS.md`).
+6. Returns `{events, memory_files, tasks, decisions, deployments}` as
+   **persisted** counts (`events` is net-new; tasks is written-not-skipped),
+   plus a `received` block mirroring the input and an `entities` block with the
+   resolved UUIDs — so partial support can never masquerade as full success.
 
 ## Idempotency
 

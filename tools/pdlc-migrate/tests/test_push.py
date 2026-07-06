@@ -51,13 +51,17 @@ def _inline_payload() -> dict:
 def test_push_payload_posts_to_engine_via_asgi_transport():
     transport = httpx.ASGITransport(app=app)
     result = push_payload(_inline_payload(), "http://engine", transport=transport)
-    assert result == {
-        "events": 1,
-        "memory_files": 2,
-        "tasks": 1,
-        "decisions": 1,
-        "deployments": 1,
-    }
+    # Per-kind top-level counts are now PERSISTED counts (tasks/decisions/
+    # deployments really land now — they used to be len() echoes).
+    assert result["events"] == 1
+    assert result["memory_files"] == 2
+    assert result["tasks"] == 1
+    assert result["decisions"] == 1
+    assert result["deployments"] == 1
+    # New transparency fields: received mirrors the input; entities is DB-gated
+    # (None here — no Postgres behind the ASGI test app).
+    assert result["received"]["tasks"] == 1
+    assert result["entities"] == {"initiative_id": None, "application_id": None}
 
 
 def test_push_payload_is_idempotent_on_events():

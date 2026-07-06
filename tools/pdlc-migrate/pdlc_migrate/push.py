@@ -89,7 +89,11 @@ def push_payload(
     *,
     transport: httpx.BaseTransport | httpx.AsyncBaseTransport | None = None,
 ) -> dict[str, Any]:
-    """POST the import payload to the engine and return the decoded counts.
+    """POST the import payload to the engine and return its response.
+
+    The response carries per-kind PERSISTED counts (events/memory_files/
+    tasks/decisions/deployments), a ``received`` block mirroring the input,
+    and an ``entities`` block with the resolved initiative/application ids.
 
     Pass ``transport=httpx.ASGITransport(app=engine_app)`` to drive the engine
     in-process (hermetic tests); omit it for a real network client. An async

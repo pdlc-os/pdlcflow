@@ -1109,3 +1109,62 @@ def test_mcp_registry_and_execution_roundtrip(monkeypatch):
         MB.reset_call_client()
         reset_mcp_caches()
         S.reset_secrets()
+
+
+def test_migrate_entity_resolution_and_task_persistence(monkeypatch):
+    """T3-3/T1-5 against real Postgres: taxonomy names resolve to initiative/
+    application UUIDs (idempotently), and migrated tasks land in the durable
+    store with their external_id preserved."""
+    import uuid as _uuid
+
+    from app.db.rls import set_org_context
+    from app.db.session import get_sync_engine
+    from app.persistence.tasks import PostgresTaskStore
+    from app.routes.migrate import Task, Taxonomy, _persist_tasks, _resolve_entities
+    from sqlalchemy import text as _text
+
+    monkeypatch.setattr(settings, "task_store", "postgres")
+    org, proj = _seed_project()
+    eng = get_sync_engine(settings)
+    tax = Taxonomy(initiative="Platform Rebuild", application="acme-web")
+
+    # First resolution creates both entities and returns their UUIDs.
+    r1 = _resolve_entities(org, tax)
+    assert r1["initiative_id"] and r1["application_id"]
+    _uuid.UUID(r1["initiative_id"])  # valid UUID
+    _uuid.UUID(r1["application_id"])
+
+    # Idempotent: a second resolution reuses the same rows (no duplicates).
+    r2 = _resolve_entities(org, tax)
+    assert r2 == r1
+    with eng.begin() as c:
+        set_org_context(c, org)
+        n_init = c.execute(_text(
+            "select count(*) from initiatives where org_id = :o and name = :n"),
+            {"o": org, "n": "Platform Rebuild"}).scalar()
+        n_app = c.execute(_text(
+            "select count(*) from applications where org_id = :o and name = :n"),
+            {"o": org, "n": "acme-web"}).scalar()
+        # The application's initiative_id FK points at the resolved initiative.
+        app_init = c.execute(_text(
+            "select initiative_id from applications where id = :i"),
+            {"i": r1["application_id"]}).scalar()
+    assert n_init == 1 and n_app == 1
+    assert str(app_init) == r1["initiative_id"]
+
+    # Migrated tasks persist to the durable store with external_id preserved,
+    # and re-import is idempotent (duplicate external_id skipped, not raised).
+    from pdlc_graph.ports import reset_task_store, set_task_store
+    set_task_store(PostgresTaskStore(settings))
+    try:
+        tasks = [Task(external_id="bd-7", title="migrated task", status="done")]
+        assert _persist_tasks(org, proj, tasks) == 1
+        assert _persist_tasks(org, proj, tasks) == 0  # duplicate skipped
+        with eng.begin() as c:
+            set_org_context(c, org)
+            got = c.execute(_text(
+                "select title from tasks where org_id = :o and external_id = 'bd-7'"),
+                {"o": org}).scalar()
+        assert got == "migrated task"
+    finally:
+        reset_task_store()

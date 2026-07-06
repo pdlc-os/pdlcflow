@@ -21,7 +21,7 @@
 | T1-2 | Real VCS merge (Ship reports fake merge SHAs) | pdlc-graph + engine | 🔴 Integrity | M |
 | T1-3 | Real deploy execution (+ hardcoded `*.example.app` deploy URL) | pdlc-graph + engine | 🔴 Integrity | L |
 | T1-4 (mini ✅) | Verify gates now label scans "skipped" not "clean"; real scanner port still open | pdlc-graph | 🔴 Integrity | M |
-| T1-5 | Migrate import drops tasks/decisions/deployments, reports counts anyway | engine + migrate | 🔴 Integrity | M |
+| ~~T1-5~~ ✅ | Migrate import persists tasks/decisions/deployments; received-vs-persisted response — **done** | engine + migrate | 🔴 Integrity | M |
 | ~~T1-6~~ ✅ | FirehoseSink real delivery (was silent no-op) — **done** (quick-wins) | engine | 🔴 Integrity | S |
 | ~~T2-1~~ ✅ | `/health/ready` real db/redis probes — **done** (quick-wins) | engine | 🟠 Operational | S |
 | ~~T2-2~~ ✅ | Python CI teeth: ruff+pytest blocking (mypy ratchet kept) — **done** | CI | 🟠 Operational | S |
@@ -30,7 +30,7 @@
 | ~~T2-5~~ ✅ | CDK image from context w/ GHCR default — **done** (quick-wins) | infra | 🟠 Operational | S |
 | T3-1 | MCP stdio execution stub (registration works, every call fails) | engine | 🟡 Feature | M |
 | T3-2 | Initialization phase is a passthrough (no Constitution/Intent/Roadmap flow) | pdlc-graph | 🟡 Feature | L |
-| T3-3 | Migrate entity resolution (initiative/application names → UUIDs) | migrate + engine | 🟡 Feature | M |
+| ~~T3-3~~ ✅ | Migrate entity resolution (names → UUIDs, idempotent, DB-gated) — **done** | migrate + engine | 🟡 Feature | M |
 | T3-4 | MemoryFileViewer is a live mockup in every project sidebar | studio | 🟡 Feature | M |
 | T3-5 | Per-org RPM quota overrides ("Quotas page") never shipped | engine + studio | 🟡 Feature | M |
 | T3-6 | RoadmapBoard + SettingsDrawer orphan scaffolds; SketchSocraticToggle unpersisted | studio | 🟡 Feature | M–L |

@@ -5,10 +5,24 @@ All notable changes to pdlcflow are documented here. This project adheres to
 
 ## Unreleased
 
-Quick-wins honesty pass — removing places where the system reported success
-for things that didn't happen (from the [stub-gaps roadmap](docs/.research/stub-gaps-roadmap.md)).
+Quick-wins honesty pass + migrate fidelity — removing places where the system
+reported success for things that didn't happen (from the
+[stub-gaps roadmap](docs/.research/stub-gaps-roadmap.md)).
 
 ### Fixed
+- **Migrate import now persists everything** (T1-5) — `POST /v1/migrate/import`
+  previously stored only events + memory files while **returning success-shaped
+  counts** for tasks/decisions/deployments it silently dropped. Tasks now land
+  in the durable task store (`external_id`/`bd-NN` preserved, duplicates skipped
+  on re-import); decisions render to `DECISIONS.md` and deployments to
+  `DEPLOYMENTS.md` via the artifact port. The response reports **persisted**
+  counts plus a `received` block and an `entities` block so partial support can
+  never masquerade as full success again.
+- **Migrate entity resolution** (T3-3) — taxonomy `initiative` / `application`
+  names are upserted (by name, per org, idempotently) into the entity tables and
+  their UUIDs stamped onto every imported event, so migrated history populates
+  the initiative + application rollups (was only `domains`). DB-gated and
+  fail-soft — resolution never fails the import.
 - **FirehoseSink now actually delivers events** — `PDLC_CLICKSTREAM_SINK=firehose`
   was a silent no-op (`return None`) that dropped every event; it now
   `put_record_batch`es newline-delimited JSON in ≤500-record batches with a
