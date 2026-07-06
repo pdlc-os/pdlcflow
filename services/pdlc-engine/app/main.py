@@ -60,6 +60,18 @@ async def lifespan(_app: FastAPI):
     from .runtime.mcp_backend import wire_mcp_backend
 
     wire_mcp_backend(settings)  # org MCP tool servers (PRD-09, flag-gated)
+    # Execution arc — real test runner / VCS merge / deploy / security scans.
+    # Single-user self-host only (enable_execution + no auth); simulated
+    # otherwise, so hermetic CI + multi-tenant SaaS are unaffected.
+    from .runtime.deploy_backend import wire_deployer
+    from .runtime.security_backend import wire_scanner
+    from .runtime.test_backend import wire_test_runner
+    from .runtime.vcs_backend import wire_vcs
+
+    wire_test_runner(settings)
+    wire_vcs(settings)
+    wire_deployer(settings)
+    wire_scanner(settings)
     wire_token_streaming(settings)  # live "drafting" preview frames (off by default)
     wire_evals(settings)  # after LLM wiring so the judge can use the factory
     wire_auth(settings)  # select user store + bootstrap the env admin

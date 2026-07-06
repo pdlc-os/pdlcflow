@@ -21,6 +21,7 @@ from langgraph.graph import END, START, StateGraph
 from ... import gates
 from ...deploy_port import (
     assert_deploy_allowed,
+    deploy,
     get_deploy_register,
     infer_tier,
     select_deploy_targets,
@@ -126,8 +127,14 @@ def execute(state: PDLCState) -> dict:
     )
     merge_sha = merge["sha"]
 
+    # Execute the real deploy (a configured command/webhook, engine-side) and
+    # record the URL it yields. With no deployer injected this is an honest
+    # no-op that returns a labeled placeholder — never a fake *.example.app.
+    result = deploy(env=deploy_target, ref=merge_sha, feature=feature)
     slug = _slug(feature)
-    deploy_url = f"https://{slug}.example.app"
+    deploy_url = result.get("url") or (
+        f"(simulated — no deploy performed for {slug})" if result.get("simulated")
+        else f"https://{slug}.example.app")
     get_deploy_register().record(
         project_id,
         env=deploy_target,

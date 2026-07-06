@@ -5,10 +5,38 @@ All notable changes to pdlcflow are documented here. This project adheres to
 
 ## Unreleased
 
-Quick-wins honesty pass + migrate fidelity + schema hygiene — removing places
-where the system reported success for things that didn't happen, and closing
-event-schema drift (from the
+Execution arc + quick-wins honesty pass + migrate fidelity + schema hygiene —
+Construction/Operation's outermost side-effects are now **real** instead of
+simulations presented as results (from the
 [stub-gaps roadmap](docs/.research/stub-gaps-roadmap.md)).
+
+### Added
+- **Execution arc — real test/merge/deploy/scan** (T1-1/2/3/4, T2-3). When
+  enabled (`PDLC_ENABLE_EXECUTION`, **single-user self-host only** — refused
+  under `PDLC_AUTH_REQUIRED`, like stdio MCP / CLI providers), the graph's
+  execution ports resolve real engine backends against a checked-out repo
+  **workspace**:
+  - **Test runner** — `SubprocessTestRunner` runs the configured per-layer
+    command (`PDLC_TEST_CMD[_<LAYER>]`) in the workspace and reports the true
+    exit code (was fabricated by `SimulatedTestRunner`).
+  - **VCS merge** — `GitVCS` does a real `git clone` + `merge --no-ff` + tag +
+    push and returns the **real** merge SHA; a conflict/push failure raises so
+    a failed merge can't be reported as success (was an invented sha).
+  - **Deploy** — a new `deploy_port.set_deployer` seam + `CommandDeployer` runs
+    the configured deploy command/webhook and records the **real** environment
+    URL, which verify then smoke-tests (was a hardcoded `*.example.app`). With
+    execution off, deploy is an honest no-op labeled `(simulated)` — never a
+    fake URL. The 3-layer production-deploy ban runs first.
+  - **Security scans** — a new `security_scan_port` + `SubprocessScanner`
+    (pip-audit / npm audit / gitleaks) replaces the hardcoded verdicts; a real
+    finding flags the smoke-signoff gate blocking; absent tools report
+    `skipped`, never a faked `clean`.
+  - **Sentinel stagnation** — `_stalled` is a real progress-fingerprint check
+    (was hardcoded `False`), and the `smoke-failed` night-shift abort marker is
+    now reachable.
+  - Default off ⇒ the deterministic simulated ports remain and hermetic CI is
+    byte-identical. Tests exercise the **real** backends against local
+    `file://` git repos + subprocesses (network-free).
 
 ### Fixed
 - **Event registry back in sync** (T4-1) — the `check_event_registry.py` script
