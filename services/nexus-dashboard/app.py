@@ -75,7 +75,7 @@ def grouped(expr: str, label: str) -> pd.DataFrame:
 # --------------------------------------------------------------------------- #
 def tempo_search(thread_id: str, limit: int = 20) -> list[dict]:
     """Search Tempo for traces of one pdlc thread via TraceQL."""
-    q = '{ .pdlc.thread_id = "%s" }' % thread_id
+    q = f'{{ .pdlc.thread_id = "{thread_id}" }}'
     try:
         r = requests.get(f"{TEMPO_URL}/api/search", params={"q": q, "limit": limit}, timeout=8)
         r.raise_for_status()
@@ -99,7 +99,7 @@ def tempo_trace_spans(trace_id: str) -> pd.DataFrame:
     for batch in data.get("batches", []):
         for scope in batch.get("scopeSpans", batch.get("instrumentationLibrarySpans", [])):
             for s in scope.get("spans", []):
-                attrs = {a["key"]: list(a.get("value", {}).values())[0] for a in s.get("attributes", [])}
+                attrs = {a["key"]: next(iter(a.get("value", {}).values())) for a in s.get("attributes", [])}
                 start = int(s.get("startTimeUnixNano", 0))
                 end = int(s.get("endTimeUnixNano", 0))
                 rows.append(

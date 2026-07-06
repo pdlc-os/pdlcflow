@@ -28,13 +28,13 @@ jobs:
         run: uv sync
       - name: lint
         working-directory: ${{ matrix.package }}
-        run: uv run ruff check . || true  # ratchet — non-blocking until B-I lands
+        run: uv run ruff check .  # blocking (quick-wins pass: the ratchet retired)
       - name: typecheck
         working-directory: ${{ matrix.package }}
-        run: uv run mypy . || true
+        run: uv run mypy . || true  # ratchet — 68 pre-existing errors; tracked in stub-gaps-roadmap T2-2
       - name: test
         working-directory: ${{ matrix.package }}
-        run: uv run pytest -q || true
+        run: uv run pytest -q  # blocking (quick-wins pass: the ratchet retired)
 
   evals:
     name: evals (hermetic, stub judge)

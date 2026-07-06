@@ -13,6 +13,18 @@ log = logging.getLogger("pdlc.auth")
 def wire_auth(settings) -> None:
     """Pick the user store (Postgres when a DB is configured, else in-memory) and
     bootstrap the env-configured admin if no users exist. Always safe to call."""
+    # Honesty guard: only local JWT auth is implemented. PDLC_AUTH_MODE=cognito
+    # used to be silently ignored — a deployment that believed it enabled SSO
+    # kept plain local auth. Refuse to boot rather than mislead (security
+    # posture beats the never-block-boot rule here).
+    mode = getattr(settings, "auth_mode", "local")
+    if mode != "local":
+        raise RuntimeError(
+            f"PDLC_AUTH_MODE={mode!r} is not implemented — only 'local' auth "
+            f"exists today (OIDC/Cognito is tracked in "
+            f"docs/.research/stub-gaps-roadmap.md T2-4). Refusing to start "
+            f"with a misleading auth configuration."
+        )
     # Use Postgres accounts when the durable backends are on; else in-memory.
     if getattr(settings, "task_store", "memory") == "postgres":
         try:
