@@ -69,7 +69,7 @@ class SkillInvokedPayload(_P):
 
 class AgentInvokedPayload(_P):
     agent_persona: str
-    tier: Literal["opus", "sonnet", "haiku"]
+    tier: Literal["premium", "balanced", "economy"]
     purpose: str
 
 
@@ -222,14 +222,26 @@ class OverrideInvokedPayload(_P):
 class LLMTokensSpentPayload(_P):
     provider: Literal[
         "bedrock", "anthropic", "vertex", "azure",
-        "openai", "gemini", "ollama",
+        "openai", "gemini", "ollama", "openai_compatible",
     ]
     model_id: str
-    tier: Literal["opus", "sonnet", "haiku"]
+    tier: Literal["premium", "balanced", "economy"]
     agent_persona: str
     tokens_in: int
     tokens_out: int
-    usd_estimate: float | None = None
+    usd_estimate: float | None = None  # None == unpriced (not $0)
+
+
+class LLMFailoverPayload(_P):
+    from_provider: str
+    reason: str  # the retriable exception type name
+    attempt: int
+
+
+class LLMRateLimitedPayload(_P):
+    provider: str
+    tier: str
+    rpm: int
 
 
 # ---------------- Context / UI / error ----------------
@@ -269,3 +281,33 @@ class EvalBlockedPayload(_P):
     score: float
     threshold: float
     reason: str = ""
+
+
+# ---------------- Budget (PRD-07) ----------------
+class BudgetThresholdPayload(_P):
+    pct: int  # 50 | 80 | 100 …
+    month: str  # "YYYY-MM"
+    spent_usd: float
+    limit_usd: float
+
+
+# ---------------- MCP tools (PRD-09) ----------------
+class ToolCalledPayload(_P):
+    agent_persona: str
+    server: str
+    tool: str
+    duration_ms: int
+    ok: bool
+    bytes: int = 0
+    truncated: bool = False
+
+
+# ---------------- Generic-dict audit families ----------------
+# These carry loose, call-site-varying reference dicts (never content) and are
+# validated only by event_type — like `admin.access.denied`. They intentionally
+# have NO rigid payload class; forcing `extra="forbid"` would misrepresent the
+# varying shapes the emitters actually send. Documented in registry.md:
+#   admin.llm_key.set / .cleared, admin.provider.probed, admin.preset.applied
+#   llm_config.changed / .rolled_back / .imported / .exported
+#   budget.configured
+#   prompt.activated / .deactivated, prompt_pack.exported / .imported

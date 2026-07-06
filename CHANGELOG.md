@@ -5,11 +5,28 @@ All notable changes to pdlcflow are documented here. This project adheres to
 
 ## Unreleased
 
-Quick-wins honesty pass + migrate fidelity — removing places where the system
-reported success for things that didn't happen (from the
+Quick-wins honesty pass + migrate fidelity + schema hygiene — removing places
+where the system reported success for things that didn't happen, and closing
+event-schema drift (from the
 [stub-gaps roadmap](docs/.research/stub-gaps-roadmap.md)).
 
 ### Fixed
+- **Event registry back in sync** (T4-1) — the `check_event_registry.py` script
+  that `registry.md` and the monitoring wiki referenced **never existed**, so
+  17 event types (the whole observability/provider audit family) had drifted
+  undocumented. The script now exists at
+  `packages/event-schema/scripts/check_event_registry.py`, a hermetic test runs
+  it in the blocking event-schema CI job, `registry.md` documents all **57**
+  types, and stale `opus/sonnet/haiku` tier literals + a missing
+  `openai_compatible` provider were corrected in `payloads.py` (with typed
+  payloads added for `budget.threshold`, `tool.called`, `llm.failover`,
+  `llm.rate_limited`; the loose audit families documented as generic-dict).
+- **Dead code removed** (T4-2) — deleted the never-constructed
+  `LLMTokenTallyCallback` (superseded by `_emit_spend`), the entirely
+  unreferenced `pdlc_graph/tools/*` stub modules (git/gh/deploy/memory/test —
+  the persona tool surface goes through the MCP `tool_port`), and three
+  orphaned Studio components (`ThemeToggle`, `StepCard`,
+  `PartyMeetingVisualizer`).
 - **Migrate import now persists everything** (T1-5) — `POST /v1/migrate/import`
   previously stored only events + memory files while **returning success-shaped
   counts** for tasks/decisions/deployments it silently dropped. Tasks now land

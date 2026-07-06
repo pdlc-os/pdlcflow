@@ -17,7 +17,7 @@ def test_envelope_roundtrip():
     payload = LLMTokensSpentPayload(
         provider="bedrock",
         model_id="anthropic.claude-opus-4-7",
-        tier="opus",
+        tier="balanced",
         agent_persona="neo",
         tokens_in=1200,
         tokens_out=380,
