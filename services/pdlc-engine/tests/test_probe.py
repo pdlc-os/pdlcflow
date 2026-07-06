@@ -220,10 +220,12 @@ def test_model_defaults_endpoint():
     assert r.status_code == 200
     body = r.json()
     assert body["providers"] == [
-        "bedrock", "anthropic", "vertex", "azure", "openai", "gemini", "ollama"]
+        "bedrock", "anthropic", "vertex", "azure", "openai", "gemini", "ollama",
+        "openai_compatible"]
     assert not {"claude_code", "codex", "gemini_cli"} & set(body["providers"])
     assert len(body["personas"]) == 10 and "sentinel" in body["personas"]
-    assert set(body["tier_maps"]) == set(body["providers"])
+    # openai_compatible has no built-in tier map — the console starts it blank.
+    assert set(body["tier_maps"]) == set(body["providers"]) - {"openai_compatible"}
     for m in body["tier_maps"].values():
         assert set(m) == {"premium", "balanced", "economy"}
     assert body["instance_default"]["provider"] == settings.default_llm_provider

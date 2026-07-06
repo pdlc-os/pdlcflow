@@ -1,0 +1,214 @@
+{
+  "catalog_version": "2026.07",
+  "presets": [
+    {
+      "id": "bedrock-us",
+      "label": "AWS Bedrock (us-east-1)",
+      "provider": "bedrock",
+      "region": "us-east-1",
+      "tier_map": {
+        "premium": "anthropic.claude-opus-4-8",
+        "balanced": "anthropic.claude-sonnet-4-6",
+        "economy": "anthropic.claude-haiku-4-5"
+      },
+      "docs_url": "https://docs.aws.amazon.com/bedrock/",
+      "tags": ["aws", "claude", "first-party"]
+    },
+    {
+      "id": "anthropic",
+      "label": "Anthropic (direct API)",
+      "provider": "anthropic",
+      "tier_map": {
+        "premium": "claude-opus-4-8",
+        "balanced": "claude-sonnet-4-6",
+        "economy": "claude-haiku-4-5"
+      },
+      "docs_url": "https://docs.anthropic.com/",
+      "key_hint": "sk-ant-…",
+      "tags": ["claude", "first-party"]
+    },
+    {
+      "id": "vertex",
+      "label": "Google Vertex AI (Claude)",
+      "provider": "vertex",
+      "tier_map": {
+        "premium": "claude-opus-4-8",
+        "balanced": "claude-sonnet-4-6",
+        "economy": "claude-haiku-4-5"
+      },
+      "docs_url": "https://cloud.google.com/vertex-ai/docs",
+      "tags": ["gcp", "claude", "first-party"]
+    },
+    {
+      "id": "openai",
+      "label": "OpenAI (direct API)",
+      "provider": "openai",
+      "tier_map": {
+        "premium": "gpt-5.5",
+        "balanced": "gpt-5.4",
+        "economy": "gpt-5.4-mini"
+      },
+      "docs_url": "https://platform.openai.com/docs",
+      "key_hint": "sk-…",
+      "tags": ["gpt", "first-party"]
+    },
+    {
+      "id": "azure-openai",
+      "label": "Azure OpenAI",
+      "provider": "azure",
+      "tier_map": {
+        "premium": "gpt-5.5",
+        "balanced": "gpt-5.4",
+        "economy": "gpt-5.4-mini"
+      },
+      "docs_url": "https://learn.microsoft.com/azure/ai-services/openai/",
+      "key_hint": "deployment names are tenant-specific — edit the tiers to match yours",
+      "tags": ["azure", "gpt", "first-party"]
+    },
+    {
+      "id": "gemini",
+      "label": "Google Gemini (direct API)",
+      "provider": "gemini",
+      "tier_map": {
+        "premium": "gemini-3.1-pro",
+        "balanced": "gemini-3.5-flash",
+        "economy": "gemini-3.1-flash-lite"
+      },
+      "docs_url": "https://ai.google.dev/gemini-api/docs",
+      "key_hint": "AIza…",
+      "tags": ["gemini", "first-party"]
+    },
+    {
+      "id": "ollama",
+      "label": "Ollama (local)",
+      "provider": "ollama",
+      "endpoint": "http://localhost:11434",
+      "tier_map": {
+        "premium": "llama3.3:70b",
+        "balanced": "qwen2.5:32b",
+        "economy": "qwen2.5:7b"
+      },
+      "docs_url": "https://ollama.com/",
+      "tags": ["local", "self-host", "first-party"]
+    },
+    {
+      "id": "openrouter",
+      "label": "OpenRouter",
+      "provider": "openai_compatible",
+      "endpoint": "https://openrouter.ai/api/v1",
+      "tier_map": {
+        "premium": "anthropic/claude-opus-4.8",
+        "balanced": "anthropic/claude-sonnet-4.6",
+        "economy": "deepseek/deepseek-chat"
+      },
+      "docs_url": "https://openrouter.ai/docs",
+      "key_hint": "sk-or-v1-…",
+      "pricing_hints": {
+        "anthropic/claude-opus-4.8": { "in": 15.0, "out": 75.0 },
+        "anthropic/claude-sonnet-4.6": { "in": 3.0, "out": 15.0 },
+        "deepseek/deepseek-chat": { "in": 0.27, "out": 1.1 }
+      },
+      "tags": ["gateway", "multi-model", "openai-compatible"]
+    },
+    {
+      "id": "deepseek",
+      "label": "DeepSeek",
+      "provider": "openai_compatible",
+      "endpoint": "https://api.deepseek.com/v1",
+      "tier_map": {
+        "premium": "deepseek-reasoner",
+        "balanced": "deepseek-chat",
+        "economy": "deepseek-chat"
+      },
+      "docs_url": "https://api-docs.deepseek.com/",
+      "key_hint": "sk-…",
+      "pricing_hints": {
+        "deepseek-reasoner": { "in": 0.55, "out": 2.19 },
+        "deepseek-chat": { "in": 0.27, "out": 1.1 }
+      },
+      "tags": ["gateway", "deepseek", "openai-compatible"]
+    },
+    {
+      "id": "moonshot-kimi",
+      "label": "Moonshot AI (Kimi)",
+      "provider": "openai_compatible",
+      "endpoint": "https://api.moonshot.ai/v1",
+      "tier_map": {
+        "premium": "kimi-k2-thinking",
+        "balanced": "kimi-k2",
+        "economy": "moonshot-v1-8k"
+      },
+      "docs_url": "https://platform.moonshot.ai/docs",
+      "key_hint": "sk-…",
+      "tags": ["gateway", "kimi", "openai-compatible"]
+    },
+    {
+      "id": "zhipu-glm",
+      "label": "Zhipu AI (GLM)",
+      "provider": "openai_compatible",
+      "endpoint": "https://open.bigmodel.cn/api/paas/v4",
+      "tier_map": {
+        "premium": "glm-4.6",
+        "balanced": "glm-4.5-air",
+        "economy": "glm-4-flash"
+      },
+      "docs_url": "https://docs.bigmodel.cn/",
+      "tags": ["gateway", "glm", "openai-compatible"]
+    },
+    {
+      "id": "siliconflow",
+      "label": "SiliconFlow",
+      "provider": "openai_compatible",
+      "endpoint": "https://api.siliconflow.cn/v1",
+      "tier_map": {
+        "premium": "deepseek-ai/DeepSeek-R1",
+        "balanced": "deepseek-ai/DeepSeek-V3",
+        "economy": "Qwen/Qwen2.5-7B-Instruct"
+      },
+      "docs_url": "https://docs.siliconflow.cn/",
+      "key_hint": "sk-…",
+      "tags": ["gateway", "multi-model", "openai-compatible"]
+    },
+    {
+      "id": "litellm",
+      "label": "LiteLLM proxy (local)",
+      "provider": "openai_compatible",
+      "endpoint": "http://localhost:4000/v1",
+      "tier_map": {
+        "premium": "gpt-5.5",
+        "balanced": "gpt-5.4",
+        "economy": "gpt-5.4-mini"
+      },
+      "docs_url": "https://docs.litellm.ai/",
+      "key_hint": "model names are whatever your LiteLLM config routes — edit the tiers",
+      "tags": ["local", "self-host", "proxy", "openai-compatible"]
+    },
+    {
+      "id": "vllm",
+      "label": "vLLM server (local)",
+      "provider": "openai_compatible",
+      "endpoint": "http://localhost:8000/v1",
+      "tier_map": {
+        "premium": "meta-llama/Llama-3.1-70B-Instruct",
+        "balanced": "meta-llama/Llama-3.1-70B-Instruct",
+        "economy": "meta-llama/Llama-3.1-8B-Instruct"
+      },
+      "docs_url": "https://docs.vllm.ai/",
+      "key_hint": "use the model name your vLLM server was launched with",
+      "tags": ["local", "self-host", "openai-compatible"]
+    },
+    {
+      "id": "ollama-openai",
+      "label": "Ollama (OpenAI-compatible mode)",
+      "provider": "openai_compatible",
+      "endpoint": "http://localhost:11434/v1",
+      "tier_map": {
+        "premium": "llama3.3:70b",
+        "balanced": "qwen2.5:32b",
+        "economy": "qwen2.5:7b"
+      },
+      "docs_url": "https://ollama.com/blog/openai-compatibility",
+      "tags": ["local", "self-host", "openai-compatible"]
+    }
+  ]
+}

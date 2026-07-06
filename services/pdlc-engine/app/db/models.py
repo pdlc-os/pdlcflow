@@ -266,7 +266,9 @@ class OrgLLMConfig(Base):
     tier_map: Mapped[dict] = mapped_column(JSONB, nullable=False)
     __table_args__ = (
         CheckConstraint(
-            "provider in ('bedrock','anthropic','vertex','azure','openai','gemini','ollama')"
+            "provider in ('bedrock','anthropic','vertex','azure','openai','gemini',"
+            "'ollama','openai_compatible')",
+            name="ck_org_llm_config_provider",
         ),
     )
 
@@ -288,7 +290,9 @@ class AgentLLMConfig(Base):
             "('atlas','bolt','echo','friday','jarvis','muse','neo','phantom','pulse','sentinel')"
         ),
         CheckConstraint(
-            "provider in ('bedrock','anthropic','vertex','azure','openai','gemini','ollama')"
+            "provider in ('bedrock','anthropic','vertex','azure','openai','gemini',"
+            "'ollama','openai_compatible')",
+            name="ck_agent_llm_config_provider",
         ),
     )
 

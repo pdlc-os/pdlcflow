@@ -232,6 +232,11 @@ export const admin = {
       `/admin/models/test?org_id=${encodeURIComponent(orgId)}`,
       { method: 'POST', body: JSON.stringify(body) },
     ),
+
+  listPresets: (orgId: string, q?: string) =>
+    json<PresetCatalog>(
+      `/admin/models/presets?org_id=${encodeURIComponent(orgId)}${q ? `&q=${encodeURIComponent(q)}` : ''}`,
+    ),
 };
 
 // Models settings types — mirror app/routes/admin/models.py response models.
@@ -297,6 +302,24 @@ export interface TestResult {
   error_class: string | null;
   tested_model: string | null;
   message: string;
+}
+
+export interface Preset {
+  id: string;
+  label: string;
+  provider: string;
+  endpoint: string | null;
+  region: string | null;
+  tier_map: Record<TierName, string>;
+  docs_url: string | null;
+  key_hint: string | null;
+  tags: string[];
+  needs_secret: boolean;
+}
+
+export interface PresetCatalog {
+  catalog_version: string;
+  presets: Preset[];
 }
 
 export interface ThreadSummary {

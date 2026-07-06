@@ -34,8 +34,23 @@ PRICES: dict[tuple[str, str], tuple[float, float]] = {
 def estimate_usd(provider: str, model_id: str, usage: dict[str, int]) -> float:
     key = (provider, model_id)
     if key not in PRICES:
+        # Gateway models (openai_compatible etc.) aren't in the static table —
+        # consult the preset catalog's pricing hints before giving up, so their
+        # usage isn't silently $0 in dashboards.
+        hint = _catalog_hint(provider, model_id)
+        if hint is not None:
+            return (usage["input"] * hint[0] + usage["output"] * hint[1]) / 1_000_000
         key = (provider, "*")
     if key not in PRICES:
         return 0.0
     inp, out = PRICES[key]
     return (usage["input"] * inp + usage["output"] * out) / 1_000_000
+
+
+def _catalog_hint(provider: str, model_id: str) -> tuple[float, float] | None:
+    try:
+        from .presets import load_catalog
+
+        return load_catalog().pricing_hint(provider, model_id)
+    except Exception:  # pricing must never break a completion callback
+        return None

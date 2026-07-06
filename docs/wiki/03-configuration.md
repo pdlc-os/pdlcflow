@@ -228,6 +228,12 @@ Semantics worth knowing:
 | --- | --- | --- |
 | `PDLC_SECRET_CACHE_TTL_S` | `300` | TTL for the engine's resolved-key cache on the LLM hot path. Bounds how long a rotated key may still be served on other replicas. `0` disables caching. |
 
+### OpenAI-compatible gateways & provider presets
+
+Beyond the 7 first-party providers, the **`openai_compatible`** provider points an org (or a single agent) at any OpenAI-protocol endpoint — relay gateways (OpenRouter, DeepSeek, Kimi/Moonshot, GLM, SiliconFlow) or self-hosted servers (LiteLLM, vLLM, Ollama's `/v1`). It requires an explicit `endpoint` (base_url) and a complete `tier_map` (there is no built-in default), both enforced when the config is written. Tenant-supplied endpoints pass the same SSRF egress policy as probes — private/loopback endpoints (local vLLM/LiteLLM/Ollama) need `PDLC_ALLOW_PRIVATE_LLM_ENDPOINTS=true` (self-host only).
+
+The **preset catalog** (`GET /v1/admin/models/presets`, or "Start from a preset…" on the console's Models page) ships curated entries — provider, endpoint, recommended tier map, docs link, key format hint — for one-minute onboarding: pick a preset, review the pre-filled form, paste your key, **Test**, Save. Presets are suggestions updated with each pdlcflow release; your saved org config is the truth.
+
 ### Provider connectivity probes
 
 `POST /v1/admin/models/test` runs a minimal live completion against a **candidate** config (provider/model/region/endpoint + optional one-shot `api_key`) or the **saved** config for a scope (`{"scope": "org-default", "use_saved_key": true}` or `"agent:<persona>"`) — so a bad key, model id, or endpoint is caught **before** it breaks a turn. Responses are `{ok, latency_ms, error_class, tested_model, message}` with a stable error taxonomy (`auth_error`, `model_not_found`, `access_denied`, `endpoint_unreachable`, `rate_limited`, `timeout`, `bad_request`, …). The last result per scope is kept in `llm_provider_health` and served by `GET /v1/admin/models/health` for status chips. Probes are limited to 10/min per org.

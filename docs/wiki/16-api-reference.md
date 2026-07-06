@@ -151,6 +151,8 @@ emits an `admin.access.denied` audit event and returns **403** (cross-org ban).
 | `GET /v1/admin/evals/summary` | `org_id` | `{by_eval: {...}, by_agent: {...}}` |
 | `GET /v1/admin/exports/rollup.csv` | `org_id`, `dimension`, `from?`, `to?` | `text/csv` |
 | `GET /v1/admin/models/defaults` | `org_id` | `{providers, personas, tier_maps, instance_default}` — console prefill lists |
+| `GET /v1/admin/models/presets` | `org_id`, `q?` | `{catalog_version, presets: [{id, label, provider, endpoint, tier_map, docs_url, key_hint, tags, needs_secret}]}` |
+| `POST /v1/admin/models/presets/{id}/apply` | `org_id` | `{ok, applied: {provider, endpoint, region, tier_map}, needs_secret}` — one-click org default |
 | `GET /v1/admin/models/org-default` | `org_id` | `OrgDefault \| null` (incl. `has_key`; never key/ref material) |
 | `PUT /v1/admin/models/org-default` | `org_id`, body `OrgDefault` (+ write-only `api_key?`) | `{ok, has_key}` |
 | `DELETE /v1/admin/models/org-default/key` | `org_id` | `{ok: true}` — clears the stored BYOK key |

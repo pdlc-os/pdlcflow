@@ -3,6 +3,29 @@
 All notable changes to pdlcflow are documented here. This project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## Unreleased
+
+Provider presets & the open gateway ecosystem (Wave 2 of the cc-switch gap roadmap, PRD-04).
+
+### Added
+- **`openai_compatible` provider** — point any org (or single agent) at an
+  OpenAI-protocol gateway or server with a custom base_url: OpenRouter,
+  DeepSeek, Kimi/Moonshot, GLM, SiliconFlow, LiteLLM, vLLM, Ollama's `/v1` —
+  zero per-vendor code. Endpoint + complete tier_map are enforced at
+  config-write time (never a mid-turn `KeyError` — `resolve_model_id` now
+  raises a typed `ModelResolutionError`), and tenant-supplied endpoints pass
+  the SSRF egress guard before they can be stored. Migration `0008` widens the
+  provider CHECK constraints (and names them for deterministic future
+  widenings).
+- **Provider preset catalog** — curated, versioned, vendored
+  (`app/llm/presets/catalog.json`, 15 entries: the 7 first-party providers +
+  8 gateways/local servers). `GET /v1/admin/models/presets?q=` to browse/search,
+  `POST /v1/admin/models/presets/{id}/apply` for one-click org setup (never
+  touches secrets; `needs_secret` tells the console to chain key entry). The
+  console's Models page gains a **"Start from a preset…"** picker that
+  pre-fills the form for review → key → Test → Save. Preset `pricing_hints`
+  feed `estimate_usd` so gateway usage isn't silently $0 in dashboards.
+
 ## v1.11.0 — 2026-07-05
 
 Provider Management (Wave 1 of the cc-switch gap roadmap: BYOK, connectivity

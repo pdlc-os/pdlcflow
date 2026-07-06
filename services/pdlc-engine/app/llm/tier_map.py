@@ -72,10 +72,28 @@ DEFAULT_TIER_MAP: dict[str, dict[str, str]] = {
 }
 
 
+class ModelResolutionError(RuntimeError):
+    """No model id can be resolved for (provider, tier) — a config error, not a
+    crash: providers without a built-in map (openai_compatible) require an org
+    tier_map or an agent model_id, enforced at config-write time by the admin
+    API. Raised (instead of a bare KeyError) so a stale/partial config fails
+    with an actionable message."""
+
+
 def resolve_model_id(
     provider: str,
     tier: str,
     override: dict[str, str] | None = None,
 ) -> str:
-    table = override or DEFAULT_TIER_MAP[provider]
-    return table[tier]
+    table = override or DEFAULT_TIER_MAP.get(provider)
+    if not table:
+        raise ModelResolutionError(
+            f"provider {provider!r} has no built-in tier map; set the org tier_map "
+            f"(or an agent model_id) in Settings → Models"
+        )
+    try:
+        return table[tier]
+    except KeyError:
+        raise ModelResolutionError(
+            f"tier_map for provider {provider!r} lacks tier {tier!r}"
+        ) from None
