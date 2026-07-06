@@ -63,6 +63,16 @@ class Settings(BaseSettings):
     # loopback addresses (self-host with a local Ollama). Keep off for SaaS.
     allow_private_llm_endpoints: bool = False
 
+    # Resilient routing (failover chain / circuit breaker / rate limiting).
+    # Failover only activates when an org configures a failover_chain; the
+    # kill switch reverts to single-candidate resolution instantly.
+    llm_failover_enabled: bool = True
+    llm_breaker_threshold: int = 5   # failures within the window that trip OPEN
+    llm_breaker_window_s: int = 60
+    llm_breaker_cooldown_s: int = 30
+    rate_limit_enabled: bool = False  # per-org RPM enforcement (Redis)
+    llm_rpm_default: int = 60
+
     # LLM defaults
     default_llm_provider: Literal[
         "bedrock", "anthropic", "vertex", "azure", "openai", "gemini", "ollama",

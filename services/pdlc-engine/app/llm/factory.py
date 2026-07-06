@@ -225,6 +225,48 @@ class LLMProviderFactory:
             secret_value=self._resolve_secret(row["secret_ref"]),
         )
 
+    # ----- failover chain (PRD-05) -----
+    # The primary candidate is always resolve()'s pick; these are candidates
+    # 1..n, built LAZILY (per-entry secret resolution / model construction runs
+    # only when the loop actually reaches that candidate, so one broken
+    # fallback entry can't poison the healthy primary path). Queried on demand
+    # — orgs without a chain pay no extra DB read on the hot path because the
+    # backend only iterates past the primary after a retriable failure.
+
+    def _failover_entries(self, org_id: str) -> list[dict]:
+        if self._db is None or not self._is_org_uuid(org_id):
+            return []
+        from ..db.rls import set_org_context
+
+        with self._db.begin() as conn:
+            set_org_context(conn, org_id)
+            row = conn.execute(
+                text("select failover_chain from org_llm_config where org_id = :o"),
+                {"o": org_id},
+            ).mappings().first()
+        return list(row["failover_chain"]) if row and row["failover_chain"] else []
+
+    def failover_candidates(self, tier: Tier, tenant: TenantCtx) -> list:
+        """Zero-arg builders, one per chain entry; each returns
+        (model, provider, model_id, endpoint). Order = admin intent."""
+        if not getattr(settings, "llm_failover_enabled", True):
+            return []
+        builders = []
+        for entry in self._failover_entries(tenant.org_id):
+            def _build(e=entry):
+                cfg = ProviderConfig(
+                    provider=e["provider"],
+                    region=e.get("region"),
+                    endpoint=e.get("endpoint"),
+                    tier_map_override=e.get("tier_map"),
+                    secret_value=self._resolve_secret(e.get("secret_ref")),
+                )
+                self._guard_cli(cfg.provider)
+                model_id = resolve_model_id(cfg.provider, tier, cfg.tier_map_override)
+                return _BUILDERS[cfg.provider](cfg, model_id), cfg.provider, model_id, cfg.endpoint
+            builders.append(_build)
+        return builders
+
     def _resolve_secret(self, ref: str | None) -> str | None:
         """secret_ref → plaintext for the tenant path, with a TTL cache.
 

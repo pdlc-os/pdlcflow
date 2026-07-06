@@ -5,6 +5,27 @@ engine. At boot the engine installs a factory-backed implementation so personas
 resolve through `LLMProviderFactory` (two-level org/agent config → provider →
 model). It is wired ONLY when explicitly enabled, so dev/test keep the
 deterministic offline stub (no creds, no network, no model drift).
+
+Resilient routing (PRD-05) lives HERE, not in the factory: the factory stays a
+pure config→model resolver; this backend owns the retry loop because it
+already owns spans, timing, usage extraction, and error handling.
+
+  - Candidate 0 is exactly the pre-failover resolution (agent override → org
+    default → instance default → fallback). Candidates 1..n come from the
+    org's `failover_chain`, queried ONLY after a retriable primary failure —
+    orgs without a chain pay zero extra work and behave byte-identically.
+  - Error taxonomy (app/llm/errors.classify): 429/5xx/timeouts/connection →
+    try next candidate; auth/validation → surface immediately (config bug,
+    not incident — a doomed request must not burn the chain).
+  - Circuit breaker gates FALLBACK candidates only (the primary is always
+    attempted — a breaker that locks out a chainless org's only provider
+    would be worse than the outage it guards against).
+  - Rate limiting (off by default) charges one token per ATTEMPT — each
+    attempt is a real upstream call. Rejection raises RateLimited: our own
+    quota is not a provider incident, so it never triggers failover.
+  - Streaming: failover applies only until the first content token has been
+    yielded. After that, an error propagates — splicing two models' prose
+    into one artifact is worse than a visible failure.
 """
 
 from __future__ import annotations
@@ -14,7 +35,11 @@ import logging
 import time
 
 from .. import observability
+from ..config import settings
+from ..llm.breaker import breaker_key, get_breaker
+from ..llm.errors import classify
 from ..llm.factory import LLMProviderFactory, TenantCtx
+from ..llm.rate_limit import RateLimited, get_rate_limit
 
 log = logging.getLogger("pdlc.runtime.llm")
 
@@ -56,6 +81,28 @@ class FactoryCompletionBackend:
     def _model(self, persona: str, tier: str | None):
         return self._resolve(persona, tier)[0]
 
+    def _fallbacks(self, eff_tier: str) -> list:
+        """Chain builders for the tenant (empty when disabled/unsupported)."""
+        if not getattr(settings, "llm_failover_enabled", True):
+            return []
+        if not hasattr(self._factory, "failover_candidates"):
+            return []
+        try:
+            return self._factory.failover_candidates(eff_tier, self._tenant())  # type: ignore[arg-type]
+        except Exception as exc:  # a broken chain must not break the turn
+            log.warning("failover chain unavailable: %s", type(exc).__name__)
+            return []
+
+    def _check_rate_limit(self, org: str, provider: str, eff_tier: str) -> None:
+        if not getattr(settings, "rate_limit_enabled", False):
+            return
+        rl = get_rate_limit()
+        if not rl.acquire(org, provider, eff_tier):
+            observability.record_rate_limited(provider, eff_tier)
+            _emit_resilience("llm.rate_limited", org,
+                             {"provider": provider, "tier": eff_tier, "rpm": rl.rpm})
+            raise RateLimited(org, provider, eff_tier, rl.rpm)
+
     @staticmethod
     def _messages(system: str | None, prompt: str) -> list:
         messages: list = []
@@ -68,42 +115,157 @@ class FactoryCompletionBackend:
         self, persona: str, prompt: str, *, tier: str | None = None, system: str | None = None
     ) -> str:
         eff_tier = tier or _DEFAULT_TIER
+        org = self._tenant().org_id
+        messages = self._messages(system, prompt)
+
+        # ----- primary attempt (the pre-failover hot path) -----
         model, provider, model_id = self._resolve(persona, tier)
+        self._check_rate_limit(org, provider, eff_tier)
         t0 = time.perf_counter()
-        # LLM span — the leaf of the trace tree, with GenAI semconv + cost. No-op
-        # unless observability is wired.
         with observability.llm_span(persona, eff_tier) as span:
             try:
-                result = model.invoke(self._messages(system, prompt))
-            except Exception:
+                result = model.invoke(messages)
+            except Exception as exc:
                 self._record(span, persona, provider, model_id, eff_tier,
                              {"input": 0, "output": 0}, t0, ok=False)
-                raise
-            usage = _usage_from_message(result)
-            self._record(span, persona, provider, model_id, eff_tier, usage, t0, ok=True)
-            return getattr(result, "content", str(result))
+                if span is not None:
+                    with contextlib.suppress(Exception):
+                        span.record_exception(exc)
+                primary_exc: Exception = exc
+            else:
+                usage = _usage_from_message(result)
+                self._record(span, persona, provider, model_id, eff_tier, usage, t0, ok=True)
+                return getattr(result, "content", str(result))
+
+        if classify(primary_exc) != "retriable":
+            raise primary_exc
+        fallbacks = self._fallbacks(eff_tier)
+        if not fallbacks:
+            raise primary_exc
+
+        # ----- failover loop -----
+        last_exc: Exception = primary_exc
+        failed_provider = provider
+        for rank, build in enumerate(fallbacks, start=1):
+            observability.record_fallback(failed_provider, type(last_exc).__name__)
+            _emit_resilience("llm.failover", org,
+                             {"from_provider": failed_provider,
+                              "reason": type(last_exc).__name__, "attempt": rank})
+            try:
+                model, provider, model_id, endpoint = build()
+            except Exception as exc:
+                log.warning("skipping broken fallback #%d: %s", rank, type(exc).__name__)
+                continue
+            bkey = breaker_key(provider, endpoint)
+            breaker = get_breaker()
+            if not breaker.allow(org, bkey):
+                log.info("breaker open for %s — skipping fallback #%d", bkey, rank)
+                continue
+            self._check_rate_limit(org, provider, eff_tier)
+            t0 = time.perf_counter()
+            with observability.llm_span(persona, eff_tier) as span:
+                if span is not None:
+                    with contextlib.suppress(Exception):
+                        span.set_attribute("pdlc.llm.fallback_rank", rank)
+                try:
+                    result = model.invoke(messages)
+                except Exception as exc:
+                    self._record(span, persona, provider, model_id, eff_tier,
+                                 {"input": 0, "output": 0}, t0, ok=False)
+                    if span is not None:
+                        with contextlib.suppress(Exception):
+                            span.record_exception(exc)
+                    breaker.record_failure(org, bkey)
+                    if classify(exc) != "retriable":
+                        raise
+                    last_exc, failed_provider = exc, provider
+                    continue
+                usage = _usage_from_message(result)
+                breaker.record_success(org, bkey)
+                # Serving labels are the FALLBACK's provider/model (FR-8).
+                self._record(span, persona, provider, model_id, eff_tier, usage, t0, ok=True)
+                return getattr(result, "content", str(result))
+        raise last_exc
 
     def stream(
         self, persona: str, prompt: str, *, tier: str | None = None, system: str | None = None
     ):
-        """Yield text chunks as the model streams (powers live token streaming)."""
+        """Yield text chunks as the model streams (powers live token streaming).
+
+        Failover window = until the first content token is yielded; after that
+        an error propagates as it does today (no mid-stream model splicing)."""
         eff_tier = tier or _DEFAULT_TIER
-        model, provider, model_id = self._resolve(persona, tier)
-        t0 = time.perf_counter()
-        with observability.llm_span(persona, eff_tier) as span:
-            usage = {"input": 0, "output": 0}
+        org = self._tenant().org_id
+        messages = self._messages(system, prompt)
+
+        def _primary():
+            m, p, mid = self._resolve(persona, tier)
+            return m, p, mid, None
+
+        queue: list[tuple[int, object]] = [(0, _primary)]
+        fallbacks_loaded = False
+        last_exc: Exception | None = None
+        failed_provider = "unknown"
+
+        while queue:
+            rank, build = queue.pop(0)
+            if rank > 0:
+                observability.record_fallback(
+                    failed_provider,
+                    type(last_exc).__name__ if last_exc else "unknown")
+                _emit_resilience("llm.failover", org,
+                                 {"from_provider": failed_provider,
+                                  "reason": type(last_exc).__name__ if last_exc else "unknown",
+                                  "attempt": rank})
             try:
-                for chunk in model.stream(self._messages(system, prompt)):
-                    u = _usage_from_message(chunk)  # last chunk often carries usage
-                    if u["input"] or u["output"]:
-                        usage = u
-                    text = getattr(chunk, "content", "")
-                    if text:
-                        yield text
-            except Exception:
-                self._record(span, persona, provider, model_id, eff_tier, usage, t0, ok=False)
-                raise
-            self._record(span, persona, provider, model_id, eff_tier, usage, t0, ok=True)
+                model, provider, model_id, endpoint = build()  # type: ignore[operator]
+            except Exception as exc:
+                if rank == 0:
+                    raise
+                log.warning("skipping broken fallback #%d: %s", rank, type(exc).__name__)
+                continue
+            bkey = breaker_key(provider, endpoint)
+            breaker = get_breaker()
+            if rank > 0 and not breaker.allow(org, bkey):
+                continue
+            self._check_rate_limit(org, provider, eff_tier)
+
+            t0 = time.perf_counter()
+            committed = False
+            usage = {"input": 0, "output": 0}
+            with observability.llm_span(persona, eff_tier) as span:
+                if span is not None and rank > 0:
+                    with contextlib.suppress(Exception):
+                        span.set_attribute("pdlc.llm.fallback_rank", rank)
+                try:
+                    for chunk in model.stream(messages):
+                        u = _usage_from_message(chunk)  # last chunk often carries usage
+                        if u["input"] or u["output"]:
+                            usage = u
+                        text = getattr(chunk, "content", "")
+                        if text:
+                            committed = True
+                            yield text
+                except Exception as exc:
+                    self._record(span, persona, provider, model_id, eff_tier, usage, t0, ok=False)
+                    if span is not None:
+                        with contextlib.suppress(Exception):
+                            span.record_exception(exc)
+                    if rank > 0:
+                        breaker.record_failure(org, bkey)
+                    if committed or classify(exc) != "retriable":
+                        raise  # NG1: never failover after the first token
+                    last_exc, failed_provider = exc, provider
+                    if not fallbacks_loaded:
+                        fallbacks_loaded = True
+                        queue.extend(enumerate(self._fallbacks(eff_tier), start=1))
+                    if not queue:
+                        raise
+                    continue
+                if rank > 0:
+                    breaker.record_success(org, bkey)
+                self._record(span, persona, provider, model_id, eff_tier, usage, t0, ok=True)
+                return
 
     @staticmethod
     def _record(span, persona, provider, model_id, tier, usage, t0, *, ok: bool) -> None:
@@ -124,6 +286,25 @@ class FactoryCompletionBackend:
             tokens_in=usage["input"], tokens_out=usage["output"], usd=usd,
             duration_ms=duration_ms, ok=ok,
         )
+
+
+def _emit_resilience(event_type: str, org: str, payload: dict) -> None:
+    """Best-effort clickstream event (llm.failover / llm.rate_limited). Uses the
+    nil project UUID like the admin audit events — org-level, not project work."""
+    try:
+        import uuid as _uuid
+
+        from ..clickstream.emitter import get_emitter
+
+        get_emitter().emit(
+            event_type,
+            {"org_id": _uuid.UUID(str(org)), "project_id": _uuid.UUID(int=0),
+             "actor": "system"},
+            payload,
+            str(_uuid.uuid4()),
+        )
+    except Exception:  # telemetry must never break a turn
+        pass
 
 
 def _usage_from_message(msg) -> dict[str, int]:

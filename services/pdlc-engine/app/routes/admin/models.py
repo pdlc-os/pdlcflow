@@ -113,6 +113,26 @@ def apply_preset(
     }
 
 
+class FallbackEntry(BaseModel):
+    """One failover-chain candidate (PRD-05). api_key is WRITE-ONLY; omitting
+    it carries over the entry's previously stored key when the provider at the
+    same position is unchanged."""
+
+    provider: Provider
+    region: str | None = None
+    endpoint: str | None = None
+    tier_map: dict[str, str] | None = None
+    api_key: str | None = Field(None, min_length=1)
+
+
+class FallbackEntryOut(BaseModel):
+    provider: Provider
+    region: str | None = None
+    endpoint: str | None = None
+    tier_map: dict[str, str] | None = None
+    has_key: bool = False
+
+
 class OrgDefault(BaseModel):
     provider: Provider
     tier_map: dict[str, str]  # {"premium": "...", "balanced": "...", "economy": "..."}
@@ -121,6 +141,8 @@ class OrgDefault(BaseModel):
     # WRITE-ONLY: accepted on PUT, stored via the secrets backend, never echoed.
     # None ⇒ keep whatever key is already stored.
     api_key: str | None = Field(None, min_length=1)
+    # Ordered fallback candidates tried on retriable primary failures.
+    failover_chain: list[FallbackEntry] = Field(default_factory=list, max_length=3)
 
 
 class OrgDefaultOut(BaseModel):
@@ -131,6 +153,7 @@ class OrgDefaultOut(BaseModel):
     region: str | None = None
     endpoint: str | None = None
     has_key: bool = False
+    failover_chain: list[FallbackEntryOut] = Field(default_factory=list)
 
 
 class AgentOverride(BaseModel):
@@ -186,6 +209,59 @@ def _validate_provider_config(
             probe.validate_endpoint(endpoint)
         except probe.EndpointNotAllowed as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+# Providers whose builders fall back to the OPERATOR's env key when no tenant
+# key is present — a chain entry without its own key would silently downgrade
+# the tenant to the instance credentials, so it's rejected at write time.
+# (bedrock/vertex/ollama are keyless; openai_compatible has NO env fallback by
+# design, so keyless entries are safe there — local vLLM/LiteLLM.)
+_ENV_KEYED_PROVIDERS = {"anthropic", "openai", "gemini", "azure"}
+
+
+def _validate_chain(entries: list[FallbackEntry]) -> None:
+    """DB-free validation pass — runs before anything is read or stored."""
+    for i, entry in enumerate(entries):
+        _validate_provider_config(entry.provider, entry.endpoint,
+                                  tier_map=entry.tier_map)
+        if entry.provider == "openai_compatible" and entry.tier_map is None:
+            raise HTTPException(
+                status_code=422,
+                detail=f"failover_chain[{i}]: openai_compatible requires a tier_map")
+
+
+def _build_chain(org_id: str, entries: list[FallbackEntry],
+                 existing: list[dict]) -> list[dict]:
+    """Persist-shape the (already validated) chain. Keys entered as api_key are
+    stored via the secretstore; omitted keys carry over from the existing chain
+    at the same position when the provider is unchanged."""
+    chain: list[dict] = []
+    for i, entry in enumerate(entries):
+        secret_ref = None
+        if entry.api_key is not None:
+            secret_ref = _store_key(entry.api_key, hint=f"llm/org/{org_id}/chain/{i}")
+            invalidate_secret_cache(secret_ref)
+        elif (i < len(existing)
+              and existing[i].get("provider") == entry.provider):
+            secret_ref = existing[i].get("secret_ref")
+        if secret_ref is None and entry.provider in _ENV_KEYED_PROVIDERS:
+            raise HTTPException(
+                status_code=422,
+                detail=f"failover_chain[{i}]: {entry.provider} requires api_key — "
+                       "a fallback must not silently bill the operator's env key")
+        chain.append({
+            "provider": entry.provider, "region": entry.region,
+            "endpoint": entry.endpoint, "tier_map": entry.tier_map,
+            "secret_ref": secret_ref,
+        })
+    return chain
+
+
+def _chain_out(chain: list[dict]) -> list[FallbackEntryOut]:
+    return [FallbackEntryOut(
+        provider=e["provider"], region=e.get("region"), endpoint=e.get("endpoint"),
+        tier_map=e.get("tier_map"), has_key=bool(e.get("secret_ref")),
+    ) for e in chain or []]
 
 
 @router.get("/defaults")
@@ -253,11 +329,15 @@ def get_org_default(
         set_org_context(conn, org_id)
         row = conn.execute(
             text("select provider, tier_map, region, endpoint, "
-                 "secret_ref is not null as has_key "
+                 "secret_ref is not null as has_key, failover_chain "
                  "from org_llm_config where org_id = :o"),
             {"o": org_id},
         ).mappings().first()
-    return OrgDefaultOut(**row) if row else None
+    if not row:
+        return None
+    data = dict(row)
+    data["failover_chain"] = _chain_out(data.get("failover_chain") or [])
+    return OrgDefaultOut(**data)
 
 
 @router.put("/org-default")
@@ -265,28 +345,43 @@ def set_org_default(
     cfg: OrgDefault, org_id: str = Depends(admin_org("/admin/models/org-default"))
 ) -> dict:
     _validate_provider_config(cfg.provider, cfg.endpoint, tier_map=cfg.tier_map)
+    _validate_chain(cfg.failover_chain)
+    # Existing chain is needed for key carryover (only when a chain is sent).
+    existing_chain: list = []
+    if cfg.failover_chain:
+        with _engine().begin() as conn:
+            set_org_context(conn, org_id)
+            existing_chain = list(conn.execute(
+                text("select failover_chain from org_llm_config where org_id = :o"),
+                {"o": org_id},
+            ).scalar() or [])
+    chain = _build_chain(org_id, cfg.failover_chain, existing_chain)
     params = {"o": org_id, "p": cfg.provider, "r": cfg.region, "e": cfg.endpoint,
-              "t": json.dumps(cfg.tier_map)}
+              "t": json.dumps(cfg.tier_map), "fc": json.dumps(chain)}
     if cfg.api_key is not None:
         ref = _store_key(cfg.api_key, hint=f"llm/org/{org_id}")
         invalidate_secret_cache(ref)  # vault refs are stable paths — drop stale plaintext
         params["sr"] = ref
         sql = (
-            "insert into org_llm_config (org_id, provider, region, endpoint, tier_map, secret_ref) "
-            "values (:o, :p, :r, :e, cast(:t as jsonb), :sr) "
+            "insert into org_llm_config "
+            "(org_id, provider, region, endpoint, tier_map, failover_chain, secret_ref) "
+            "values (:o, :p, :r, :e, cast(:t as jsonb), cast(:fc as jsonb), :sr) "
             "on conflict (org_id) do update set "
             "provider = excluded.provider, region = excluded.region, "
             "endpoint = excluded.endpoint, tier_map = excluded.tier_map, "
+            "failover_chain = excluded.failover_chain, "
             "secret_ref = excluded.secret_ref"
         )
     else:
         # api_key omitted ⇒ leave secret_ref untouched (edits must not wipe keys).
         sql = (
-            "insert into org_llm_config (org_id, provider, region, endpoint, tier_map) "
-            "values (:o, :p, :r, :e, cast(:t as jsonb)) "
+            "insert into org_llm_config "
+            "(org_id, provider, region, endpoint, tier_map, failover_chain) "
+            "values (:o, :p, :r, :e, cast(:t as jsonb), cast(:fc as jsonb)) "
             "on conflict (org_id) do update set "
             "provider = excluded.provider, region = excluded.region, "
-            "endpoint = excluded.endpoint, tier_map = excluded.tier_map"
+            "endpoint = excluded.endpoint, tier_map = excluded.tier_map, "
+            "failover_chain = excluded.failover_chain"
         )
     with _engine().begin() as conn:
         set_org_context(conn, org_id)

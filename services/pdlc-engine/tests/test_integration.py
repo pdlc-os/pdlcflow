@@ -653,3 +653,75 @@ def get_sync_engine_for_tests():
     from app.db.session import get_sync_engine
 
     return get_sync_engine(settings)
+
+
+def test_failover_chain_roundtrip(monkeypatch):
+    """Chain entries persist with per-entry secret_refs (write-only), read back
+    as has_key, carry keys over on re-PUT, and resolve through
+    factory.failover_candidates with each entry's own key + tier_map."""
+    from app import secretstore as S
+    from app.llm.factory import LLMProviderFactory, TenantCtx, invalidate_secret_cache
+    from app.main import app
+    from cryptography.fernet import Fernet
+    from fastapi.testclient import TestClient
+
+    monkeypatch.setattr(settings, "secrets_backend", "encrypted")
+    monkeypatch.setattr(settings, "secret_key", Fernet.generate_key().decode())
+    S.reset_secrets()
+    invalidate_secret_cache()
+    try:
+        org, _ = _seed_project()
+        c = TestClient(app)
+        q = f"?org_id={org}"
+        tiers = {"premium": "claude-opus-4-8", "balanced": "claude-sonnet-4-6",
+                 "economy": "claude-haiku-4-5"}
+        gw_tiers = {"premium": "deepseek-reasoner", "balanced": "deepseek-chat",
+                    "economy": "deepseek-chat"}
+
+        r = c.put(f"/v1/admin/models/org-default{q}", json={
+            "provider": "anthropic", "tier_map": tiers, "api_key": "sk-primary",
+            "failover_chain": [
+                {"provider": "bedrock", "region": "us-east-1", "tier_map": tiers},
+                {"provider": "openai_compatible", "endpoint": "https://8.8.8.8/v1",
+                 "tier_map": gw_tiers, "api_key": "sk-gateway"},
+            ]})
+        assert r.status_code == 200, r.text
+        assert "sk-gateway" not in r.text
+
+        g = c.get(f"/v1/admin/models/org-default{q}").json()
+        chain = g["failover_chain"]
+        assert [e["provider"] for e in chain] == ["bedrock", "openai_compatible"]
+        assert chain[0]["has_key"] is False and chain[1]["has_key"] is True
+        assert "secret_ref" not in chain[1] and "sk-gateway" not in str(g)
+
+        # keyed provider without a key in the chain → rejected (no silent
+        # operator-key billing from a fallback)
+        bad = c.put(f"/v1/admin/models/org-default{q}", json={
+            "provider": "anthropic", "tier_map": tiers,
+            "failover_chain": [{"provider": "openai", "tier_map": tiers}]})
+        assert bad.status_code == 422
+
+        # factory resolves each entry lazily with its own key
+        f = LLMProviderFactory(db=get_sync_engine_for_tests())
+        builders = f.failover_candidates("balanced", TenantCtx(org_id=org))
+        assert len(builders) == 2
+        _model, provider, model_id, endpoint = builders[1]()
+        assert provider == "openai_compatible"
+        assert model_id == "deepseek-chat"
+        assert endpoint == "https://8.8.8.8/v1"
+
+        # re-PUT without api_key on the gateway entry → key carried over
+        r2 = c.put(f"/v1/admin/models/org-default{q}", json={
+            "provider": "anthropic", "tier_map": tiers,
+            "failover_chain": [
+                {"provider": "bedrock", "region": "eu-west-1", "tier_map": tiers},
+                {"provider": "openai_compatible", "endpoint": "https://8.8.8.8/v1",
+                 "tier_map": gw_tiers},
+            ]})
+        assert r2.status_code == 200
+        g2 = c.get(f"/v1/admin/models/org-default{q}").json()
+        assert g2["failover_chain"][1]["has_key"] is True  # carried over
+        assert g2["failover_chain"][0]["region"] == "eu-west-1"
+    finally:
+        S.reset_secrets()
+        invalidate_secret_cache()
