@@ -112,7 +112,7 @@ CI** (the hermetic `evals` job).
 
 ## Viewing results
 
-- **Events:** `eval.scored` and `eval.blocked` land in the events stream (40-event taxonomy).
+- **Events:** `eval.scored` and `eval.blocked` land in the events stream (50+-event taxonomy).
 - **API:** `GET /v1/admin/evals/summary?org_id=...` → `{ by_eval: {id: {n, avg_score, pass_rate}}, by_agent: {...} }` (org-scoped; cross-org banned → 403).
 - **CI:** the hermetic `evals` job runs the harness end-to-end with the deterministic stub judge (`pytest -m eval`).
 

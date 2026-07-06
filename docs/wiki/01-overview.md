@@ -3,7 +3,9 @@
 
 # Overview
 
-pdlcflow is a stand-alone runtime for the **Product Development Lifecycle (PDLC)** methodology. Where the upstream `pdlc` plugin runs PDLC inside Claude Code on a single dev box, pdlcflow lifts the same workflow off the editor into a self-hostable (or SaaS) service: a Python **LangGraph engine** drives a feature through four phases — **Initialization, Inception, Construction, Operation** — pausing at **8 approval gates**, fanning work out to **10 agent personas** (and party meetings), enforcing TDD and a hard production-deploy ban, and emitting a **40-event clickstream** that powers an admin analytics console. The whole thing is driven over a REST + WebSocket API by a React Studio UI.
+pdlcflow is a stand-alone runtime for the **Product Development Lifecycle (PDLC)** methodology. Where the upstream `pdlc` plugin runs PDLC inside Claude Code on a single dev box, pdlcflow lifts the same workflow off the editor into a self-hostable (or SaaS) service: a Python **LangGraph engine** drives a feature through four phases — **Initialization, Inception, Construction, Operation** — pausing at **8 approval gates**, fanning work out to **10 agent personas** (and party meetings), enforcing TDD and a hard production-deploy ban, and emitting a **50+-event clickstream** that powers an admin analytics console. The whole thing is driven over a REST + WebSocket API by a React Studio UI.
+
+On top of the workflow sits a full **per-tenant provider platform**: each org picks its own LLM provider and models (8 providers incl. a generic OpenAI-compatible gateway), brings its own API key (BYOK), and gets connectivity probes, a preset catalog, automatic failover with a circuit breaker, per-org rate limits, cost budgets, immutable config versioning, egress controls, org-tunable persona prompts, and optional **MCP tool servers** that give agents external tools — all org-scoped and RLS-isolated. See [Configuration](03-configuration.md) and [MCP Tool Servers](20-mcp-tools.md).
 
 ## The methodology in one paragraph
 
@@ -13,9 +15,9 @@ A feature flows through four phases. The **meta-graph** (`packages/pdlc-graph/pd
 
 | Component | Path | Role |
 |-----------|------|------|
-| **event-schema** | `packages/event-schema/` | `EventEnvelope` + the 40-event taxonomy (registry in `event_schema/registry.md`). Carries tenancy + traceability dims on every event. |
-| **pdlc-graph** | `packages/pdlc-graph/` | The LangGraph engine: meta-graph router + `meta/brainstorm/build/ship/night_shift/utility` subgraphs, party orchestrator, 10 persona soul-specs, the 8 gates, and the deterministic Sentinel evaluator. |
-| **pdlc-engine** | `services/pdlc-engine/` | FastAPI service: REST (`/v1/...`) + WebSocket (`/ws/...`), runtime (GraphRunner + checkpointer + dispatcher + event bus), analytics rollups, clickstream emitter, persistence adapters, LLM provider factory, Alembic migrations. |
+| **event-schema** | `packages/event-schema/` | `EventEnvelope` + the 50+-event taxonomy (registry in `event_schema/registry.md`). Carries tenancy + traceability dims on every event. |
+| **pdlc-graph** | `packages/pdlc-graph/` | The LangGraph engine: meta-graph router + `meta/brainstorm/build/ship/night_shift/utility` subgraphs, party orchestrator, 10 persona soul-specs, the 8 gates, the deterministic Sentinel evaluator, and dep-free injectable ports (LLM, tracing, prompt-resolver, tool/MCP). |
+| **pdlc-engine** | `services/pdlc-engine/` | FastAPI service: REST (`/v1/...`) + WebSocket (`/ws/...`), runtime (GraphRunner + checkpointer + dispatcher + event bus), analytics rollups, clickstream emitter, persistence adapters, the 8-provider LLM factory (BYOK, failover, circuit breaker, presets), the MCP tool backend, OpenTelemetry wiring, Alembic migrations. |
 | **studio** | `apps/studio/` | React + Vite + Tailwind UI — the Studio chat/feature view **and** the Nexus Console admin dashboard in one bundle. |
 | **Postgres** | compose `postgres:17` | Durable graph checkpoints, the task store, analytics events, and row-level-security tenancy. |
 | **Redis** | compose `redis:7` | Pub/sub event bus (cross-process WebSocket fan-out + live night-shift verdicts) and the Arq job queue. |
