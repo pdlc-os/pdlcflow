@@ -9,6 +9,7 @@ Resolution order:
 
 from __future__ import annotations
 
+import time as _time
 import uuid as _uuid
 from dataclasses import dataclass
 from typing import Literal
@@ -70,6 +71,30 @@ _BUILDERS = {
     "codex": codex_p.build,
     "gemini_cli": gemini_cli_p.build,
 }
+
+
+class SecretResolutionError(RuntimeError):
+    """A tenant config points at a secret_ref that cannot be resolved.
+
+    Deliberately fatal: falling back to the instance env key here would
+    silently bill tenant traffic to the operator — exactly the bug BYOK fixes.
+    The message never contains the ref or key material.
+    """
+
+
+# Resolved plaintext keyed by ref, with a monotonic expiry. Vault resolution is
+# a network round-trip on the hottest path (every completion); Fernet decrypt is
+# cheap but caching uniformly is harmless. Cross-replica staleness after a
+# rotation is bounded by the TTL (PDLC_SECRET_CACHE_TTL_S, 0 disables caching).
+_SECRET_CACHE: dict[str, tuple[str, float]] = {}
+
+
+def invalidate_secret_cache(ref: str | None = None) -> None:
+    """Drop one cached secret (by ref) or all (admin key PUT/DELETE handlers)."""
+    if ref is None:
+        _SECRET_CACHE.clear()
+    else:
+        _SECRET_CACHE.pop(ref, None)
 
 
 @dataclass
@@ -147,10 +172,17 @@ class LLMProviderFactory:
 
         with self._db.begin() as conn:
             set_org_context(conn, org_id)
+            # The COALESCE implements key inheritance: an override without its
+            # own key borrows the org-default key, but ONLY when the providers
+            # match — an Anthropic key must never be sent to OpenAI.
             row = conn.execute(
                 text(
-                    "select provider, model_id, region, endpoint "
-                    "from agent_llm_config where org_id = :o and agent_persona = :p"
+                    "select a.provider, a.model_id, a.region, a.endpoint, "
+                    "coalesce(a.secret_ref, case when o.provider = a.provider "
+                    "then o.secret_ref end) as secret_ref "
+                    "from agent_llm_config a "
+                    "left join org_llm_config o on o.org_id = a.org_id "
+                    "where a.org_id = :o and a.agent_persona = :p"
                 ),
                 {"o": org_id, "p": persona},
             ).mappings().first()
@@ -161,6 +193,7 @@ class LLMProviderFactory:
             model_id_override=row["model_id"],
             region=row["region"],
             endpoint=row["endpoint"],
+            secret_value=self._resolve_secret(row["secret_ref"]),
         )
 
     def _org_default(self, org_id: str) -> ProviderConfig | None:
@@ -172,7 +205,7 @@ class LLMProviderFactory:
             set_org_context(conn, org_id)
             row = conn.execute(
                 text(
-                    "select provider, region, endpoint, tier_map "
+                    "select provider, region, endpoint, tier_map, secret_ref "
                     "from org_llm_config where org_id = :o"
                 ),
                 {"o": org_id},
@@ -184,7 +217,44 @@ class LLMProviderFactory:
             region=row["region"],
             endpoint=row["endpoint"],
             tier_map_override=row["tier_map"],
+            secret_value=self._resolve_secret(row["secret_ref"]),
         )
+
+    def _resolve_secret(self, ref: str | None) -> str | None:
+        """secret_ref → plaintext for the tenant path, with a TTL cache.
+
+        A NULL ref legitimately means "no tenant key" → providers fall back to
+        the instance env key. A non-null ref that will not resolve raises
+        SecretResolutionError instead of falling back (see the class docstring).
+        """
+        if not ref:
+            return None
+        ttl = getattr(settings, "secret_cache_ttl_s", 300)
+        if ttl > 0:
+            hit = _SECRET_CACHE.get(ref)
+            if hit is not None and hit[1] > _time.monotonic():
+                return hit[0]
+        try:
+            if self._secrets is not None:
+                secrets = self._secrets
+            else:
+                from ..secretstore import get_secrets
+
+                secrets = get_secrets()
+            value = secrets.resolve(ref)
+        except Exception as exc:  # bad ciphertext, Vault down, backend misconfig
+            raise SecretResolutionError(
+                "tenant LLM key could not be resolved (secrets backend error); "
+                "re-enter the key in Settings → Models or check the secrets backend"
+            ) from exc
+        if value is None:  # unknown/legacy ref shape, missing env var
+            raise SecretResolutionError(
+                "tenant LLM key could not be resolved (dangling secret_ref); "
+                "re-enter the key in Settings → Models"
+            )
+        if ttl > 0:
+            _SECRET_CACHE[ref] = (value, _time.monotonic() + ttl)
+        return value
 
     def _instance_default(self) -> ProviderConfig | None:
         # Only attach region/endpoint to the provider that uses them, so we don't
