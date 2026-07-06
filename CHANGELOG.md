@@ -5,10 +5,18 @@ All notable changes to pdlcflow are documented here. This project adheres to
 
 ## Unreleased
 
-Execution arc + quick-wins honesty pass + migrate fidelity + schema hygiene —
-Construction/Operation's outermost side-effects are now **real** instead of
-simulations presented as results (from the
-[stub-gaps roadmap](docs/.research/stub-gaps-roadmap.md)).
+## v1.14.0 — 2026-07-06
+
+**Closes the [stub-gaps roadmap](docs/.research/stub-gaps-roadmap.md) in its
+entirety.** A deep scan had catalogued every place the system reported success
+for something that hadn't happened, or shipped a declared surface that wasn't
+built. This release resolves all four tiers: the outermost side-effects of
+Construction/Operation are now **real** (execution arc), the promised features
+exist (Initialization phase, OIDC/SSO, per-org quotas, stdio MCP, live memory +
+task views), the operational honesty gaps are closed, and the hygiene debt is
+paid — across nine merged PRs (#94–#102). Highlights below; every item is
+flag-gated or additive, so hermetic CI and existing self-host deployments are
+unaffected.
 
 ### Added
 - **OIDC / SSO authentication** (T2-4) — `PDLC_AUTH_MODE=oidc` replaces the inert
