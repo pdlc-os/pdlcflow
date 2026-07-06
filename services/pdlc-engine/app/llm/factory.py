@@ -46,12 +46,16 @@ from .providers import (
     openai as openai_p,
 )
 from .providers import (
+    openai_compatible as openai_compatible_p,
+)
+from .providers import (
     vertex as vertex_p,
 )
 from .tier_map import resolve_model_id
 
 Provider = Literal[
     "bedrock", "anthropic", "vertex", "azure", "openai", "gemini", "ollama",
+    "openai_compatible",
     "claude_code", "codex", "gemini_cli",
 ]
 Tier = Literal["premium", "balanced", "economy"]
@@ -67,6 +71,7 @@ _BUILDERS = {
     "openai": openai_p.build,
     "gemini": gemini_p.build,
     "ollama": ollama_p.build,
+    "openai_compatible": openai_compatible_p.build,
     "claude_code": claude_code_p.build,
     "codex": codex_p.build,
     "gemini_cli": gemini_cli_p.build,

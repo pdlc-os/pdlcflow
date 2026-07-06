@@ -38,11 +38,79 @@ from ._guard import admin_org
 
 router = APIRouter(prefix="/models", tags=["admin", "models"])
 
-Provider = Literal["bedrock", "anthropic", "vertex", "azure", "openai", "gemini", "ollama"]
+Provider = Literal[
+    "bedrock", "anthropic", "vertex", "azure", "openai", "gemini", "ollama",
+    "openai_compatible",
+]
 Persona = Literal[
     "atlas", "bolt", "echo", "friday", "jarvis",
     "muse", "neo", "phantom", "pulse", "sentinel",
 ]
+
+
+# ---------------------------------------------------------------------------
+# Preset catalog (PRD-04) — curated vendored data; read-only + one-click apply.
+# ---------------------------------------------------------------------------
+
+
+def _preset_public(p) -> dict:
+    """Catalog entry as the console sees it (pricing_hints stay server-side)."""
+    return {
+        "id": p.id, "label": p.label, "provider": p.provider,
+        "endpoint": p.endpoint, "region": p.region, "tier_map": p.tier_map,
+        "docs_url": p.docs_url, "key_hint": p.key_hint, "tags": p.tags,
+        "needs_secret": p.needs_secret,
+    }
+
+
+@router.get("/presets")
+def list_presets(
+    q: str | None = None,
+    org_id: str = Depends(admin_org("/admin/models/presets")),
+) -> dict:
+    from ...llm.presets import load_catalog
+
+    catalog = load_catalog()
+    return {
+        "catalog_version": catalog.catalog_version,
+        "presets": [_preset_public(p) for p in catalog.search(q)],
+    }
+
+
+@router.post("/presets/{preset_id}/apply")
+def apply_preset(
+    preset_id: str,
+    org_id: str = Depends(admin_org("/admin/models/presets")),
+) -> dict:
+    """Upsert the org default from a curated preset (endpoints in the vendored
+    catalog are trusted — tenant-typed endpoints go through the SSRF guard on
+    the normal PUT instead). Never touches secret_ref; the console chains the
+    key-entry PUT when needs_secret."""
+    from ...llm.presets import load_catalog
+
+    preset = load_catalog().get(preset_id)
+    if preset is None:
+        raise HTTPException(status_code=404, detail="unknown preset")
+    with _engine().begin() as conn:
+        set_org_context(conn, org_id)
+        conn.execute(
+            text(
+                "insert into org_llm_config (org_id, provider, region, endpoint, tier_map) "
+                "values (:o, :p, :r, :e, cast(:t as jsonb)) "
+                "on conflict (org_id) do update set "
+                "provider = excluded.provider, region = excluded.region, "
+                "endpoint = excluded.endpoint, tier_map = excluded.tier_map"
+            ),
+            {"o": org_id, "p": preset.provider, "r": preset.region,
+             "e": preset.endpoint, "t": json.dumps(preset.tier_map)},
+        )
+    _audit("admin.preset.applied", org_id, {"preset": preset.id, "provider": preset.provider})
+    return {
+        "ok": True,
+        "applied": {"provider": preset.provider, "endpoint": preset.endpoint,
+                    "region": preset.region, "tier_map": preset.tier_map},
+        "needs_secret": preset.needs_secret,
+    }
 
 
 class OrgDefault(BaseModel):
@@ -87,6 +155,39 @@ def _engine():
     return get_sync_engine(settings)
 
 
+_TIERS = ("premium", "balanced", "economy")
+
+
+def _validate_provider_config(
+    provider: str,
+    endpoint: str | None,
+    *,
+    tier_map: dict[str, str] | None = None,
+) -> None:
+    """Config-write-time guards, so misconfig fails at PUT — not mid-turn.
+
+    openai_compatible has no built-in tier map and no meaningful env-key
+    fallback, so it must arrive complete; any tenant-supplied endpoint is
+    checked against the SSRF egress policy before it can be stored.
+    """
+    if provider == "openai_compatible":
+        if not endpoint:
+            raise HTTPException(
+                status_code=422,
+                detail="openai_compatible requires an endpoint (base_url)")
+        if tier_map is not None and (set(tier_map) != set(_TIERS)
+                                     or not all(tier_map.values())):
+            raise HTTPException(
+                status_code=422,
+                detail="openai_compatible requires a complete tier_map "
+                       "(premium/balanced/economy) — there is no built-in default")
+    if endpoint:
+        try:
+            probe.validate_endpoint(endpoint)
+        except probe.EndpointNotAllowed as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
 @router.get("/defaults")
 def model_defaults(
     org_id: str = Depends(admin_org("/admin/models/defaults")),
@@ -102,7 +203,10 @@ def model_defaults(
     return {
         "providers": providers,
         "personas": list(Persona.__args__),  # type: ignore[attr-defined]
-        "tier_maps": {name: DEFAULT_TIER_MAP[name] for name in providers},
+        # openai_compatible has no built-in map — the console starts it blank
+        # (or prefilled from a preset).
+        "tier_maps": {name: DEFAULT_TIER_MAP[name]
+                      for name in providers if name in DEFAULT_TIER_MAP},
         "instance_default": {
             "provider": p,
             "region": settings.bedrock_region if p == "bedrock" else None,
@@ -160,6 +264,7 @@ def get_org_default(
 def set_org_default(
     cfg: OrgDefault, org_id: str = Depends(admin_org("/admin/models/org-default"))
 ) -> dict:
+    _validate_provider_config(cfg.provider, cfg.endpoint, tier_map=cfg.tier_map)
     params = {"o": org_id, "p": cfg.provider, "r": cfg.region, "e": cfg.endpoint,
               "t": json.dumps(cfg.tier_map)}
     if cfg.api_key is not None:
@@ -232,6 +337,7 @@ def set_agent_override(
     cfg: AgentOverride,
     org_id: str = Depends(admin_org("/admin/models/agent-overrides")),
 ) -> dict:
+    _validate_provider_config(cfg.provider, cfg.endpoint)  # model_id is required by schema
     params = {"o": org_id, "a": persona, "p": cfg.provider, "m": cfg.model_id,
               "r": cfg.region, "e": cfg.endpoint}
     if cfg.api_key is not None:

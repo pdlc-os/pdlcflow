@@ -11,6 +11,7 @@ import {
   type AgentOverride,
   type ModelDefaults,
   type OrgDefault,
+  type Preset,
   type ProbeBody,
   type TestResult,
   type TierName,
@@ -20,7 +21,7 @@ import { ErrorNotice, Loading, PageHeader } from './_shared';
 
 const TIERS: TierName[] = ['premium', 'balanced', 'economy'];
 const REGION_PROVIDERS = new Set(['bedrock', 'vertex', 'azure']);
-const ENDPOINT_PROVIDERS = new Set(['ollama', 'azure']);
+const ENDPOINT_PROVIDERS = new Set(['ollama', 'azure', 'openai_compatible']);
 
 const inputCls = 'rounded border border-border bg-bg px-2 py-1';
 const btnCls =
@@ -169,8 +170,18 @@ function OrgDefaultCard({
   const onProviderChange = (p: string) => {
     setProvider(p);
     // Switching providers invalidates the old model ids — prefill the
-    // provider's defaults (still editable afterwards).
+    // provider's defaults (still editable afterwards). openai_compatible has
+    // no built-in map: start blank or pick a preset.
     setTierMap(defaults.tier_maps[p] ?? { premium: '', balanced: '', economy: '' });
+    setTest('idle');
+  };
+
+  const applyPreset = (p: Preset) => {
+    // Pre-fill only — the admin reviews, adds the key, Tests, then Saves.
+    setProvider(p.provider);
+    setTierMap(p.tier_map);
+    setRegion(p.region ?? '');
+    setEndpoint(p.endpoint ?? '');
     setTest('idle');
   };
 
@@ -244,6 +255,8 @@ function OrgDefaultCard({
           ). Saving creates an org-level config.
         </div>
       ) : null}
+
+      <PresetPicker orgId={orgId} onPick={applyPreset} />
 
       <div className="grid grid-cols-[120px_1fr] items-center gap-2">
         <div className="text-muted-fg">Provider</div>
@@ -328,6 +341,105 @@ function OrgDefaultCard({
         {dirty && !busy ? <span className="text-xs text-muted-fg">unsaved changes</span> : null}
         {error ? <span className="text-xs text-red-400">{error}</span> : null}
       </div>
+    </div>
+  );
+}
+
+// ── Preset picker ───────────────────────────────────────────────────────────
+
+function PresetPicker({ orgId, onPick }: { orgId: string; onPick: (p: Preset) => void }) {
+  const [open, setOpen] = useState(false);
+  const [q, setQ] = useState('');
+  const presets = useQuery({
+    queryKey: ['admin', 'presets', orgId],
+    queryFn: () => admin.listPresets(orgId),
+    refetchOnWindowFocus: false,
+    enabled: open,
+  });
+
+  const items = useMemo(() => {
+    const all = presets.data?.presets ?? [];
+    if (!q) return all;
+    const n = q.toLowerCase();
+    return all.filter(
+      (p) =>
+        p.id.toLowerCase().includes(n) ||
+        p.label.toLowerCase().includes(n) ||
+        p.tags.some((t) => t.toLowerCase().includes(n)),
+    );
+  }, [presets.data, q]);
+
+  if (!open) {
+    return (
+      <button onClick={() => setOpen(true)} className={btnCls}>
+        Start from a preset…
+      </button>
+    );
+  }
+  return (
+    <div className="space-y-2 rounded border border-border p-3">
+      <div className="flex items-center gap-2">
+        <input
+          autoFocus
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          placeholder="Search presets (openrouter, deepseek, vllm…)"
+          className={`${inputCls} flex-1`}
+        />
+        <button onClick={() => setOpen(false)} className={btnCls}>
+          Close
+        </button>
+      </div>
+      {presets.isLoading ? (
+        <div className="text-xs text-muted-fg">Loading catalog…</div>
+      ) : (
+        <div className="grid max-h-64 grid-cols-2 gap-2 overflow-y-auto">
+          {items.map((p) => (
+            <div key={p.id} className="rounded border border-border p-2">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs font-medium">{p.label}</span>
+                <button
+                  onClick={() => {
+                    onPick(p);
+                    setOpen(false);
+                  }}
+                  title={p.key_hint ? `Key: ${p.key_hint}` : undefined}
+                  className={btnCls}
+                >
+                  Use
+                </button>
+              </div>
+              <div className="mt-1 flex flex-wrap items-center gap-1 text-[10px] text-muted-fg">
+                <span>{p.provider}</span>
+                {p.tags.map((t) => (
+                  <span key={t} className="rounded bg-border/50 px-1">
+                    {t}
+                  </span>
+                ))}
+                {p.docs_url ? (
+                  <a
+                    href={p.docs_url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="underline"
+                  >
+                    docs
+                  </a>
+                ) : null}
+              </div>
+            </div>
+          ))}
+          {items.length === 0 ? (
+            <div className="col-span-2 text-xs text-muted-fg">No presets match.</div>
+          ) : null}
+        </div>
+      )}
+      {presets.data ? (
+        <div className="text-[10px] text-muted-fg">
+          Catalog {presets.data.catalog_version} — presets pre-fill the form; review, add your
+          key, Test, then Save.
+        </div>
+      ) : null}
     </div>
   );
 }

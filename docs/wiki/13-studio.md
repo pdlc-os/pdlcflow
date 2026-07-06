@@ -198,9 +198,11 @@ org-scoped via the session store. See [Monitoring](14-monitoring.md) for what
 each renders.
 
 **Models** is the provider settings console: set the org default provider +
-tier map (premium/balanced/economy model ids, prefilled per provider), override
-provider/model per agent persona, and attach BYOK API keys per scope (shown
-only as a "●●● key set" chip — keys are write-only). Every row has a **Test**
+tier map (premium/balanced/economy model ids, prefilled per provider — or
+one-click from the searchable **preset catalog**, which covers first-party
+providers plus OpenAI-compatible gateways like OpenRouter/DeepSeek/Kimi/GLM and
+local vLLM/LiteLLM), override provider/model per agent persona, and attach BYOK
+API keys per scope (shown only as a "●●● key set" chip — keys are write-only). Every row has a **Test**
 button that live-probes the current (even unsaved) values via
 `POST /v1/admin/models/test` and shows ✓ latency or a classified error before
 you save. Changes take effect on each agent's next turn; switching the org

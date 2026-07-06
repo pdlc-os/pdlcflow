@@ -614,3 +614,42 @@ def test_provider_probe_saved_scope_and_health_table(monkeypatch):
         probe.reset_probe_limiter()
         S.reset_secrets()
         invalidate_secret_cache()
+
+
+def test_preset_apply_roundtrip():
+    """Applying a preset upserts the org default (no secret touched); the
+    factory then resolves models from the preset's tier_map; a gateway
+    (openai_compatible) row round-trips through the widened CHECK constraint."""
+    from app.llm.factory import LLMProviderFactory
+    from app.main import app
+    from fastapi.testclient import TestClient
+
+    org, _ = _seed_project()
+    c = TestClient(app)
+    q = f"?org_id={org}"
+
+    r = c.post(f"/v1/admin/models/presets/openrouter/apply{q}")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["ok"] is True and body["needs_secret"] is True
+    assert body["applied"]["provider"] == "openai_compatible"
+
+    g = c.get(f"/v1/admin/models/org-default{q}").json()
+    assert g["provider"] == "openai_compatible"
+    assert g["endpoint"] == "https://openrouter.ai/api/v1"
+    assert g["has_key"] is False  # apply never touches secrets
+
+    f = LLMProviderFactory(db=get_sync_engine_for_tests())
+    cfg = f._org_default(org)
+    assert cfg.provider == "openai_compatible"
+    assert cfg.tier_map_override["economy"] == "deepseek/deepseek-chat"
+
+    # Switching back to a first-party preset also works (idempotent upsert).
+    assert c.post(f"/v1/admin/models/presets/bedrock-us/apply{q}").status_code == 200
+    assert c.get(f"/v1/admin/models/org-default{q}").json()["provider"] == "bedrock"
+
+
+def get_sync_engine_for_tests():
+    from app.db.session import get_sync_engine
+
+    return get_sync_engine(settings)
