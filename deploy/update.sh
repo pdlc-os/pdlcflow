@@ -63,6 +63,18 @@ mkdir -p postgres-init && curl -fsSL "$BASE/postgres-init/01-app-role.sh" -o pos
 chmod +x postgres-init/01-app-role.sh  # Postgres execs init *.sh; curl -o drops the exec bit
 curl -fsSL "$BASE/pdlcflow" -o pdlcflow && chmod +x pdlcflow
 
+# Refresh observability configs (opt-in `observability` profile).
+mkdir -p observability/grafana/provisioning/datasources observability/grafana/provisioning/dashboards observability/grafana/dashboards
+for f in \
+  observability/otel-collector-config.yaml \
+  observability/tempo.yaml \
+  observability/prometheus.yml \
+  observability/grafana/provisioning/datasources/datasources.yaml \
+  observability/grafana/provisioning/dashboards/dashboards.yaml \
+  observability/grafana/dashboards/pdlcflow.json; do
+  curl -fsSL "$BASE/$f" -o "$f"
+done
+
 # Recreate the 'pdlcflow' command if the symlink or PDLCFLOW_HOME env is missing.
 if [ ! -L "$PDLCFLOW_BIN_DIR/pdlcflow" ] || ! grep -q '^export PDLCFLOW_HOME=' "$(_rc_file)" 2>/dev/null; then
   c "🔗 (Re)installing the 'pdlcflow' command"

@@ -112,6 +112,25 @@ class Settings(BaseSettings):
     # e.g. "groundedness,citation". Empty => measure-only.
     eval_blocking: str = ""
 
+    # Observability — OpenTelemetry traces + metrics for the Nexus dashboard.
+    # Off by default so dev/test/CI stay hermetic (no SDK provider installed → the
+    # graph's tracer port is a no-op, byte-identical output). When enabled, the
+    # engine exports OTLP to a collector (Tempo for traces, Prometheus for
+    # metrics) which the Grafana + Streamlit Nexus dashboards read from. Enable
+    # with the compose `observability` profile, which sets PDLC_OTEL_ENABLED=true.
+    otel_enabled: bool = False
+    otel_service_name: str = "pdlc-engine"
+    # OTLP/gRPC endpoint of the collector. The standard OTEL_EXPORTER_OTLP_ENDPOINT
+    # env var is honoured too; this is the pdlc-prefixed convenience knob.
+    otel_endpoint: str = "http://otel-collector:4317"
+    # Export spans/metrics to stdout as well (local debugging without a collector).
+    otel_console_export: bool = False
+    # Metric export cadence (seconds) to the collector.
+    otel_metric_interval_s: int = 15
+    # Instrument FastAPI request spans (server-side HTTP traces) in addition to
+    # the graph turn/node/LLM spans.
+    otel_instrument_fastapi: bool = True
+
     # CORS
     cors_origins: list[str] = Field(default_factory=lambda: ["http://localhost:5173"])
 

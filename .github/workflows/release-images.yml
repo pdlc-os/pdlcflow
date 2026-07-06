@@ -28,6 +28,8 @@ jobs:
             dockerfile: services/pdlc-engine/Dockerfile
           - name: pdlcflow-studio
             dockerfile: apps/studio/Dockerfile
+          - name: pdlcflow-nexus-dashboard
+            dockerfile: services/nexus-dashboard/Dockerfile
     steps:
       - uses: actions/checkout@v4
       - uses: docker/setup-qemu-action@v3

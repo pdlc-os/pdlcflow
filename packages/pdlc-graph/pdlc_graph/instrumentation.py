@@ -14,6 +14,8 @@ import uuid
 from collections.abc import Callable
 from typing import Any, Protocol
 
+from . import tracing
+
 try:  # langgraph control-flow signals (interrupt(), Command bubbling) — NOT errors
     from langgraph.errors import GraphBubbleUp as _ControlFlow
 except Exception:  # pragma: no cover - older/newer langgraph
@@ -86,6 +88,23 @@ def evaluate(
     return results
 
 
+def _span_attrs(fn_name: str, event_type: str, state: dict) -> dict:
+    """OTel attributes for a node span — tenancy + workflow position, so the
+    trace tree can be sliced by org/project/thread/phase/agent in Grafana."""
+    attrs = {
+        "pdlc.node": fn_name,
+        "pdlc.event_type": event_type,
+        "pdlc.phase": state.get("phase"),
+        "pdlc.org_id": state.get("org_id"),
+        "pdlc.project_id": state.get("project_id"),
+        "pdlc.thread_id": state.get("thread_id"),
+        "pdlc.initiative_id": state.get("initiative_id"),
+        "pdlc.squad_id": state.get("squad_id"),
+        "pdlc.agent_persona": state.get("agent_persona"),
+    }
+    return {k: v for k, v in attrs.items() if v is not None}
+
+
 def instrumented_node(event_type: str) -> Callable:
     def deco(fn: Callable) -> Callable:
         @functools.wraps(fn)
@@ -93,19 +112,29 @@ def instrumented_node(event_type: str) -> Callable:
             corr = state.get("correlation_id") or str(uuid.uuid4())
             t0 = time.time()
             _emitter.emit(event_type, state, {"node": fn.__name__, "phase": "enter"}, corr)
-            try:
-                out = fn(state)
-            except _ControlFlow:
-                # interrupt() / Command bubbling pauses the graph — control flow,
-                # not a failure. Re-raise without emitting a spurious error event.
-                raise
-            except Exception as exc:
-                _emitter.emit(
-                    "error", state,
-                    {"exc_type": type(exc).__name__, "where": fn.__name__},
-                    corr,
-                )
-                raise
+            # One OTel span per node execution — this is the "across multiple
+            # agents" view: nested under the engine's per-turn root span, the
+            # span tree shows which persona/node ran when. No-op unless the
+            # engine injected a tracer (see pdlc_graph.tracing).
+            with tracing.span(
+                f"pdlc.node.{fn.__name__}",
+                kind="internal",
+                attributes=_span_attrs(fn.__name__, event_type, state),
+            ) as _span:
+                try:
+                    out = fn(state)
+                except _ControlFlow:
+                    # interrupt() / Command bubbling pauses the graph — control
+                    # flow, not a failure. Re-raise without a spurious error event.
+                    raise
+                except Exception as exc:
+                    _span.record_exception(exc)
+                    _emitter.emit(
+                        "error", state,
+                        {"exc_type": type(exc).__name__, "where": fn.__name__},
+                        corr,
+                    )
+                    raise
             _emitter.emit(
                 event_type, state,
                 {"node": fn.__name__, "phase": "exit",

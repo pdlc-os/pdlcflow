@@ -89,6 +89,63 @@ services:
     working_dir: /workspace/services/pdlc-engine
     command: ["uv", "run", "python", "/workspace/scripts/run_eval_suite.py", "--real"]
 
+  # ── Observability stack (opt-in) ─────────────────────────────────────────
+  # Enable with:  set PDLC_OTEL_ENABLED=true in .env, then
+  #   docker compose --profile observability up -d
+  # The engine exports OTLP → otel-collector, which fans traces to Tempo and
+  # metrics to Prometheus; Grafana (:3000) and the Streamlit Nexus dashboard
+  # (:8501) read from them. See docs/wiki/19-observability.md.
+  otel-collector:
+    profiles: ["observability"]
+    image: otel/opentelemetry-collector-contrib:0.111.0
+    command: ["--config=/etc/otel/config.yaml"]
+    volumes:
+      - ./observability/otel-collector-config.yaml:/etc/otel/config.yaml:ro
+    ports: ["4317:4317", "4318:4318", "8889:8889"]
+
+  tempo:
+    profiles: ["observability"]
+    image: grafana/tempo:2.6.1
+    command: ["-config.file=/etc/tempo/tempo.yaml"]
+    volumes:
+      - ./observability/tempo.yaml:/etc/tempo/tempo.yaml:ro
+      - tempodata:/var/tempo
+
+  prometheus:
+    profiles: ["observability"]
+    image: prom/prometheus:v2.54.1
+    command: ["--config.file=/etc/prometheus/prometheus.yml"]
+    volumes:
+      - ./observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - promdata:/prometheus
+    ports: ["9090:9090"]
+
+  grafana:
+    profiles: ["observability"]
+    image: grafana/grafana:11.2.2
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: "Admin"
+      GF_SECURITY_ALLOW_EMBEDDING: "true"
+    volumes:
+      - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafanadata:/var/lib/grafana
+    ports: ["3000:3000"]
+    depends_on: [prometheus, tempo]
+
+  nexus-dashboard:
+    profiles: ["observability"]
+    build:
+      context: ../../
+      dockerfile: services/nexus-dashboard/Dockerfile
+    environment:
+      PROMETHEUS_URL: http://prometheus:9090
+      TEMPO_URL: http://tempo:3200
+      GRAFANA_URL: http://localhost:3000
+    ports: ["8501:8501"]
+    depends_on: [prometheus, tempo]
+
   caddy:
     image: caddy:2-alpine
     profiles: [tls]
@@ -105,3 +162,6 @@ volumes:
   artifacts:
   caddy-data:
   caddy-config:
+  tempodata:
+  promdata:
+  grafanadata:

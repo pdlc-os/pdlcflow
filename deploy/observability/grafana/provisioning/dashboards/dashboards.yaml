@@ -1,0 +1,11 @@
+# Load JSON dashboards mounted into /var/lib/grafana/dashboards.
+apiVersion: 1
+providers:
+  - name: pdlcflow
+    orgId: 1
+    folder: pdlcflow
+    type: file
+    disableDeletion: false
+    editable: true
+    options:
+      path: /var/lib/grafana/dashboards

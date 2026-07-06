@@ -9,8 +9,11 @@ deterministic offline stub (no creds, no network, no model drift).
 
 from __future__ import annotations
 
+import contextlib
 import logging
+import time
 
+from .. import observability
 from ..llm.factory import LLMProviderFactory, TenantCtx
 
 log = logging.getLogger("pdlc.runtime.llm")
@@ -38,12 +41,20 @@ class FactoryCompletionBackend:
             org = self._org_id
         return TenantCtx(org_id=org)
 
+    def _resolve(self, persona: str, tier: str | None):
+        """Return (model, provider, model_id) for this persona/tier/tenant.
+
+        Prefers the factory's `resolve()` (which also yields provider + model_id
+        for span/cost labelling); falls back to `get_model()` for any injected
+        factory that predates it, labelling the call as unknown."""
+        eff_tier = tier or _DEFAULT_TIER
+        if hasattr(self._factory, "resolve"):
+            return self._factory.resolve(persona=persona, tier=eff_tier, tenant=self._tenant())  # type: ignore[arg-type]
+        model = self._factory.get_model(persona=persona, tier=eff_tier, tenant=self._tenant())  # type: ignore[arg-type]
+        return model, "unknown", "unknown"
+
     def _model(self, persona: str, tier: str | None):
-        return self._factory.get_model(
-            persona=persona,
-            tier=tier or _DEFAULT_TIER,  # type: ignore[arg-type]
-            tenant=self._tenant(),
-        )
+        return self._resolve(persona, tier)[0]
 
     @staticmethod
     def _messages(system: str | None, prompt: str) -> list:
@@ -56,17 +67,75 @@ class FactoryCompletionBackend:
     def complete(
         self, persona: str, prompt: str, *, tier: str | None = None, system: str | None = None
     ) -> str:
-        result = self._model(persona, tier).invoke(self._messages(system, prompt))
-        return getattr(result, "content", str(result))
+        eff_tier = tier or _DEFAULT_TIER
+        model, provider, model_id = self._resolve(persona, tier)
+        t0 = time.perf_counter()
+        # LLM span — the leaf of the trace tree, with GenAI semconv + cost. No-op
+        # unless observability is wired.
+        with observability.llm_span(persona, eff_tier) as span:
+            try:
+                result = model.invoke(self._messages(system, prompt))
+            except Exception:
+                self._record(span, persona, provider, model_id, eff_tier,
+                             {"input": 0, "output": 0}, t0, ok=False)
+                raise
+            usage = _usage_from_message(result)
+            self._record(span, persona, provider, model_id, eff_tier, usage, t0, ok=True)
+            return getattr(result, "content", str(result))
 
     def stream(
         self, persona: str, prompt: str, *, tier: str | None = None, system: str | None = None
     ):
         """Yield text chunks as the model streams (powers live token streaming)."""
-        for chunk in self._model(persona, tier).stream(self._messages(system, prompt)):
-            text = getattr(chunk, "content", "")
-            if text:
-                yield text
+        eff_tier = tier or _DEFAULT_TIER
+        model, provider, model_id = self._resolve(persona, tier)
+        t0 = time.perf_counter()
+        with observability.llm_span(persona, eff_tier) as span:
+            usage = {"input": 0, "output": 0}
+            try:
+                for chunk in model.stream(self._messages(system, prompt)):
+                    u = _usage_from_message(chunk)  # last chunk often carries usage
+                    if u["input"] or u["output"]:
+                        usage = u
+                    text = getattr(chunk, "content", "")
+                    if text:
+                        yield text
+            except Exception:
+                self._record(span, persona, provider, model_id, eff_tier, usage, t0, ok=False)
+                raise
+            self._record(span, persona, provider, model_id, eff_tier, usage, t0, ok=True)
+
+    @staticmethod
+    def _record(span, persona, provider, model_id, tier, usage, t0, *, ok: bool) -> None:
+        """Stamp GenAI semconv attributes on the span + record OTel metrics."""
+        from ..llm.pricing import estimate_usd
+
+        duration_ms = (time.perf_counter() - t0) * 1000
+        usd = estimate_usd(provider, model_id, usage) if ok else 0.0
+        if span is not None:
+            with contextlib.suppress(Exception):
+                span.set_attribute("gen_ai.system", provider)
+                span.set_attribute("gen_ai.request.model", model_id)
+                span.set_attribute("gen_ai.usage.input_tokens", usage["input"])
+                span.set_attribute("gen_ai.usage.output_tokens", usage["output"])
+                span.set_attribute("pdlc.cost_usd", usd)
+        observability.record_llm(
+            persona=persona, provider=provider, model=model_id, tier=tier or _DEFAULT_TIER,
+            tokens_in=usage["input"], tokens_out=usage["output"], usd=usd,
+            duration_ms=duration_ms, ok=ok,
+        )
+
+
+def _usage_from_message(msg) -> dict[str, int]:
+    """Normalise LangChain usage_metadata across providers → {input, output}."""
+    try:
+        u = getattr(msg, "usage_metadata", None) or {}
+        return {
+            "input": int(u.get("input_tokens", 0) or 0),
+            "output": int(u.get("output_tokens", 0) or 0),
+        }
+    except Exception:
+        return {"input": 0, "output": 0}
 
 
 def wire_llm_backend(settings) -> bool:

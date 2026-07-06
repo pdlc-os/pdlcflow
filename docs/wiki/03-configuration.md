@@ -40,6 +40,8 @@ All engine configuration is environment-driven through Pydantic settings with th
 | `PDLC_JUDGE_TIER` | `premium` | Capability tier for the LLM-as-judge (`premium`\|`balanced`\|`economy`). |
 | `PDLC_AUTH_REQUIRED` | `false` | Enforce JWT auth; derive the tenant from the token. |
 | `PDLC_ENABLE_CLI_PROVIDERS` | `false` | Allow subscription-CLI providers (single-user self-host only; see below). |
+| `PDLC_OTEL_ENABLED` | `false` | Export OpenTelemetry traces + metrics (agent span tree, latency, token/cost) to the collector. Off ⇒ the graph tracer port is a no-op. See [Observability](19-observability.md). |
+| `PDLC_OTEL_ENDPOINT` | `http://otel-collector:4317` | OTLP/gRPC endpoint of the OTel collector. |
 | `PDLC_CORS_ORIGINS` | `["http://localhost:5173"]` | Allowed CORS origins for the API. |
 
 > AWS credentials (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION`) are read by boto3 directly — only needed when using Bedrock, Firehose, or real S3.

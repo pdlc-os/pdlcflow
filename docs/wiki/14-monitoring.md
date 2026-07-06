@@ -9,6 +9,13 @@ feeds them into an analytics read store, and surfaces rollups through the
 tenancy/traceability dimensions every event carries, the analytics pipeline, the
 admin routes, the cross-org ban, and live night-shift verdicts.
 
+> **This page = tenant business analytics** (per-org tokens/USD, phase rollups)
+> served behind RLS by the engine. For **operational telemetry** — distributed
+> traces of the agent span tree, latency/throughput metrics, Grafana, and the
+> Streamlit Nexus Dashboard — see [Observability](19-observability.md). The two
+> are complementary pipes: business facts live in Postgres (RLS), operational
+> signals flow through OpenTelemetry.
+
 ## The 40-event taxonomy
 
 Every event the clickstream emits is one of **40 typed event types in 16

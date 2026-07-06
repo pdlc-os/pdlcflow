@@ -44,6 +44,7 @@ graph LR
 | 16 | [API & WebSocket Reference](16-api-reference.md) | Every REST endpoint + the thread WebSocket |
 | 17 | [Evals Framework](17-evals.md) | Per-agent scoring, groundedness/hallucination, drift, LLM-as-judge, eval CI |
 | 18 | [Data Model & Hierarchy](18-data-model.md) | Org · Domain · Squad · Repo · Initiative · Program · Project · Conversation — and RLS |
+| 19 | [Observability](19-observability.md) | OpenTelemetry traces + metrics, the Collector/Tempo/Prometheus stack, Grafana + the Streamlit Nexus Dashboard |
 
 ---
 
