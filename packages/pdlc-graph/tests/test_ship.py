@@ -105,7 +105,9 @@ def test_happy_path_pauses_then_merges_and_deploys():
     assert final["merge_and_deploy_approved"] is True
     assert final["merged"] is True
     assert final["version"] == "v1.3.0"
-    assert final["deploy_url"] == "https://dark-mode.example.app"
+    # No deployer wired (hermetic) -> honest simulated placeholder, not a fake URL.
+    assert "simulated" in final["deploy_url"]
+    assert "example.app" not in final["deploy_url"]
     assert final["deployments_ref"]
 
     # CHANGELOG + DEPLOYMENTS are real rendered markdown.

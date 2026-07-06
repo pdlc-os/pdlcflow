@@ -65,10 +65,23 @@ def evaluate(run_state: dict, state_md: str) -> Verdict:
     return {"ok": True, "verdict": "continue"}
 
 
-def _stalled(run_state: dict, progress: list[str]) -> bool:
-    """Stagnation: no new progress marker since last fire AND no abort marker.
+_STALL_LIMIT = 2  # consecutive stagnant firings before a stagnation abort
 
-    The real implementation compares fire counts. Phase A stub: always False
-    (no false aborts during scaffold smoke runs).
+
+def _stalled(run_state: dict, progress: list[str]) -> bool:
+    """Stagnation: forward progress hasn't grown across the last _STALL_LIMIT+1
+    Sentinel firings.
+
+    Pure read of `night_shift_progress_log` — a list of progress-marker
+    fingerprints the sentinel nodes append (in returned state, so it's
+    replay-safe). Stalled when the tail entries are identical, i.e. no new
+    `ns-progress:` marker appeared across successive firings. In the current
+    linear night-shift (build → ship) each firing adds a distinct marker, so
+    this never fires on the happy path; it exists to catch a genuinely stuck
+    loop should one be reintroduced.
     """
-    return False
+    log = run_state.get("night_shift_progress_log") or []
+    if len(log) <= _STALL_LIMIT:
+        return False
+    tail = log[-(_STALL_LIMIT + 1):]
+    return len(set(tail)) == 1

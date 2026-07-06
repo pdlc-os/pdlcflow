@@ -83,6 +83,29 @@ class Settings(BaseSettings):
     egress_no_proxy: str = ""             # comma-separated host suffixes (in-cluster Ollama etc.)
     egress_ca_bundle: str | None = None   # PEM bundle path for TLS-inspecting proxies
 
+    # Execution arc — real test runner / VCS merge / deploy / security scans.
+    # These CLONE the repo + run commands on the engine host, so like stdio MCP
+    # and the subscription CLIs they are single-user self-host only: enabled
+    # only when enable_execution is set AND auth is off. Default off ⇒ the
+    # deterministic simulated ports stay in place (hermetic CI unchanged).
+    enable_execution: bool = False
+    workspace_dir: str = "/tmp/pdlcflow-workspaces"
+    test_cmd: str = "true"  # default per-layer command; override per layer below
+    test_cmd_unit: str | None = None
+    test_cmd_integration: str | None = None
+    test_cmd_contract: str | None = None
+    test_cmd_e2e: str | None = None
+    test_cmd_security: str | None = None
+    test_cmd_perf: str | None = None
+    test_cmd_ux: str | None = None
+    test_cmd_smoke: str | None = None
+    test_timeout_s: int = 600
+    deploy_cmd: str | None = None      # e.g. "./deploy.sh {env} {ref}"
+    deploy_webhook: str | None = None  # POSTed {env, ref, project_id} when set
+    security_scan: bool = True         # run real scanners when execution is on
+    git_author_name: str = "pdlcflow"
+    git_author_email: str = "bot@pdlcflow.local"
+
     # MCP tool servers (PRD-09). wire_mcp gates execution entirely (registry
     # data is inert without it). stdio transport executes commands on the
     # engine host → single-user self-host only, mirroring CLI providers.

@@ -106,3 +106,41 @@ def reset_deploy_register() -> None:
 
 def get_deploy_register() -> DeployRegister:
     return _register
+
+
+# --------------------------------------------------------------------------- #
+# Deploy execution seam (execution arc, T1-3)
+#
+# There was NO execution seam: ship.py hardcoded a `*.example.app` URL and
+# recorded a deploy that never happened. `deploy(env, ref)` runs the real
+# deploy (a configured command / webhook, engine-side) and returns the true
+# environment URL. The default `_simulated_deploy` performs nothing and returns
+# an honestly-labeled placeholder, so with execution off nothing pretends to
+# have deployed.
+# --------------------------------------------------------------------------- #
+class Deployer(Protocol):
+    def deploy(self, *, env: str, ref: str, feature: str) -> dict: ...  # {url, id, simulated?}
+
+
+def _simulated_deploy(*, env: str, ref: str, feature: str) -> dict:
+    return {"url": None, "id": None, "simulated": True}
+
+
+_deployer: Deployer | None = None
+
+
+def set_deployer(deployer: Deployer) -> None:
+    global _deployer
+    _deployer = deployer
+
+
+def reset_deployer() -> None:
+    global _deployer
+    _deployer = None
+
+
+def deploy(*, env: str, ref: str, feature: str) -> dict:
+    """Execute the deploy for `env` at `ref`; returns {url, id, simulated?}.
+    Falls back to the honest no-op simulation when no deployer is injected."""
+    fn = _deployer.deploy if _deployer is not None else _simulated_deploy
+    return fn(env=env, ref=ref, feature=feature)

@@ -24,6 +24,13 @@ import time
 
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.types import Command
+from pdlc_graph.execution_context import (
+    ExecutionContext,
+    set_execution_context,
+)
+from pdlc_graph.execution_context import (
+    reset_execution_context as _reset_execution_context,
+)
 from pdlc_graph.graphs.meta import build_meta_graph
 from pdlc_graph.llm_port import reset_thread_context, set_thread_context
 from pdlc_graph.ports import reset_current_org, set_current_org
@@ -143,6 +150,12 @@ class GraphRunner:
         project = parts[1] if len(parts) >= 2 else ""
         tok = set_thread_context(thread_id)
         org_tok = set_current_org(org)
+        # Bind the execution context (which repo/branch this turn operates on) so
+        # the real test/VCS/deploy/scan backends can resolve the workspace. Uses
+        # the project from the thread id + feature/branch from state (fresh:
+        # invoke_input dict; resume: the persisted snapshot). No-op unless the
+        # execution backends are wired (single-user self-host).
+        exec_tok = self._bind_execution_context(cfg, project, invoke_input)
         # Root OTel span for the turn — node/LLM spans nest under it. No-op unless
         # observability is wired. One trace per turn (a thread spans many turns +
         # human pauses; see app/observability/tracing.py).
@@ -154,11 +167,33 @@ class GraphRunner:
             observability.record_turn("error", (time.perf_counter() - t0) * 1000)
             raise
         finally:
+            if exec_tok is not None:
+                _reset_execution_context(exec_tok)
             reset_current_org(org_tok)
             reset_thread_context(tok)
         pending = self._sync_pending(thread_id, cfg)
         observability.record_turn("paused" if pending else "completed", (time.perf_counter() - t0) * 1000)
         return pending
+
+    def _bind_execution_context(self, cfg, project: str, invoke_input):
+        """Resolve feature/branch for the turn and bind the execution context.
+        Fresh command → invoke_input is the state dict; resume → read the
+        persisted snapshot. Best-effort; never blocks a turn."""
+        feature = branch = None
+        try:
+            if isinstance(invoke_input, dict):
+                feature = invoke_input.get("feature")
+                branch = invoke_input.get("branch")
+            if feature is None:
+                values = self._graph.get_state(cfg).values
+                feature = values.get("feature")
+                branch = branch or values.get("branch")
+        except Exception:
+            pass
+        if not project:
+            return None
+        return set_execution_context(
+            ExecutionContext(project_id=project, feature=feature, branch=branch))
 
     def _pending_interrupt(self, cfg) -> dict | None:
         state = self._graph.get_state(cfg)

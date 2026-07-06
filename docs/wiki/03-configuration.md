@@ -202,6 +202,39 @@ Wiring is defensive: `wire_persistence`, `build_checkpointer`, `wire_event_bus`,
 - Misconfiguration degrades a feature (e.g. checkpoints become non-durable) instead of taking the service down.
 - Watch the startup logs (`docker compose logs -f api`) for lines like `PostgresSaver unavailable (...); falling back to MemorySaver` to confirm a real backend actually engaged — a green boot does **not** by itself prove Postgres is wired.
 
+## Real execution (test / merge / deploy / scan) — single-user self-host only
+
+By default, Construction/Operation's outermost side-effects are **deterministic
+simulations**: `SimulatedTestRunner` scripts pass/fail, `SimulatedVCS` returns a
+fake merge SHA, deploy is a labeled no-op, and security checks report `skipped`.
+This keeps CI hermetic and multi-tenant SaaS safe.
+
+Enabling real execution makes them actually run — clone the connected repo, run
+tests/scans/build/deploy as subprocesses, and merge with local git. Because that
+is **host code execution**, it is gated exactly like stdio MCP and the
+subscription CLIs: it requires `PDLC_ENABLE_EXECUTION=true` **and** is refused
+whenever `PDLC_AUTH_REQUIRED=true` (single-user self-host only). The project must
+have a connected repository (URL + token).
+
+| Variable | Default | Meaning |
+| --- | --- | --- |
+| `PDLC_ENABLE_EXECUTION` | `false` | Master switch. Real backends wire only when set **and** auth is off. |
+| `PDLC_WORKSPACE_DIR` | `/tmp/pdlcflow-workspaces` | Where repos are cloned per (project, branch). |
+| `PDLC_TEST_CMD` | `true` | Default per-layer test command run in the workspace. |
+| `PDLC_TEST_CMD_<LAYER>` | — | Override per layer (`UNIT`, `INTEGRATION`, `CONTRACT`, `E2E`, `SECURITY`, `PERF`, `UX`, `SMOKE`). |
+| `PDLC_TEST_TIMEOUT_S` | `600` | Hard per-command budget. |
+| `PDLC_DEPLOY_CMD` | — | Deploy command; `{env}`/`{ref}` substituted. Print `deploy_url=<url>` to record the environment URL. |
+| `PDLC_DEPLOY_WEBHOOK` | — | Alternative: POST `{env, ref, project_id}`; response `{url, id}`. |
+| `PDLC_SECURITY_SCAN` | `true` | Run `pip-audit` / `npm audit` / `gitleaks` when present (absent ⇒ `skipped`, never faked clean). |
+
+What changes when enabled: Ship performs a **real merge** (real SHA + tag pushed
+to the repo's default branch) and a **real deploy** (the returned URL is what
+verify smoke-tests); the Construction TDD loop and the 7 test layers run the
+**real suite**; a security **finding** blocks the smoke-signoff gate; and the
+night-shift Sentinel's stagnation guard is live. The three-layer
+production-deploy ban still runs in front of every deploy. A failed merge/deploy
+**raises** — it is never reported as success.
+
 ## Secrets (per-repo VCS tokens, tenant LLM keys)
 
 Sensitive values are stored via a pluggable backend. A value is written with `put()` which returns an opaque **ref** saved in the DB column (e.g. `repositories.token_secret_ref`); `resolve(ref)` returns the plaintext. **`resolve` dispatches on the ref prefix**, so a deployment can switch backends and still read old refs.

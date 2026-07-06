@@ -17,15 +17,15 @@
 
 | # | Item | Area | Severity | Effort |
 |---|------|------|----------|--------|
-| T1-1 | Real test runner (builds/ships report fabricated test results) | pdlc-graph + engine | 🔴 Integrity | L |
-| T1-2 | Real VCS merge (Ship reports fake merge SHAs) | pdlc-graph + engine | 🔴 Integrity | M |
-| T1-3 | Real deploy execution (+ hardcoded `*.example.app` deploy URL) | pdlc-graph + engine | 🔴 Integrity | L |
-| T1-4 (mini ✅) | Verify gates now label scans "skipped" not "clean"; real scanner port still open | pdlc-graph | 🔴 Integrity | M |
+| ~~T1-1~~ ✅ | Real test runner (SubprocessTestRunner, self-host gated) — **done** | pdlc-graph + engine | 🔴 Integrity | L |
+| ~~T1-2~~ ✅ | Real VCS merge (GitVCS: clone+merge+push+tag, real sha) — **done** | pdlc-graph + engine | 🔴 Integrity | M |
+| ~~T1-3~~ ✅ | Real deploy execution (deploy seam + CommandDeployer; honest sim otherwise) — **done** | pdlc-graph + engine | 🔴 Integrity | L |
+| ~~T1-4~~ ✅ | Real security scanners (security_scan_port + SubprocessScanner; gate blocks on findings) — **done** | pdlc-graph | 🔴 Integrity | M |
 | ~~T1-5~~ ✅ | Migrate import persists tasks/decisions/deployments; received-vs-persisted response — **done** | engine + migrate | 🔴 Integrity | M |
 | ~~T1-6~~ ✅ | FirehoseSink real delivery (was silent no-op) — **done** (quick-wins) | engine | 🔴 Integrity | S |
 | ~~T2-1~~ ✅ | `/health/ready` real db/redis probes — **done** (quick-wins) | engine | 🟠 Operational | S |
 | ~~T2-2~~ ✅ | Python CI teeth: ruff+pytest blocking (mypy ratchet kept) — **done** | CI | 🟠 Operational | S |
-| T2-3 | Sentinel `_stalled` always False; most night-shift aborts unreachable | pdlc-graph | 🟠 Operational | M |
+| ~~T2-3~~ ✅ | Sentinel `_stalled` real (progress-fingerprint) + smoke-failed marker reachable — **done** | pdlc-graph | 🟠 Operational | M |
 | T2-4 (partial ✅) | `PDLC_AUTH_MODE` boot-guard done (no longer inert); real OIDC still open | engine | 🟠 Operational | L |
 | ~~T2-5~~ ✅ | CDK image from context w/ GHCR default — **done** (quick-wins) | infra | 🟠 Operational | S |
 | T3-1 | MCP stdio execution stub (registration works, every call fails) | engine | 🟡 Feature | M |

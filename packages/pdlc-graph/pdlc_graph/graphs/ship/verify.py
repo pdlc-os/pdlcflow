@@ -16,6 +16,7 @@ from langgraph.graph import END, START, StateGraph
 from ... import gates
 from ...instrumentation import instrumented_node
 from ...llm_port import complete
+from ...security_scan_port import scan
 from ...state import PDLCState
 from ...test_runner_port import run_layer
 
@@ -29,10 +30,13 @@ _REQUIRED_CHECKS = ("http_health", "user_journey")
 
 @instrumented_node("subphase.entered")
 def security_checks(state: PDLCState) -> dict:
-    """Step 10a — final pre-verify security sweep (Phantom).
+    """Step 10a — final pre-verify security sweep.
 
-    No real scanners run yet (stub-gaps-roadmap T1-4): one Phantom completion
-    produces an advisory note; the check labels record "skipped" honestly.
+    Runs real scanners (dependency audit + secret scan) via the security-scan
+    port when execution is wired (T1-4); with no scanner they honestly report
+    "skipped" — never a faked "clean". A real FINDING (passed=False, not
+    skipped) flags the sign-off gate blocking. A Phantom completion adds an
+    advisory note either way.
     """
     feature = state.get("feature") or "untitled-feature"
     deploy_url = state.get("deploy_url") or "(unknown)"
@@ -43,20 +47,29 @@ def security_checks(state: PDLCState) -> dict:
         f"Report critical findings, if any.",
         system="PDLC security reviewer",
     ).strip()
-    # HONESTY: no real dependency audit / secret scan runs yet (a real
-    # security_scan_port is tracked in stub-gaps-roadmap T1-4) — label the
-    # checks "skipped", never "clean". The Phantom note is the only real work.
+    dep = scan("dependency_audit")
+    sec = scan("secret_scan")
+    scans_run = not (dep.get("skipped") and sec.get("skipped"))
+    passed = bool(dep.get("passed", True) and sec.get("passed", True))
     security = {
-        "dependency_audit": "skipped",
-        "secret_scan": "skipped",
+        "dependency_audit": _label(dep),
+        "secret_scan": _label(sec),
         "security_headers": "skipped",
-        "scans_run": False,
-        "report": note,
-        "passed": True,  # structural pass — nothing ran, nothing failed
+        "scans_run": scans_run,
+        "findings": int(dep.get("findings", 0)) + int(sec.get("findings", 0)),
+        "report": "\n".join(
+            x for x in (note, dep.get("report", ""), sec.get("report", "")) if x),
+        "passed": passed,
     }
     results = dict(state.get("smoke_results") or {})
     results["security"] = security
     return {"smoke_results": results}
+
+
+def _label(result: dict) -> str:
+    if result.get("skipped"):
+        return "skipped"
+    return "clean" if result.get("passed") else "findings"
 
 
 @instrumented_node("step.completed")
@@ -71,7 +84,11 @@ def smoke_tests(state: PDLCState) -> dict:
             f"{check}@{target}",
             fail_until=1 if check in failing else 0,
         )
-        results[check] = {"passed": bool(outcome["passed"]), "report": outcome["report"]}
+        # `required` makes the night-shift `smoke-failed` abort marker reachable
+        # (_state_md keys off it) — required checks that fail abort the run.
+        results[check] = {"passed": bool(outcome["passed"]),
+                          "required": check in _REQUIRED_CHECKS,
+                          "report": outcome["report"]}
     return {"smoke_results": results}
 
 
@@ -104,6 +121,11 @@ def smoke_gate(state: PDLCState) -> dict:
     failed_required = [
         c for c in _REQUIRED_CHECKS if not (results.get(c) or {}).get("passed", False)
     ]
+    # A real security scan that FOUND something (ran and did not pass) is a
+    # hard block — night-shift must not auto-approve a deploy with live
+    # vulnerabilities. A "skipped" scan (nothing ran) does not block.
+    sec = results.get("security") or {}
+    security_blocking = sec.get("scans_run") and not sec.get("passed", True)
     summary_lines = []
     for check in _SMOKE_CHECKS:
         if check in results:
@@ -111,14 +133,21 @@ def smoke_gate(state: PDLCState) -> dict:
             summary_lines.append(f"{check}: {mark}")
     if "ux_verify" in results:
         summary_lines.append("ux_verify: pass")
+    if "security" in results:
+        summary_lines.append(f"security: {'fail' if security_blocking else 'ok'}")
     payload = {
         "feature": state.get("feature"),
         "deploy_url": state.get("deploy_url"),
         "smoke_results": results,
         "summary": "Smoke results — " + "; ".join(summary_lines),
     }
-    if failed_required:  # a required smoke failure blocks night-shift auto-approval
-        payload["blocking"] = f"required smoke check(s) failed: {', '.join(failed_required)}"
+    blockers = []
+    if failed_required:
+        blockers.append(f"required smoke check(s) failed: {', '.join(failed_required)}")
+    if security_blocking:
+        blockers.append(f"security scan found {sec.get('findings', 0)} finding(s)")
+    if blockers:  # blocks night-shift auto-approval
+        payload["blocking"] = "; ".join(blockers)
     verdict = gates.approval_gate(state, GATE_KIND, payload)
     return {"smoke_signed_off": bool(verdict.get("approved"))}
 
