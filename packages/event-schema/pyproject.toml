@@ -1,6 +1,6 @@
 [project]
 name = "pdlc-event-schema"
-version = "1.14.0"
+version = "1.14.1"
 description = "Pydantic envelope + 37 typed payloads for the PDLC clickstream"
 requires-python = ">=3.12"
 license = { text = "MIT" }

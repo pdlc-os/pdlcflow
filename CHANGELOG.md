@@ -5,6 +5,33 @@ All notable changes to pdlcflow are documented here. This project adheres to
 
 ## Unreleased
 
+## v1.14.1 — 2026-07-06
+
+**Deploy-blocking fixes** — surfaced by standing up the `deploy/` stack from a
+clean slate. Both defects shipped in every prior release but only bite a *fresh*
+install with the durable, RLS-forced self-host defaults; the hermetic tests
+(MemorySaver, no RLS) and the integration suite (CI superuser, RLS bypassed)
+masked them.
+
+### Fixed
+- **Fresh-database migrations** (#105) — `alembic upgrade head` (the documented
+  install step) failed on any new database. `0001_init` builds the schema via
+  `Base.metadata.create_all()`, so it already creates every current ORM table;
+  the incremental migrations then re-created the same objects → `DuplicateTable`
+  at `0007`. The table/column/index creates in `0005`, `0007`, `0009`–`0015`
+  are now `if not exists`. A second latent bug fell out behind it: `0008`'s
+  `:t::regclass` is invalid under asyncpg's bind-param parsing → now
+  `cast(:t as regclass)`. Validated: all 15 migrations apply cleanly on a wiped
+  DB (29 tables, 27 RLS policies).
+- **Interactive flow on the durable checkpointer** (#106) — with
+  `PDLC_USE_POSTGRES_CHECKPOINTER=true` (the self-host default), no command ever
+  paused: `/brainstorm`, `/init`, and every approval gate ran straight to
+  "completed". `GraphRunner._advance` read the pending interrupt *after*
+  resetting `current_org` to `"default"`, so the RLS-forced checkpoint policy
+  (`thread_id LIKE app.org_id || ':%'`) hid the thread's own `__interrupt__`
+  writes. Pending is now reconciled while the tenant is still bound; a hermetic
+  regression guards the invariant.
+
 ## v1.14.0 — 2026-07-06
 
 **Closes the [stub-gaps roadmap](docs/.research/stub-gaps-roadmap.md) in its
