@@ -210,3 +210,20 @@ def test_health_ready_llm_status():
     assert client.get("/health/ready").json()["checks"]["llm"] == "ok"
     probe.record_instance_probe(probe.failure("auth_error"))
     assert client.get("/health/ready").json()["checks"]["llm"] == "degraded"
+
+
+# ----- GET /admin/models/defaults (console prefill data) ----------------------
+
+
+def test_model_defaults_endpoint():
+    r = client.get(f"/v1/admin/models/defaults?org_id={ORG}")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["providers"] == [
+        "bedrock", "anthropic", "vertex", "azure", "openai", "gemini", "ollama"]
+    assert not {"claude_code", "codex", "gemini_cli"} & set(body["providers"])
+    assert len(body["personas"]) == 10 and "sentinel" in body["personas"]
+    assert set(body["tier_maps"]) == set(body["providers"])
+    for m in body["tier_maps"].values():
+        assert set(m) == {"premium", "balanced", "economy"}
+    assert body["instance_default"]["provider"] == settings.default_llm_provider

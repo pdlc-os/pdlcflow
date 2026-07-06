@@ -150,11 +150,16 @@ emits an `admin.access.denied` audit event and returns **403** (cross-org ban).
 | `GET /v1/admin/threads/{thread_id}` | `org_id` | `{thread_id, transcript: [{role, text, ts}], pending}` |
 | `GET /v1/admin/evals/summary` | `org_id` | `{by_eval: {...}, by_agent: {...}}` |
 | `GET /v1/admin/exports/rollup.csv` | `org_id`, `dimension`, `from?`, `to?` | `text/csv` |
-| `GET /v1/admin/models/org-default` | `org_id` | `OrgDefault \| null` |
-| `PUT /v1/admin/models/org-default` | `org_id`, body `OrgDefault` | `{ok: true}` |
-| `GET /v1/admin/models/agent-overrides` | `org_id` | `[AgentOverride]` |
-| `PUT /v1/admin/models/agent-overrides/{persona}` | `org_id`, body `AgentOverride` | `{ok, persona}` |
+| `GET /v1/admin/models/defaults` | `org_id` | `{providers, personas, tier_maps, instance_default}` — console prefill lists |
+| `GET /v1/admin/models/org-default` | `org_id` | `OrgDefault \| null` (incl. `has_key`; never key/ref material) |
+| `PUT /v1/admin/models/org-default` | `org_id`, body `OrgDefault` (+ write-only `api_key?`) | `{ok, has_key}` |
+| `DELETE /v1/admin/models/org-default/key` | `org_id` | `{ok: true}` — clears the stored BYOK key |
+| `GET /v1/admin/models/agent-overrides` | `org_id` | `[AgentOverride]` (incl. `has_key`) |
+| `PUT /v1/admin/models/agent-overrides/{persona}` | `org_id`, body `AgentOverride` (+ write-only `api_key?`) | `{ok, persona, has_key}` |
 | `DELETE /v1/admin/models/agent-overrides/{persona}` | `org_id` | `{ok, persona}` |
+| `DELETE /v1/admin/models/agent-overrides/{persona}/key` | `org_id` | `{ok, persona}` |
+| `POST /v1/admin/models/test` | `org_id`, body candidate `{provider, model_id?/tier?, region?, endpoint?, api_key?}` or saved `{scope, use_saved_key?}` | `{ok, latency_ms, error_class, tested_model, message}` (10/min per org) |
+| `GET /v1/admin/models/health` | `org_id` | `{health: [{scope, provider, ok, latency_ms, error_class, checked_at}]}` |
 
 Notes:
 - `from`/`to` are query aliases (mapped to `frm` internally).

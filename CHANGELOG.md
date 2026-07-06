@@ -8,8 +8,19 @@ All notable changes to pdlcflow are documented here. This project adheres to
 Observability — OpenTelemetry traces + metrics, Grafana, and a Streamlit ops dashboard.
 BYOK — per-tenant LLM API keys now actually resolve and inject (Wave 1 of the cc-switch gap roadmap).
 Provider health — pre-save connectivity probes with a stable error taxonomy (Wave 1, PRD-03).
+Provider Settings Console — the Studio Models page is now real (Wave 1, PRD-02).
 
 ### Added
+- **Provider Settings Console**: Studio's Nexus → Models page (previously a
+  static mockup) now fully works — load/edit/save the org default provider with
+  a per-tier model map (prefilled from provider defaults on switch, with a
+  confirm dialog naming the org-wide blast radius), per-persona overrides with
+  inherit/override states and Clear, BYOK key entry/rotation/removal per scope
+  (write-only; only a "key set" chip is ever shown), and a working **Test**
+  button per row that probes the current draft (or the saved config with its
+  stored key) and renders ✓ latency / classified error inline. Unsaved-change
+  guard on navigation. New read-only `GET /v1/admin/models/defaults` supplies
+  providers/personas/tier-map prefills/instance default.
 - **Provider connectivity testing**: `POST /v1/admin/models/test` probes a
   candidate or saved provider config with a minimal live completion (built
   through the same factory path real turns use), returning

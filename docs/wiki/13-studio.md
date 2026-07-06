@@ -197,6 +197,16 @@ Initiatives, Domains, Squads, Agents, Features, Exports, Models** — all
 org-scoped via the session store. See [Monitoring](14-monitoring.md) for what
 each renders.
 
+**Models** is the provider settings console: set the org default provider +
+tier map (premium/balanced/economy model ids, prefilled per provider), override
+provider/model per agent persona, and attach BYOK API keys per scope (shown
+only as a "●●● key set" chip — keys are write-only). Every row has a **Test**
+button that live-probes the current (even unsaved) values via
+`POST /v1/admin/models/test` and shows ✓ latency or a classified error before
+you save. Changes take effect on each agent's next turn; switching the org
+default provider asks for confirmation (it changes every agent's model
+org-wide). See [Configuration](03-configuration.md) for BYOK semantics.
+
 
 ---
 

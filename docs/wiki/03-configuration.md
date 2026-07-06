@@ -216,7 +216,7 @@ The bundled Vault is **off by default** to keep the stack lean. `cryptography` (
 
 ### Tenant API keys (BYOK)
 
-An org admin can attach an LLM API key to the org's model config (and to any per-agent override) via `PUT /v1/admin/models/org-default` / `…/agent-overrides/{persona}` with a **write-only** `api_key` field. The key is stored through the secrets backend above; only the opaque ref lands in the DB, and reads expose only a derived `has_key` flag — never the key or the ref. `DELETE …/org-default/key` (or `…/agent-overrides/{persona}/key`) removes it.
+An org admin can attach an LLM API key to the org's model config (and to any per-agent override) from **Studio → Nexus Console → Models**, or via `PUT /v1/admin/models/org-default` / `…/agent-overrides/{persona}` with a **write-only** `api_key` field. The key is stored through the secrets backend above; only the opaque ref lands in the DB, and reads expose only a derived `has_key` flag — never the key or the ref. `DELETE …/org-default/key` (or `…/agent-overrides/{persona}/key`) removes it.
 
 Semantics worth knowing:
 
