@@ -834,3 +834,93 @@ def test_config_versioning_lifecycle(monkeypatch):
     finally:
         S.reset_secrets()
         invalidate_secret_cache()
+
+
+def test_pricing_and_budget_lifecycle(monkeypatch):
+    """Override CRUD + effective sheet + factory cache; budget PUT/GET with
+    month-to-date from real events; alert ledger fires each threshold once."""
+    import json as _json
+    import uuid as _uuid
+
+    from app.clickstream.budget import _evaluate, reset_budget_memo
+    from app.llm.factory import LLMProviderFactory, invalidate_pricing_cache
+    from app.main import app
+    from fastapi.testclient import TestClient
+    from sqlalchemy import text as _text
+
+    org, proj = _seed_project()
+    c = TestClient(app)
+    q = f"?org_id={org}"
+    tiers = {"premium": "claude-opus-4-8", "balanced": "claude-sonnet-4-6",
+             "economy": "claude-haiku-4-5"}
+    reset_budget_memo()
+    invalidate_pricing_cache()
+    eng = get_sync_engine_for_tests()
+
+    # overrides require an org config first (409), then round-trip
+    assert c.put(f"/v1/admin/pricing/overrides{q}",
+                 json={"openai/gpt-5.4": {"in": 1.0, "out": 5.0}}).status_code == 409
+    c.put(f"/v1/admin/models/org-default{q}",
+          json={"provider": "anthropic", "tier_map": tiers})
+    r = c.put(f"/v1/admin/pricing/overrides{q}",
+              json={"openai/gpt-5.4": {"in": 1.0, "out": 5.0}})
+    assert r.status_code == 200 and r.json()["keys"] == 1
+    sheet = c.get(f"/v1/admin/pricing{q}").json()
+    assert sheet["effective"]["openai/gpt-5.4"] == {"in": 1.0, "out": 5.0,
+                                                    "source": "override"}
+    # the factory-side cache used on the completion path sees the override
+    f = LLMProviderFactory(db=eng)
+    assert f.pricing_overrides(org) == {"openai/gpt-5.4": {"in": 1.0, "out": 5.0}}
+    # override changes are versioned like any other config change
+    assert c.get(f"/v1/admin/models/versions{q}").json()["versions"][0][
+        "change_kind"] == "update"
+    # full-replace semantics: PUT {} clears
+    c.put(f"/v1/admin/pricing/overrides{q}", json={})
+    assert c.get(f"/v1/admin/pricing{q}").json()["effective"][
+        "openai/gpt-5.4"]["source"] == "catalog"
+
+    # budget: seed spend events, configure a budget, evaluate thresholds
+    with eng.begin() as conn:
+        from app.db.rls import set_org_context
+        set_org_context(conn, org)
+        for usd in (200.0, 220.0):  # month-to-date 420
+            conn.execute(_text(
+                "insert into events (event_id, event_type, schema_version, org_id, "
+                "project_id, domains, payload, ts) values (:i, 'llm.tokens_spent', 1, "
+                ":o, :p, '{}', cast(:pl as jsonb), now())"),
+                {"i": str(_uuid.uuid4()), "o": org, "p": proj,
+                 "pl": _json.dumps({"usd_estimate": usd, "tokens_in": 1,
+                                    "tokens_out": 1})})
+    assert c.put(f"/v1/admin/budget{q}",
+                 json={"monthly_limit_usd": 500,
+                       "alert_pcts": [50, 80, 100]}).status_code == 200
+    _evaluate(org)  # 420/500 = 84% → fires 50 and 80
+    b = c.get(f"/v1/admin/budget{q}").json()
+    assert b["month_to_date_usd"] == pytest.approx(420.0)
+    assert b["fired"] == [50, 80]
+    _evaluate(org)  # idempotent — ledger dedupes
+    assert c.get(f"/v1/admin/budget{q}").json()["fired"] == [50, 80]
+    # crossing 100 fires exactly the remaining threshold
+    with eng.begin() as conn:
+        from app.db.rls import set_org_context
+        set_org_context(conn, org)
+        conn.execute(_text(
+            "insert into events (event_id, event_type, schema_version, org_id, "
+            "project_id, domains, payload, ts) values (:i, 'llm.tokens_spent', 1, "
+            ":o, :p, '{}', cast(:pl as jsonb), now())"),
+            {"i": str(_uuid.uuid4()), "o": org, "p": proj,
+             "pl": _json.dumps({"usd_estimate": 100.0, "tokens_in": 1,
+                                "tokens_out": 1})})
+    _evaluate(org)
+    assert c.get(f"/v1/admin/budget{q}").json()["fired"] == [50, 80, 100]
+
+    # pricing_override survives export → import (PRD-06 integration)
+    c.put(f"/v1/admin/pricing/overrides{q}",
+          json={"anthropic/claude-opus-4-8": {"in": 10.0, "out": 50.0}})
+    doc = c.get(f"/v1/admin/models/export{q}").json()
+    assert doc["org_default"]["pricing_override"] == {
+        "anthropic/claude-opus-4-8": {"in": 10.0, "out": 50.0}}
+    other, _ = _seed_project()
+    c.post(f"/v1/admin/models/import?org_id={other}", json=doc)
+    imported = c.get(f"/v1/admin/pricing?org_id={other}").json()
+    assert imported["effective"]["anthropic/claude-opus-4-8"]["source"] == "override"

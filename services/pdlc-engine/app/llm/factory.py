@@ -102,6 +102,19 @@ def invalidate_secret_cache(ref: str | None = None) -> None:
         _SECRET_CACHE.pop(ref, None)
 
 
+# Org pricing overrides, cached briefly so cost labelling doesn't add a second
+# DB round-trip per completion (PRD-07). {org_id: (overrides|None, expires)}.
+_PRICING_CACHE: dict[str, tuple[dict | None, float]] = {}
+_PRICING_TTL_S = 60.0
+
+
+def invalidate_pricing_cache(org_id: str | None = None) -> None:
+    if org_id is None:
+        _PRICING_CACHE.clear()
+    else:
+        _PRICING_CACHE.pop(org_id, None)
+
+
 @dataclass
 class ProviderConfig:
     provider: Provider
@@ -224,6 +237,28 @@ class LLMProviderFactory:
             tier_map_override=row["tier_map"],
             secret_value=self._resolve_secret(row["secret_ref"]),
         )
+
+    def pricing_overrides(self, org_id: str) -> dict | None:
+        """The org's `pricing_override` sheet for estimate_usd (PRD-07), with a
+        short TTL cache — admin PUTs call invalidate_pricing_cache()."""
+        if self._db is None or not self._is_org_uuid(org_id):
+            return None
+        hit = _PRICING_CACHE.get(org_id)
+        if hit is not None and hit[1] > _time.monotonic():
+            return hit[0]
+        from ..db.rls import set_org_context
+
+        try:
+            with self._db.begin() as conn:
+                set_org_context(conn, org_id)
+                value = conn.execute(
+                    text("select pricing_override from org_llm_config where org_id = :o"),
+                    {"o": org_id},
+                ).scalar()
+        except Exception:  # pricing must never break a completion
+            value = None
+        _PRICING_CACHE[org_id] = (value, _time.monotonic() + _PRICING_TTL_S)
+        return value
 
     # ----- failover chain (PRD-05) -----
     # The primary candidate is always resolve()'s pick; these are candidates

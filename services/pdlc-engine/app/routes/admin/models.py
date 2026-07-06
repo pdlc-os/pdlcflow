@@ -322,7 +322,7 @@ def _read_current_config(conn, org_id: str, scope: str) -> dict | None:
     if scope == "org":
         row = conn.execute(
             text("select provider, region, endpoint, tier_map, secret_ref, "
-                 "failover_chain from org_llm_config where org_id = :o"),
+                 "failover_chain, pricing_override from org_llm_config where org_id = :o"),
             {"o": org_id},
         ).mappings().first()
     else:

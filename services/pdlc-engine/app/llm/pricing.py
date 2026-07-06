@@ -1,53 +1,70 @@
-"""Per-provider $ per 1M tokens for cost rollups.
+"""$ per 1M tokens for cost rollups — dashboards only, NEVER billing decisions.
 
-Numbers are rough public-list ballparks at design time. Tenants can override
-via `org_llm_config.pricing_override` (added in Phase B). Pricing is for the
-admin dashboard's `usd_estimate` — never used for billing decisions.
+The price sheet is a versioned data file (`pricing_catalog.json`, updated with
+each release) instead of a frozen dict, layered under per-org overrides:
+
+  resolution: org override → catalog exact (provider/model) →
+              preset pricing_hints (gateway models, PRD-04) →
+              catalog wildcard (provider/*) → None (UNPRICED)
+
+Unknown models estimate to **None**, not $0.0 — "unpriced" must be visible in
+dashboards, not disguised as free (rollup consumers already COALESCE nulls).
+Overrides live in `org_llm_config.pricing_override` (PRD-07), shaped
+`{"<provider>/<model_id>": {"in": $/1M, "out": $/1M}}`.
 """
 
 from __future__ import annotations
 
-# (input_$_per_1M, output_$_per_1M)
-PRICES: dict[tuple[str, str], tuple[float, float]] = {
-    ("bedrock",   "anthropic.claude-opus-4-8"):    (15.0, 75.0),
-    ("bedrock",   "anthropic.claude-sonnet-4-6"):  (3.0,  15.0),
-    ("bedrock",   "anthropic.claude-haiku-4-5"):   (0.8,  4.0),
-    ("anthropic", "claude-opus-4-8"):              (15.0, 75.0),
-    ("anthropic", "claude-sonnet-4-6"):            (3.0,  15.0),
-    ("anthropic", "claude-haiku-4-5"):             (0.8,  4.0),
-    ("vertex",    "claude-opus-4-8"):              (15.0, 75.0),
-    ("vertex",    "claude-sonnet-4-6"):            (3.0,  15.0),
-    ("vertex",    "claude-haiku-4-5"):             (0.8,  4.0),
-    ("openai",    "gpt-5.5"):                      (5.0,  30.0),
-    ("openai",    "gpt-5.4"):                      (2.5,  15.0),
-    ("openai",    "gpt-5.4-mini"):                 (0.75, 4.5),
-    ("azure",     "gpt-5.5"):                      (5.0,  30.0),
-    ("azure",     "gpt-5.4"):                      (2.5,  15.0),
-    ("azure",     "gpt-5.4-mini"):                 (0.75, 4.5),
-    ("gemini",    "gemini-3.1-pro"):               (2.0,  10.0),
-    ("gemini",    "gemini-3.5-flash"):             (0.3,  2.5),
-    ("gemini",    "gemini-3.1-flash-lite"):        (0.1,  0.4),
-    ("ollama",    "*"):                            (0.0,  0.0),  # local; no $
-}
+import json
+from functools import lru_cache
+from pathlib import Path
 
 
-def estimate_usd(provider: str, model_id: str, usage: dict[str, int]) -> float:
-    key = (provider, model_id)
-    if key not in PRICES:
-        # Gateway models (openai_compatible etc.) aren't in the static table —
-        # consult the preset catalog's pricing hints before giving up, so their
-        # usage isn't silently $0 in dashboards.
-        hint = _catalog_hint(provider, model_id)
-        if hint is not None:
-            return (usage["input"] * hint[0] + usage["output"] * hint[1]) / 1_000_000
-        key = (provider, "*")
-    if key not in PRICES:
-        return 0.0
-    inp, out = PRICES[key]
-    return (usage["input"] * inp + usage["output"] * out) / 1_000_000
+@lru_cache(maxsize=1)
+def _load() -> tuple[str, dict[str, dict[str, float]]]:
+    raw = json.loads((Path(__file__).parent / "pricing_catalog.json").read_text())
+    return raw["version"], raw["prices"]
+
+
+def catalog_version() -> str:
+    return _load()[0]
+
+
+def catalog_prices() -> dict[str, dict[str, float]]:
+    return _load()[1]
+
+
+def estimate_usd(
+    provider: str,
+    model_id: str,
+    usage: dict[str, int],
+    overrides: dict | None = None,
+) -> float | None:
+    key = f"{provider}/{model_id}"
+    price: dict | None = None
+    if overrides and key in overrides:
+        price = overrides[key]
+    else:
+        prices = catalog_prices()
+        if key in prices:
+            price = prices[key]
+        else:
+            hint = _catalog_hint(provider, model_id)
+            if hint is not None:
+                price = {"in": hint[0], "out": hint[1]}
+            elif f"{provider}/*" in prices:
+                price = prices[f"{provider}/*"]
+    if price is None:
+        return None  # unpriced — visible, not silently $0
+    try:
+        return (usage["input"] * float(price["in"])
+                + usage["output"] * float(price["out"])) / 1_000_000
+    except Exception:  # malformed override — never break a completion
+        return None
 
 
 def _catalog_hint(provider: str, model_id: str) -> tuple[float, float] | None:
+    """Preset catalog pricing hints for gateway models (PRD-04)."""
     try:
         from .presets import load_catalog
 

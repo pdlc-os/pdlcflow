@@ -3,6 +3,40 @@
 All notable changes to pdlcflow are documented here. This project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## Unreleased
+
+Cost analytics — pricing overrides, versioned price catalog, budgets, and real
+spend events (Wave 3 of the cc-switch gap roadmap, PRD-07).
+
+### Added
+- **Per-org pricing overrides** — `org_llm_config.pricing_override` (the column
+  `pricing.py` promised), editable via `PUT /v1/admin/pricing/overrides` and the
+  console's new **Pricing & budget** panel (effective sheet with
+  catalog/preset/override provenance badges). Resolution: override → catalog →
+  preset hint → wildcard → unpriced. Overrides are versioned like any other
+  config change and travel with export/import. Migration `0011`.
+- **Versioned pricing catalog** — the hardcoded `PRICES` dict became
+  `pricing_catalog.json` (same values, byte-identical estimates), updated with
+  each release.
+- **Unpriced ≠ free** — unknown models now report `usd_estimate: null` instead
+  of `$0.0`; spans carry `pdlc.unpriced=true`; rollup consumers already
+  COALESCE nulls, so dashboards keep working while unpriced traffic becomes
+  visible.
+- **Org monthly budgets** — `PUT /v1/admin/budget` sets a soft limit; crossing
+  50/80/100% (configurable) fires a `budget.threshold` clickstream event
+  exactly once per org/month/threshold (ledger-deduped, evaluated on the
+  clickstream drain path, memoized + fail-silent). Console shows month-to-date
+  progress + fired chips. Estimates only — alerts never block turns.
+- **Real `llm.tokens_spent` events** — the completion backend now emits the
+  spend event the Nexus token/cost rollups pivot on (attributed via the turn's
+  thread context); previously the emitting callback existed but was never
+  wired, so production rollups had no producer.
+
+### Fixed
+- Cost labelling now honors the org's negotiated prices on the OTel metrics
+  path as well (the factory caches `pricing_override` with a 60 s TTL — no
+  extra hot-path query).
+
 ## v1.12.0 — 2026-07-06
 
 Provider resilience & the open ecosystem (Wave 2 of the cc-switch gap roadmap):

@@ -166,6 +166,10 @@ emits an `admin.access.denied` audit event and returns **403** (cross-org ban).
 | `POST /v1/admin/models/versions/{id}/rollback` | `org_id` | `{ok, restored_scope, secret_requires_reentry}` — appends a `rollback` version, never rewrites history |
 | `GET /v1/admin/models/export` | `org_id` | Self-describing provider-set JSON — **never contains key material** (`enc:` refs stripped; `vault:`/`env:` export as pointers) |
 | `POST /v1/admin/models/import` | `org_id`, `dry_run?`, `strategy=merge\|replace`, body = export document | dry-run: `{plan: [{scope, action, reasons, secret}]}`; apply: `{ok, applied, plan}` — atomic, reuses the write-path validators |
+| `GET /v1/admin/pricing` | `org_id` | `{catalog_version, disclaimer, effective: {"provider/model": {in, out, source: catalog\|preset\|override}}}` |
+| `PUT /v1/admin/pricing/overrides` | `org_id`, body `{"provider/model": {in, out}}` | `{ok, keys}` — full-replace of the org's override sheet (409 until a provider is configured) |
+| `GET /v1/admin/budget` | `org_id` | `{monthly_limit_usd, alert_pcts, month_to_date_usd, fired} \| null` |
+| `PUT /v1/admin/budget` | `org_id`, body `{monthly_limit_usd, alert_pcts?}` | `{ok}` — soft monthly budget; thresholds emit `budget.threshold` events |
 
 Notes:
 - `from`/`to` are query aliases (mapped to `frm` internally).

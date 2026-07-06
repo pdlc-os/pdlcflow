@@ -181,7 +181,7 @@ def test_estimate_usd_uses_catalog_hints():
     usage = {"input": 1_000_000, "output": 1_000_000}
     # deepseek-chat hint: 0.27 in + 1.10 out
     assert estimate_usd("openai_compatible", "deepseek-chat", usage) == pytest.approx(1.37)
-    # unknown gateway model → still 0.0 (PRD-07 adds real overrides)
-    assert estimate_usd("openai_compatible", "totally-unknown", usage) == 0.0
-    # static table still wins for first-party
+    # unknown gateway model → UNPRICED (None, not $0 — PRD-07 FR-5)
+    assert estimate_usd("openai_compatible", "totally-unknown", usage) is None
+    # pricing catalog still wins for first-party
     assert estimate_usd("anthropic", "claude-opus-4-8", usage) == pytest.approx(90.0)

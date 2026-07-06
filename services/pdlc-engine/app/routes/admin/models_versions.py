@@ -199,16 +199,21 @@ def rollback_version(
         elif scope == "org":
             conn.execute(
                 text("insert into org_llm_config "
-                     "(org_id, provider, region, endpoint, tier_map, secret_ref, failover_chain) "
-                     "values (:o, :p, :r, :e, cast(:t as jsonb), :sr, cast(:fc as jsonb)) "
+                     "(org_id, provider, region, endpoint, tier_map, secret_ref, "
+                     "failover_chain, pricing_override) "
+                     "values (:o, :p, :r, :e, cast(:t as jsonb), :sr, "
+                     "cast(:fc as jsonb), cast(:po as jsonb)) "
                      "on conflict (org_id) do update set provider = excluded.provider, "
                      "region = excluded.region, endpoint = excluded.endpoint, "
                      "tier_map = excluded.tier_map, secret_ref = excluded.secret_ref, "
-                     "failover_chain = excluded.failover_chain"),
+                     "failover_chain = excluded.failover_chain, "
+                     "pricing_override = excluded.pricing_override"),
                 {"o": org_id, "p": snap["provider"], "r": snap.get("region"),
                  "e": snap.get("endpoint"), "t": json.dumps(snap.get("tier_map")),
                  "sr": snap.get("secret_ref"),
-                 "fc": json.dumps(snap.get("failover_chain") or [])},
+                 "fc": json.dumps(snap.get("failover_chain") or []),
+                 "po": json.dumps(snap.get("pricing_override"))
+                       if snap.get("pricing_override") is not None else None},
             )
         else:
             conn.execute(
@@ -264,6 +269,7 @@ def export_models(
             "provider": org["provider"], "region": org.get("region"),
             "endpoint": org.get("endpoint"), "tier_map": org.get("tier_map"),
             "secret": secret_export(org.get("secret_ref"), org["provider"]),
+            "pricing_override": org.get("pricing_override"),
             "failover_chain": [
                 {"provider": e.get("provider"), "region": e.get("region"),
                  "endpoint": e.get("endpoint"), "tier_map": e.get("tier_map"),
@@ -311,6 +317,7 @@ class ImportOrgDefault(BaseModel):
     endpoint: str | None = None
     failover_chain: list[ImportChainEntry] = Field(default_factory=list, max_length=3)
     secret: ImportSecret | None = None
+    pricing_override: dict[str, dict[str, float]] | None = None
 
 
 class ImportOverride(BaseModel):
@@ -419,14 +426,19 @@ def import_models(
             version_ids += 1
             conn.execute(
                 text("insert into org_llm_config "
-                     "(org_id, provider, region, endpoint, tier_map, secret_ref, failover_chain) "
-                     "values (:o, :p, :r, :e, cast(:t as jsonb), :sr, cast(:fc as jsonb)) "
+                     "(org_id, provider, region, endpoint, tier_map, secret_ref, "
+                     "failover_chain, pricing_override) "
+                     "values (:o, :p, :r, :e, cast(:t as jsonb), :sr, "
+                     "cast(:fc as jsonb), cast(:po as jsonb)) "
                      "on conflict (org_id) do update set provider = excluded.provider, "
                      "region = excluded.region, endpoint = excluded.endpoint, "
                      "tier_map = excluded.tier_map, secret_ref = excluded.secret_ref, "
-                     "failover_chain = excluded.failover_chain"),
+                     "failover_chain = excluded.failover_chain, "
+                     "pricing_override = excluded.pricing_override"),
                 {"o": org_id, "p": d.provider, "r": d.region, "e": d.endpoint,
-                 "t": json.dumps(d.tier_map), "sr": org_ref, "fc": json.dumps(chain)},
+                 "t": json.dumps(d.tier_map), "sr": org_ref, "fc": json.dumps(chain),
+                 "po": json.dumps(d.pricing_override)
+                       if d.pricing_override is not None else None},
             )
         elif strategy == "replace":
             if _read_current_config(conn, org_id, "org") is not None:

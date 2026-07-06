@@ -258,7 +258,43 @@ export const admin = {
         `${opts?.dryRun ? '&dry_run=true' : ''}&strategy=${opts?.strategy ?? 'merge'}`,
       { method: 'POST', body: JSON.stringify(doc) },
     ),
+
+  getPricing: (orgId: string) =>
+    json<PricingSheet>(`/admin/pricing?org_id=${encodeURIComponent(orgId)}`),
+
+  putPricingOverrides: (orgId: string, overrides: Record<string, PriceInOut>) =>
+    json<{ ok: boolean; keys: number }>(
+      `/admin/pricing/overrides?org_id=${encodeURIComponent(orgId)}`,
+      { method: 'PUT', body: JSON.stringify(overrides) },
+    ),
+
+  getBudget: (orgId: string) =>
+    json<BudgetInfo | null>(`/admin/budget?org_id=${encodeURIComponent(orgId)}`),
+
+  putBudget: (orgId: string, body: { monthly_limit_usd: number; alert_pcts?: number[] }) =>
+    json<{ ok: boolean }>(`/admin/budget?org_id=${encodeURIComponent(orgId)}`, {
+      method: 'PUT',
+      body: JSON.stringify(body),
+    }),
 };
+
+export interface PriceInOut {
+  in: number;
+  out: number;
+}
+
+export interface PricingSheet {
+  catalog_version: string;
+  disclaimer: string;
+  effective: Record<string, PriceInOut & { source: 'catalog' | 'preset' | 'override' }>;
+}
+
+export interface BudgetInfo {
+  monthly_limit_usd: number;
+  alert_pcts: number[];
+  month_to_date_usd: number;
+  fired: number[];
+}
 
 // Models settings types — mirror app/routes/admin/models.py response models.
 export type TierName = 'premium' | 'balanced' | 'economy';

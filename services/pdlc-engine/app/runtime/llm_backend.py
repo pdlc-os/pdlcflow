@@ -93,6 +93,16 @@ class FactoryCompletionBackend:
             log.warning("failover chain unavailable: %s", type(exc).__name__)
             return []
 
+    def _pricing_overrides(self, org: str) -> dict | None:
+        """Org price-sheet overrides for cost labelling (PRD-07); cached in the
+        factory with a short TTL. Never breaks a completion."""
+        if not hasattr(self._factory, "pricing_overrides"):
+            return None
+        try:
+            return self._factory.pricing_overrides(org)  # type: ignore[union-attr]
+        except Exception:
+            return None
+
     def _check_rate_limit(self, org: str, provider: str, eff_tier: str) -> None:
         if not getattr(settings, "rate_limit_enabled", False):
             return
@@ -117,6 +127,7 @@ class FactoryCompletionBackend:
         eff_tier = tier or _DEFAULT_TIER
         org = self._tenant().org_id
         messages = self._messages(system, prompt)
+        overrides = self._pricing_overrides(org)
 
         # ----- primary attempt (the pre-failover hot path) -----
         model, provider, model_id = self._resolve(persona, tier)
@@ -127,14 +138,14 @@ class FactoryCompletionBackend:
                 result = model.invoke(messages)
             except Exception as exc:
                 self._record(span, persona, provider, model_id, eff_tier,
-                             {"input": 0, "output": 0}, t0, ok=False)
+                             {"input": 0, "output": 0}, t0, ok=False, overrides=overrides)
                 if span is not None:
                     with contextlib.suppress(Exception):
                         span.record_exception(exc)
                 primary_exc: Exception = exc
             else:
                 usage = _usage_from_message(result)
-                self._record(span, persona, provider, model_id, eff_tier, usage, t0, ok=True)
+                self._record(span, persona, provider, model_id, eff_tier, usage, t0, ok=True, overrides=overrides)
                 return getattr(result, "content", str(result))
 
         if classify(primary_exc) != "retriable":
@@ -171,7 +182,7 @@ class FactoryCompletionBackend:
                     result = model.invoke(messages)
                 except Exception as exc:
                     self._record(span, persona, provider, model_id, eff_tier,
-                                 {"input": 0, "output": 0}, t0, ok=False)
+                                 {"input": 0, "output": 0}, t0, ok=False, overrides=overrides)
                     if span is not None:
                         with contextlib.suppress(Exception):
                             span.record_exception(exc)
@@ -183,7 +194,7 @@ class FactoryCompletionBackend:
                 usage = _usage_from_message(result)
                 breaker.record_success(org, bkey)
                 # Serving labels are the FALLBACK's provider/model (FR-8).
-                self._record(span, persona, provider, model_id, eff_tier, usage, t0, ok=True)
+                self._record(span, persona, provider, model_id, eff_tier, usage, t0, ok=True, overrides=overrides)
                 return getattr(result, "content", str(result))
         raise last_exc
 
@@ -197,6 +208,7 @@ class FactoryCompletionBackend:
         eff_tier = tier or _DEFAULT_TIER
         org = self._tenant().org_id
         messages = self._messages(system, prompt)
+        overrides = self._pricing_overrides(org)
 
         def _primary():
             m, p, mid = self._resolve(persona, tier)
@@ -247,7 +259,7 @@ class FactoryCompletionBackend:
                             committed = True
                             yield text
                 except Exception as exc:
-                    self._record(span, persona, provider, model_id, eff_tier, usage, t0, ok=False)
+                    self._record(span, persona, provider, model_id, eff_tier, usage, t0, ok=False, overrides=overrides)
                     if span is not None:
                         with contextlib.suppress(Exception):
                             span.record_exception(exc)
@@ -264,28 +276,66 @@ class FactoryCompletionBackend:
                     continue
                 if rank > 0:
                     breaker.record_success(org, bkey)
-                self._record(span, persona, provider, model_id, eff_tier, usage, t0, ok=True)
+                self._record(span, persona, provider, model_id, eff_tier, usage, t0, ok=True, overrides=overrides)
                 return
 
     @staticmethod
-    def _record(span, persona, provider, model_id, tier, usage, t0, *, ok: bool) -> None:
-        """Stamp GenAI semconv attributes on the span + record OTel metrics."""
+    def _record(span, persona, provider, model_id, tier, usage, t0, *, ok: bool,
+                overrides: dict | None = None) -> None:
+        """Stamp GenAI semconv attributes on the span, record OTel metrics, and
+        emit the `llm.tokens_spent` clickstream event that feeds the Nexus
+        spend rollups. usd is None (UNPRICED, not $0) for unknown models."""
         from ..llm.pricing import estimate_usd
 
         duration_ms = (time.perf_counter() - t0) * 1000
-        usd = estimate_usd(provider, model_id, usage) if ok else 0.0
+        usd = estimate_usd(provider, model_id, usage, overrides) if ok else None
         if span is not None:
             with contextlib.suppress(Exception):
                 span.set_attribute("gen_ai.system", provider)
                 span.set_attribute("gen_ai.request.model", model_id)
                 span.set_attribute("gen_ai.usage.input_tokens", usage["input"])
                 span.set_attribute("gen_ai.usage.output_tokens", usage["output"])
-                span.set_attribute("pdlc.cost_usd", usd)
+                if ok and usd is None:
+                    span.set_attribute("pdlc.unpriced", True)
+                else:
+                    span.set_attribute("pdlc.cost_usd", usd or 0.0)
         observability.record_llm(
             persona=persona, provider=provider, model=model_id, tier=tier or _DEFAULT_TIER,
-            tokens_in=usage["input"], tokens_out=usage["output"], usd=usd,
+            tokens_in=usage["input"], tokens_out=usage["output"], usd=usd or 0.0,
             duration_ms=duration_ms, ok=ok,
         )
+        if ok:
+            _emit_spend(persona, provider, model_id, tier or _DEFAULT_TIER, usage, usd)
+
+
+def _emit_spend(persona: str, provider: str, model_id: str, tier: str,
+                usage: dict[str, int], usd: float | None) -> None:
+    """Best-effort `llm.tokens_spent` — the event the Nexus token/spend rollups
+    pivot on. Attribution comes from the turn's bound thread id
+    (org:project:session); outside a turn (or non-UUID ids) it is skipped."""
+    try:
+        import uuid as _uuid
+
+        from pdlc_graph.llm_port import current_thread
+
+        from ..clickstream.emitter import get_emitter
+
+        thread = current_thread() or ""
+        parts = thread.split(":")
+        if len(parts) < 2:
+            return
+        get_emitter().emit(
+            "llm.tokens_spent",
+            {"org_id": _uuid.UUID(parts[0]), "project_id": _uuid.UUID(parts[1]),
+             "thread_id": thread,
+             "session_id": parts[2] if len(parts) > 2 else None},
+            {"provider": provider, "model_id": model_id, "tier": tier,
+             "agent_persona": persona, "tokens_in": usage["input"],
+             "tokens_out": usage["output"], "usd_estimate": usd},
+            str(_uuid.uuid4()),
+        )
+    except Exception:  # telemetry must never break a turn
+        pass
 
 
 def _emit_resilience(event_type: str, org: str, payload: dict) -> None:
