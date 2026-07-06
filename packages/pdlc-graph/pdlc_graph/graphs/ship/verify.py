@@ -31,8 +31,8 @@ _REQUIRED_CHECKS = ("http_health", "user_journey")
 def security_checks(state: PDLCState) -> dict:
     """Step 10a — final pre-verify security sweep (Phantom).
 
-    Simulates a dependency audit, secret scan, and security-headers check via
-    one Phantom completion; records the summary under smoke_results["security"].
+    No real scanners run yet (stub-gaps-roadmap T1-4): one Phantom completion
+    produces an advisory note; the check labels record "skipped" honestly.
     """
     feature = state.get("feature") or "untitled-feature"
     deploy_url = state.get("deploy_url") or "(unknown)"
@@ -43,12 +43,16 @@ def security_checks(state: PDLCState) -> dict:
         f"Report critical findings, if any.",
         system="PDLC security reviewer",
     ).strip()
+    # HONESTY: no real dependency audit / secret scan runs yet (a real
+    # security_scan_port is tracked in stub-gaps-roadmap T1-4) — label the
+    # checks "skipped", never "clean". The Phantom note is the only real work.
     security = {
-        "dependency_audit": "clean",
-        "secret_scan": "clean",
-        "security_headers": "info",
+        "dependency_audit": "skipped",
+        "secret_scan": "skipped",
+        "security_headers": "skipped",
+        "scans_run": False,
         "report": note,
-        "passed": True,
+        "passed": True,  # structural pass — nothing ran, nothing failed
     }
     results = dict(state.get("smoke_results") or {})
     results["security"] = security
@@ -75,8 +79,9 @@ def smoke_tests(state: PDLCState) -> dict:
 def ux_verify(state: PDLCState) -> dict:
     """Step 11.5 — UX Verify (Muse, conditional on an existing UX review).
 
-    Records a short verify note under smoke_results["ux_verify"]. A P0 finding
-    would block the gate; the offline stub never raises one, so we record clean.
+    Records a short verify note under smoke_results["ux_verify"]. No real UX
+    check runs yet (tracked in stub-gaps-roadmap T1-4) — the result is marked
+    skipped rather than implying a clean sweep; the Muse note is advisory.
     """
     feature = state.get("feature") or "untitled-feature"
     note = complete(
@@ -87,7 +92,8 @@ def ux_verify(state: PDLCState) -> dict:
         system="PDLC UX reviewer",
     ).strip()
     results = dict(state.get("smoke_results") or {})
-    results["ux_verify"] = {"passed": True, "p0_findings": 0, "report": note}
+    results["ux_verify"] = {"passed": True, "skipped": True, "p0_findings": 0,
+                            "report": note}
     return {"smoke_results": results}
 
 

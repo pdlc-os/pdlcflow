@@ -57,8 +57,12 @@ def test_happy_path_runs_checks_then_pauses_at_gate():
     final = g.invoke(Command(resume={"approved": True}), cfg)
     assert final["smoke_signed_off"] is True
     res = final["smoke_results"]
-    # Security sweep + all three smoke checks recorded.
+    # Security sweep recorded — but honestly labeled "skipped", never "clean",
+    # since no real scanner runs yet (stub-gaps-roadmap T1-4).
     assert res["security"]["passed"] is True
+    assert res["security"]["scans_run"] is False
+    assert res["security"]["dependency_audit"] == "skipped"
+    assert res["security"]["secret_scan"] == "skipped"
     for check in ("http_health", "user_journey", "auth_flow"):
         assert res[check]["passed"] is True
         assert "smoke:" in res[check]["report"]

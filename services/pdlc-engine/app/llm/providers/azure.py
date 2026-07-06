@@ -1,8 +1,9 @@
 """Azure OpenAI — AzureChatOpenAI for GPT deployments.
 
-Claude-via-Azure-AI-Foundry is a stub until the LangChain integration is
-generally available; the resolver will pick OpenAI direct or Bedrock as a
-fallback when the org config requests Azure Claude.
+Claude-via-Azure (AI Foundry) is NOT supported: this builder always constructs
+AzureChatOpenAI, and no fallback resolver exists — configure `anthropic` or
+`bedrock` directly for Claude. (An earlier docstring promised an automatic
+fallback that was never built.)
 
 Credentials: the per-tenant/agent `secret_value` + `endpoint` if set, otherwise
 the SDK's `AZURE_OPENAI_API_KEY` / `AZURE_OPENAI_ENDPOINT` environment variables.

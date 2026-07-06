@@ -16,13 +16,18 @@ export class ComputeStack extends cdk.Stack {
 
     const cluster = new ecs.Cluster(this, 'Cluster', { vpc: props.vpc });
 
+    // Image is overridable per deploy: `cdk deploy -c apiImage=ghcr.io/...:1.13.0`.
+    // (Was a hardcoded `placeholder/pdlc-engine:phase-a` — undeployable.)
+    const apiImage: string =
+      this.node.tryGetContext('apiImage') ?? 'ghcr.io/pdlc-os/pdlcflow-api:latest';
+
     new ecs_patterns.ApplicationLoadBalancedFargateService(this, 'Api', {
       cluster,
       cpu: 512,
       memoryLimitMiB: 1024,
       desiredCount: 2,
       taskImageOptions: {
-        image: ecs.ContainerImage.fromRegistry('placeholder/pdlc-engine:phase-a'),
+        image: ecs.ContainerImage.fromRegistry(apiImage),
         containerPort: 8000,
       },
       publicLoadBalancer: true,
@@ -31,7 +36,7 @@ export class ComputeStack extends cdk.Stack {
     // Worker — separate Fargate service running Arq, no LB needed.
     const workerTask = new ecs.FargateTaskDefinition(this, 'WorkerTask', { cpu: 512, memoryLimitMiB: 1024 });
     workerTask.addContainer('Worker', {
-      image: ecs.ContainerImage.fromRegistry('placeholder/pdlc-engine:phase-a'),
+      image: ecs.ContainerImage.fromRegistry(apiImage),
       command: ['uv', 'run', 'arq', 'app.worker.arq_settings.WorkerSettings'],
       logging: ecs.LogDrivers.awsLogs({ streamPrefix: 'worker' }),
     });

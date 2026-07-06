@@ -3,6 +3,38 @@
 All notable changes to pdlcflow are documented here. This project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## Unreleased
+
+Quick-wins honesty pass — removing places where the system reported success
+for things that didn't happen (from the [stub-gaps roadmap](docs/.research/stub-gaps-roadmap.md)).
+
+### Fixed
+- **FirehoseSink now actually delivers events** — `PDLC_CLICKSTREAM_SINK=firehose`
+  was a silent no-op (`return None`) that dropped every event; it now
+  `put_record_batch`es newline-delimited JSON in ≤500-record batches with a
+  partial-failure retry and a loud-once error log so a broken stream can't
+  silently discard telemetry.
+- **`/health/ready` reports real dependency status** — the `db`/`redis` checks
+  were hardcoded `"stub"`; they now run cached `SELECT 1` / `PING` probes when
+  those backends are configured (`ok`/`degraded`/`unconfigured`). A degraded DB
+  flips readiness to **503** so orchestrators stop routing traffic to a pod that
+  can't reach Postgres; Redis/LLM never flip readiness (fail-open).
+- **Python CI can fail again** — `ruff` and `pytest` were running with
+  `|| true` (a Phase-A ratchet); both are now blocking on every push (mypy stays
+  a labeled ratchet pending its 68 pre-existing errors).
+- **`PDLC_AUTH_MODE=cognito` no longer boots silently as local auth** — the
+  unimplemented mode was an inert knob; the engine now refuses to start under any
+  non-`local` auth mode rather than mislead a deployment into thinking SSO is on.
+- **Ship verify gates stop claiming "clean"** — the security sweep and UX verify
+  hardcoded `"clean"` / `passed: True` without running any real scanner; they now
+  label the checks `"skipped"` (with `scans_run: False`) so a green sign-off no
+  longer implies a scan that never ran.
+- **CDK compute stack is deployable** — the API + worker Fargate services
+  hardcoded a `placeholder/pdlc-engine:phase-a` image; the image is now taken from
+  CDK context (`-c apiImage=…`) defaulting to the published GHCR ref.
+- Docstring truth-ups: `providers/azure.py` (no Claude-via-Azure fallback exists)
+  and `analytics/store.py` (no ClickHouse store exists).
+
 ## v1.13.0 — 2026-07-06
 
 Wave 3 of the cc-switch gap roadmap — roadmap complete: cost analytics

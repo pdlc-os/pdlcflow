@@ -1,4 +1,5 @@
 from app.main import app
+from app.routes import health
 from fastapi.testclient import TestClient
 
 client = TestClient(app)
@@ -10,10 +11,43 @@ def test_health():
     assert r.json() == {"status": "ok", "phase": "A"}
 
 
-def test_ready():
+def test_ready_unconfigured_is_ready():
+    """Hermetic default: no Postgres/Redis configured → both 'unconfigured',
+    endpoint reports ready (they aren't dependencies here)."""
+    health.reset_health_checkers()
     r = client.get("/health/ready")
     assert r.status_code == 200
-    assert r.json()["status"] == "ready"
+    body = r.json()
+    assert body["status"] == "ready"
+    assert body["checks"]["db"] == "unconfigured"
+    assert body["checks"]["redis"] == "unconfigured"
+    assert body["checks"]["llm"] == "unprobed"
+
+
+def test_ready_reports_dependency_status():
+    """Injected checkers drive the real status/readiness logic."""
+    health.reset_health_checkers()
+    health.reset_health_cache()
+    health.set_health_checkers(db=lambda: "ok", redis=lambda: "ok")
+    try:
+        r = client.get("/health/ready")
+        assert r.status_code == 200 and r.json()["checks"]["db"] == "ok"
+
+        # A degraded DB flips readiness to 503 (traffic must not route to a pod
+        # that can't reach Postgres).
+        health.reset_health_cache()
+        health.set_health_checkers(db=lambda: "degraded")
+        r = client.get("/health/ready")
+        assert r.status_code == 503
+        assert r.json()["status"] == "degraded"
+
+        # A degraded Redis does NOT flip readiness (fail-open philosophy).
+        health.reset_health_cache()
+        health.set_health_checkers(db=lambda: "ok", redis=lambda: "degraded")
+        r = client.get("/health/ready")
+        assert r.status_code == 200 and r.json()["checks"]["redis"] == "degraded"
+    finally:
+        health.reset_health_checkers()
 
 
 def test_models_org_default_is_admin_guarded():

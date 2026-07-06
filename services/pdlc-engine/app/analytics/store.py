@@ -3,7 +3,8 @@
 The emitter feeds every event here (in addition to the durable sink); the Atlas
 Console admin routes query it for rollups. In-memory by default so the whole
 dashboard works hermetically in tests and single-process dev; the engine
-injects a ClickHouse/Postgres-backed store at boot for SaaS/self-host.
+injects the Postgres-backed store at boot for SaaS/self-host (a
+ClickHouse store is a possible future scale-up; none exists today).
 
 Cross-org analytics are banned by design (plan §5.3): every query REQUIRES an
 `org_id` and only ever scans that org's events.
