@@ -87,6 +87,29 @@ def _engine():
     return get_sync_engine(settings)
 
 
+@router.get("/defaults")
+def model_defaults(
+    org_id: str = Depends(admin_org("/admin/models/defaults")),
+) -> dict:
+    """Read-only lists the console renders from: pickable providers (CLI
+    providers excluded — single-user self-host only), personas, the built-in
+    tier maps for prefill, and what the instance falls back to when the org has
+    no row of its own."""
+    from ...llm.tier_map import DEFAULT_TIER_MAP
+
+    providers = list(Provider.__args__)  # type: ignore[attr-defined]
+    p = settings.default_llm_provider
+    return {
+        "providers": providers,
+        "personas": list(Persona.__args__),  # type: ignore[attr-defined]
+        "tier_maps": {name: DEFAULT_TIER_MAP[name] for name in providers},
+        "instance_default": {
+            "provider": p,
+            "region": settings.bedrock_region if p == "bedrock" else None,
+        },
+    }
+
+
 def _store_key(api_key: str, hint: str) -> str:
     """Store a tenant key in the secrets backend; return the opaque ref."""
     from ...secretstore import get_secrets

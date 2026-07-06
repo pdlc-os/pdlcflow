@@ -186,7 +186,118 @@ export const admin = {
 
   openThread: (orgId: string, threadId: string) =>
     json<ThreadDetail>(`/admin/threads/${encodeURIComponent(threadId)}?org_id=${encodeURIComponent(orgId)}`),
+
+  // ── Models settings (org default + per-agent overrides + probes) ─────────
+  modelDefaults: (orgId: string) =>
+    json<ModelDefaults>(`/admin/models/defaults?org_id=${encodeURIComponent(orgId)}`),
+
+  getOrgDefault: (orgId: string) =>
+    json<OrgDefault | null>(`/admin/models/org-default?org_id=${encodeURIComponent(orgId)}`),
+
+  putOrgDefault: (orgId: string, body: OrgDefaultBody) =>
+    json<{ ok: boolean; has_key: boolean }>(
+      `/admin/models/org-default?org_id=${encodeURIComponent(orgId)}`,
+      { method: 'PUT', body: JSON.stringify(body) },
+    ),
+
+  deleteOrgKey: (orgId: string) =>
+    json<{ ok: boolean }>(
+      `/admin/models/org-default/key?org_id=${encodeURIComponent(orgId)}`,
+      { method: 'DELETE' },
+    ),
+
+  listAgentOverrides: (orgId: string) =>
+    json<AgentOverride[]>(`/admin/models/agent-overrides?org_id=${encodeURIComponent(orgId)}`),
+
+  putAgentOverride: (orgId: string, persona: string, body: AgentOverrideBody) =>
+    json<{ ok: boolean; persona: string; has_key: boolean }>(
+      `/admin/models/agent-overrides/${encodeURIComponent(persona)}?org_id=${encodeURIComponent(orgId)}`,
+      { method: 'PUT', body: JSON.stringify(body) },
+    ),
+
+  deleteAgentOverride: (orgId: string, persona: string) =>
+    json<{ ok: boolean }>(
+      `/admin/models/agent-overrides/${encodeURIComponent(persona)}?org_id=${encodeURIComponent(orgId)}`,
+      { method: 'DELETE' },
+    ),
+
+  deleteAgentKey: (orgId: string, persona: string) =>
+    json<{ ok: boolean }>(
+      `/admin/models/agent-overrides/${encodeURIComponent(persona)}/key?org_id=${encodeURIComponent(orgId)}`,
+      { method: 'DELETE' },
+    ),
+
+  testProvider: (orgId: string, body: ProbeBody) =>
+    json<TestResult>(
+      `/admin/models/test?org_id=${encodeURIComponent(orgId)}`,
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
 };
+
+// Models settings types — mirror app/routes/admin/models.py response models.
+export type TierName = 'premium' | 'balanced' | 'economy';
+
+export interface OrgDefault {
+  provider: string;
+  tier_map: Record<TierName, string>;
+  region: string | null;
+  endpoint: string | null;
+  has_key: boolean;
+}
+
+/** PUT body: api_key is WRITE-ONLY (omit = keep the stored key). */
+export interface OrgDefaultBody {
+  provider: string;
+  tier_map: Record<TierName, string>;
+  region?: string | null;
+  endpoint?: string | null;
+  api_key?: string;
+}
+
+export interface AgentOverride {
+  agent_persona: string;
+  provider: string;
+  model_id: string;
+  region: string | null;
+  endpoint: string | null;
+  has_key: boolean;
+}
+
+export interface AgentOverrideBody {
+  agent_persona: string;
+  provider: string;
+  model_id: string;
+  region?: string | null;
+  endpoint?: string | null;
+  api_key?: string;
+}
+
+export interface ModelDefaults {
+  providers: string[];
+  personas: string[];
+  tier_maps: Record<string, Record<TierName, string>>;
+  instance_default: { provider: string; region: string | null };
+}
+
+/** POST /admin/models/test — candidate (provider…) or saved scope. */
+export interface ProbeBody {
+  provider?: string;
+  model_id?: string;
+  tier?: TierName;
+  region?: string | null;
+  endpoint?: string | null;
+  api_key?: string;
+  scope?: string; // 'org-default' | `agent:${persona}`
+  use_saved_key?: boolean;
+}
+
+export interface TestResult {
+  ok: boolean;
+  latency_ms: number | null;
+  error_class: string | null;
+  tested_model: string | null;
+  message: string;
+}
 
 export interface ThreadSummary {
   thread_id: string;
