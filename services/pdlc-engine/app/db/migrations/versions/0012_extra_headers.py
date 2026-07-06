@@ -13,7 +13,7 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.execute("alter table org_llm_config add column extra_headers jsonb")
+    op.execute("alter table org_llm_config add column if not exists extra_headers jsonb")
 
 
 def downgrade() -> None:

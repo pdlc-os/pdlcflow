@@ -31,7 +31,7 @@ def _drop_provider_checks(table: str) -> None:
     rows = conn.execute(
         text(
             "select conname from pg_constraint "
-            "where conrelid = :t::regclass and contype = 'c' "
+            "where conrelid = cast(:t as regclass) and contype = 'c' "
             "and pg_get_constraintdef(oid) ilike '%provider%' "
             "and pg_get_constraintdef(oid) not ilike '%agent_persona%'"
         ),

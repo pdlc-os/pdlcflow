@@ -16,7 +16,7 @@ depends_on = None
 
 def upgrade() -> None:
     op.execute(
-        "create table persona_prompts ("
+        "create table if not exists persona_prompts ("
         "  id uuid primary key,"
         "  org_id uuid not null references organizations(id) on delete cascade,"
         "  persona text not null check (persona in "
@@ -32,7 +32,7 @@ def upgrade() -> None:
         ")"
     )
     op.execute(
-        "create unique index persona_prompts_one_active "
+        "create unique index if not exists persona_prompts_one_active "
         "on persona_prompts (org_id, persona) where status = 'active'"
     )
     op.execute("alter table persona_prompts enable row level security")

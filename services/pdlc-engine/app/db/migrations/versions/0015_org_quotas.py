@@ -17,7 +17,7 @@ depends_on = None
 
 def upgrade() -> None:
     op.execute(
-        "create table org_quotas ("
+        "create table if not exists org_quotas ("
         "  org_id uuid primary key references organizations(id) on delete cascade,"
         "  rpm_limit integer,"
         "  updated_at timestamptz not null default now()"

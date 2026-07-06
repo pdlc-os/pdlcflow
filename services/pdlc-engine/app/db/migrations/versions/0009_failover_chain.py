@@ -16,7 +16,7 @@ depends_on = None
 def upgrade() -> None:
     op.execute(
         "alter table org_llm_config "
-        "add column failover_chain jsonb not null default '[]'::jsonb"
+        "add column if not exists failover_chain jsonb not null default '[]'::jsonb"
     )
 
 

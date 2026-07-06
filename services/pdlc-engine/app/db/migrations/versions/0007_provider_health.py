@@ -18,7 +18,7 @@ depends_on = None
 
 def upgrade() -> None:
     op.execute(
-        "create table llm_provider_health ("
+        "create table if not exists llm_provider_health ("
         "  org_id uuid not null references organizations(id) on delete cascade,"
         "  scope text not null,"
         "  provider text not null,"
