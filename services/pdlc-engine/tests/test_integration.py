@@ -965,3 +965,68 @@ def test_extra_headers_roundtrip():
     c.post(f"/v1/admin/models/import?org_id={other}", json=doc)
     assert c.get(f"/v1/admin/models/org-default?org_id={other}").json()[
         "extra_headers"] == {"X-Gateway-Key": "route-a"}
+
+
+def test_persona_prompt_lifecycle():
+    """Draft → activate → the DB resolver serves it under the org context →
+    v2 supersedes → deactivate falls back to packaged; packs export/import as
+    drafts; RLS isolates orgs."""
+    from app.main import app
+    from app.runtime.prompt_backend import DBPromptResolver, invalidate_prompt_cache
+    from fastapi.testclient import TestClient
+    from pdlc_graph.ports import reset_current_org, set_current_org
+
+    org, _ = _seed_project()
+    c = TestClient(app)
+    q = f"?org_id={org}"
+    invalidate_prompt_cache()
+
+    # summary starts clean (9 personas, none overridden)
+    summary = c.get(f"/v1/admin/prompts{q}").json()["personas"]
+    assert len(summary) == 9 and not any(p["overridden"] for p in summary)
+
+    # draft v1 → activate
+    r = c.post(f"/v1/admin/prompts/muse{q}", json={"body": "fintech muse v1"})
+    assert r.json()["version"] == 1
+    assert c.post(f"/v1/admin/prompts/muse/versions/1/activate{q}").status_code == 200
+
+    resolver = DBPromptResolver(get_sync_engine_for_tests())
+    tok = set_current_org(org)
+    try:
+        assert resolver("muse") == "fintech muse v1"
+        assert resolver("neo") is None  # no override → packaged default upstream
+
+        # v2 supersedes; one-active invariant holds
+        c.post(f"/v1/admin/prompts/muse{q}", json={"body": "fintech muse v2"})
+        c.post(f"/v1/admin/prompts/muse/versions/2/activate{q}")
+        invalidate_prompt_cache()
+        assert resolver("muse") == "fintech muse v2"
+        detail = c.get(f"/v1/admin/prompts/muse{q}").json()
+        statuses = {v["version"]: v["status"] for v in detail["versions"]}
+        assert statuses == {1: "archived", 2: "active"}
+        assert detail["packaged_default"].strip()  # packaged spec ships alongside
+
+        # versions are immutable — no PUT route exists
+        assert c.put(f"/v1/admin/prompts/muse/versions/2{q}",
+                     json={"body": "sneaky edit"}).status_code == 405
+
+        # deactivate → back to packaged
+        c.post(f"/v1/admin/prompts/muse/deactivate{q}")
+        invalidate_prompt_cache()
+        assert resolver("muse") is None
+    finally:
+        reset_current_org(tok)
+
+    # pack round-trip into a second org (drafts only, never auto-active)
+    c.post(f"/v1/admin/prompts/muse/versions/2/activate{q}")
+    pack = c.get(f"/v1/admin/prompts/export{q}").json()
+    assert pack["format"] == "pdlcflow.prompt-pack/v1"
+    assert pack["prompts"]["muse"]["body"] == "fintech muse v2"
+    other, _ = _seed_project()
+    oq = f"?org_id={other}"
+    r = c.post(f"/v1/admin/prompts/import{oq}", json=pack)
+    assert r.json()["created"] == {"muse": 1}
+    imported = c.get(f"/v1/admin/prompts/muse{oq}").json()["versions"]
+    assert imported[0]["status"] == "draft"  # backfill protection
+    # RLS: org B sees only its own rows
+    assert len(imported) == 1

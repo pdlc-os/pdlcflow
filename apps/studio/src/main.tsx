@@ -18,6 +18,7 @@ import { AdminAgents } from './routes/admin/agents';
 import { AdminFeatures } from './routes/admin/features';
 import { AdminExports } from './routes/admin/exports';
 import { AdminModels } from './routes/admin/models';
+import { AdminPrompts } from './routes/admin/prompts';
 import { AdminNarrative } from './routes/admin/narrative';
 
 applyTheme(getStoredTheme());
@@ -44,6 +45,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
               <Route path="narrative" element={<AdminNarrative />} />
               <Route path="exports" element={<AdminExports />} />
               <Route path="models" element={<AdminModels />} />
+              <Route path="prompts" element={<AdminPrompts />} />
             </Route>
           </Route>
         </Routes>

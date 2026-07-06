@@ -54,6 +54,9 @@ async def lifespan(_app: FastAPI):
     set_runner(GraphRunner(checkpointer=build_checkpointer(settings)))
     wire_dispatcher(settings)
     wire_llm_backend(settings)
+    from .runtime.prompt_backend import wire_prompt_resolver
+
+    wire_prompt_resolver(settings)  # org persona-prompt overrides (PRD-10)
     wire_token_streaming(settings)  # live "drafting" preview frames (off by default)
     wire_evals(settings)  # after LLM wiring so the judge can use the factory
     wire_auth(settings)  # select user store + bootstrap the env admin

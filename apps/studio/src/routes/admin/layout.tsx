@@ -11,6 +11,7 @@ const ROUTES = [
   { to: 'narrative',   label: 'Narrative' },
   { to: 'exports',     label: 'Exports' },
   { to: 'models',      label: 'Models' },
+  { to: 'prompts',     label: 'Prompts' },
 ];
 
 export function AdminLayout() {
