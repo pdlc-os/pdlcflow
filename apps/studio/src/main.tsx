@@ -19,6 +19,7 @@ import { AdminFeatures } from './routes/admin/features';
 import { AdminExports } from './routes/admin/exports';
 import { AdminModels } from './routes/admin/models';
 import { AdminPrompts } from './routes/admin/prompts';
+import { AdminMCP } from './routes/admin/mcp';
 import { AdminNarrative } from './routes/admin/narrative';
 
 applyTheme(getStoredTheme());
@@ -46,6 +47,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
               <Route path="exports" element={<AdminExports />} />
               <Route path="models" element={<AdminModels />} />
               <Route path="prompts" element={<AdminPrompts />} />
+              <Route path="mcp" element={<AdminMCP />} />
             </Route>
           </Route>
         </Routes>

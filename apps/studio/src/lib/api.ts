@@ -317,7 +317,85 @@ export const admin = {
       `/admin/prompts/import?org_id=${encodeURIComponent(orgId)}${dryRun ? '&dry_run=true' : ''}`,
       { method: 'POST', body: JSON.stringify(pack) },
     ),
+
+  // ── MCP tool servers (PRD-09) ────────────────────────────────────────────
+  listMCPServers: (orgId: string) =>
+    json<{ servers: MCPServer[] }>(`/admin/mcp/servers?org_id=${encodeURIComponent(orgId)}`),
+
+  listMCPTemplates: (orgId: string) =>
+    json<{ templates: MCPTemplate[] }>(`/admin/mcp/templates?org_id=${encodeURIComponent(orgId)}`),
+
+  createMCPServer: (orgId: string, body: MCPServerBody) =>
+    json<{ ok: boolean; id: string }>(
+      `/admin/mcp/servers?org_id=${encodeURIComponent(orgId)}`,
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
+
+  updateMCPServer: (orgId: string, id: string, body: MCPServerBody) =>
+    json<{ ok: boolean }>(
+      `/admin/mcp/servers/${encodeURIComponent(id)}?org_id=${encodeURIComponent(orgId)}`,
+      { method: 'PUT', body: JSON.stringify(body) },
+    ),
+
+  deleteMCPServer: (orgId: string, id: string) =>
+    json<{ ok: boolean }>(
+      `/admin/mcp/servers/${encodeURIComponent(id)}?org_id=${encodeURIComponent(orgId)}`,
+      { method: 'DELETE' },
+    ),
+
+  testMCPServer: (orgId: string, id: string) =>
+    json<{ ok: boolean; latency_ms?: number; tools?: { name: string; description: string }[]; error?: string }>(
+      `/admin/mcp/servers/${encodeURIComponent(id)}/test?org_id=${encodeURIComponent(orgId)}`,
+      { method: 'POST' },
+    ),
+
+  setMCPBindings: (orgId: string, id: string, bindings: MCPBinding[]) =>
+    json<{ ok: boolean }>(
+      `/admin/mcp/servers/${encodeURIComponent(id)}/bindings?org_id=${encodeURIComponent(orgId)}`,
+      { method: 'PUT', body: JSON.stringify({ bindings }) },
+    ),
 };
+
+export interface MCPBinding {
+  persona: string;
+  phase: string | null;
+}
+
+export interface MCPServer {
+  id: string;
+  name: string;
+  transport: 'http' | 'stdio';
+  url: string | null;
+  command: string | null;
+  args: string[];
+  allowed_tools: string[];
+  enabled: boolean;
+  has_auth: boolean;
+  bindings: MCPBinding[];
+}
+
+/** auth_token is WRITE-ONLY (omit on update = keep the stored one). */
+export interface MCPServerBody {
+  name: string;
+  transport: 'http' | 'stdio';
+  url?: string | null;
+  command?: string | null;
+  args?: string[];
+  auth_token?: string;
+  allowed_tools: string[];
+  enabled: boolean;
+}
+
+export interface MCPTemplate {
+  id: string;
+  name: string;
+  transport: 'http' | 'stdio';
+  url?: string;
+  command?: string;
+  args?: string[];
+  allowed_tools: string[];
+  note: string;
+}
 
 export interface PromptSummary {
   persona: string;

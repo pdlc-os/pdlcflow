@@ -37,6 +37,7 @@ dependencies = [
     "opentelemetry-sdk>=1.27",
     "opentelemetry-exporter-otlp-proto-grpc>=1.27",
     "opentelemetry-instrumentation-fastapi>=0.48b0",
+    "mcp>=1.2",
     "pdlc-event-schema",
     "pdlc-graph",
     # LLM provider SDKs — installed at boot per active provider config

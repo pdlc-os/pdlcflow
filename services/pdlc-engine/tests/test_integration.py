@@ -1030,3 +1030,82 @@ def test_persona_prompt_lifecycle():
     assert imported[0]["status"] == "draft"  # backfill protection
     # RLS: org B sees only its own rows
     assert len(imported) == 1
+
+
+def test_mcp_registry_and_execution_roundtrip(monkeypatch):
+    """CRUD + write-only auth + bindings persist under RLS; the backend
+    resolves bound servers from the DB, enforces the allowlist, and executes
+    through the (faked) client with the resolved bearer token."""
+    from app import secretstore as S
+    from app.main import app
+    from app.runtime import mcp_backend as MB
+    from app.runtime.mcp_backend import MCPToolBackend, reset_mcp_caches
+    from cryptography.fernet import Fernet
+    from fastapi.testclient import TestClient
+    from pdlc_graph.ports import reset_current_org, set_current_org
+
+    monkeypatch.setattr(settings, "secrets_backend", "encrypted")
+    monkeypatch.setattr(settings, "secret_key", Fernet.generate_key().decode())
+    S.reset_secrets()
+    reset_mcp_caches()
+    calls = []
+
+    def fake_client(url, headers, tool, arguments, timeout_s):
+        calls.append((url, headers.get("Authorization"), tool, arguments))
+        return "doc hits"
+
+    MB.set_call_client(fake_client)
+    try:
+        org, _ = _seed_project()
+        c = TestClient(app)
+        q = f"?org_id={org}"
+
+        r = c.post(f"/v1/admin/mcp/servers{q}", json={
+            "name": "docs-search", "transport": "http",
+            "url": "https://8.8.8.8/mcp", "auth_token": "mcp-secret-token",
+            "allowed_tools": ["search"]})
+        assert r.status_code == 200, r.text
+        sid = r.json()["id"]
+        assert "mcp-secret-token" not in r.text
+
+        listed = c.get(f"/v1/admin/mcp/servers{q}").json()["servers"]
+        assert listed[0]["has_auth"] is True
+        assert "auth" not in str(listed[0].get("auth_secret_ref", ""))
+        assert "mcp-secret-token" not in str(listed)
+
+        # duplicate name → 409
+        assert c.post(f"/v1/admin/mcp/servers{q}", json={
+            "name": "docs-search", "transport": "http",
+            "url": "https://8.8.8.8/mcp"}).status_code == 409
+
+        # bind to muse @ Inception
+        r = c.put(f"/v1/admin/mcp/servers/{sid}/bindings{q}", json={
+            "bindings": [{"persona": "muse", "phase": "Inception"}]})
+        assert r.status_code == 200
+
+        # backend resolves + executes with the stored bearer token
+        backend = MCPToolBackend(get_sync_engine_for_tests())
+        tok = set_current_org(org)
+        try:
+            assert backend.list_tools("muse", phase="Inception") == [
+                {"server": "docs-search", "tool": "search"}]
+            assert backend.list_tools("neo", phase="Inception") == []      # unbound persona
+            assert backend.list_tools("muse", phase="Operation") == []     # wrong phase
+            out = backend.call_tool("muse", "docs-search", "search",
+                                    {"query": "dark mode"}, phase="Inception")
+            assert out["ok"] is True and out["content"] == "doc hits"
+            assert calls[0][1] == "Bearer mcp-secret-token"
+        finally:
+            reset_current_org(tok)
+
+        # RLS: another org sees nothing
+        other, _ = _seed_project()
+        assert c.get(f"/v1/admin/mcp/servers?org_id={other}").json()["servers"] == []
+
+        # delete cascades bindings
+        assert c.delete(f"/v1/admin/mcp/servers/{sid}{q}").status_code == 200
+        assert c.get(f"/v1/admin/mcp/servers{q}").json()["servers"] == []
+    finally:
+        MB.reset_call_client()
+        reset_mcp_caches()
+        S.reset_secrets()

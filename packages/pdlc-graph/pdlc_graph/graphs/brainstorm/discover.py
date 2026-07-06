@@ -131,12 +131,18 @@ def divergent_ideation(state: PDLCState) -> dict:
         return {"brainstorm_log": log}
 
     feature = state.get("feature") or "untitled-feature"
+    # Flagship MCP flow (PRD-09): when the org bound tool servers to Muse for
+    # this phase, ground ideation in real context (e.g. internal docs search).
+    # '' with the null backend → prompts (and CI output) stay byte-identical.
+    from ... import tool_port
+
+    tool_ctx = tool_port.gather_context("muse", feature, phase=state.get("phase"))
     ideas = []
     for lens in ("Technical", "User Experience", "Business", "Edge Cases"):
         prompt = (
             f"Divergent ideation for '{feature}' through the {lens} lens. "
             f"Propose one unexpected candidate idea."
-        )
+        ) + tool_ctx
         ideas.append(f"- ({lens}) {complete('muse', prompt).strip()}")
     body = "Candidate ideas (domain rotation):\n" + "\n".join(ideas)
     log.append({"section": "Divergent Ideation", "body": body, "step": "divergent-ideation"})

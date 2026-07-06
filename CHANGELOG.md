@@ -8,7 +8,8 @@ All notable changes to pdlcflow are documented here. This project adheres to
 Cost analytics — pricing overrides, versioned price catalog, budgets, and real
 spend events (Wave 3 of the cc-switch gap roadmap, PRD-07)
 + egress network controls: explicit proxy/CA/headers for LLM calls (PRD-08)
-+ persona prompt overrides & packs (PRD-10).
++ persona prompt overrides & packs (PRD-10)
++ MCP tool servers for agents (PRD-09 — cc-switch gap roadmap complete).
 
 ### Changed
 - **Persona soul-specs now actually reach models** (PRD-10 M0). The persona
@@ -35,6 +36,26 @@ spend events (Wave 3 of the cc-switch gap roadmap, PRD-07)
   text, no secrets/org ids); import always lands as **drafts** (never
   auto-activated — backfill protection), with dry-run validation. The
   template-org → client-orgs rollout flow.
+- **MCP tool servers** — agents can now call external tools. Org-scoped
+  registry (migration `0014`, RLS-forced) with per-server tool **allowlists
+  (empty = deny all)**, write-only bearer tokens via the secretstore, live
+  test-connection probes, and persona/phase **bindings** (unbound servers are
+  inert). New graph-side `tool_port` (null default — hermetic CI stays
+  byte-identical; the `mcp` SDK is engine-only) + flagship flow: Muse's
+  divergent ideation grounds itself in bound search tools, with results
+  fenced + provenance-tagged as untrusted data. Execution is flag-gated
+  (`PDLC_WIRE_MCP`, default off) with hard caps (timeout, 64 KiB result
+  truncation, 20 calls/turn, 60 s dead-server cool-down); stdio transport is
+  double-gated to single-user self-host (write **and** call time); server
+  URLs pass the SSRF egress policy (`PDLC_MCP_ALLOW_PRIVATE_NETWORKS` for VPC
+  servers). `tool.called` audit events + `pdlc.tool.<name>` spans. New
+  **Nexus → Tools** page + wiki page 20.
+- **Event-type registry fix** — the clickstream envelope validates
+  `event_type` against a fixed registry, which was silently dropping every
+  audit event added since Wave 1 (`admin.llm_key.*`, `llm_config.*`,
+  `llm.failover`, `llm.rate_limited`, `budget.threshold`, `prompt.*`). All
+  new families are now registered with correct human/system/agent actor
+  classification — the audit trails these features promised actually record.
 - **Egress network controls** — `PDLC_EGRESS_PROXY_URL` / `PDLC_EGRESS_NO_PROXY`
   / `PDLC_EGRESS_CA_BUNDLE` are threaded explicitly into every provider builder
   (httpx passthrough for the OpenAI/Anthropic family + gateways, client_kwargs
