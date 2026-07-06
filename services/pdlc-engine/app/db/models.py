@@ -293,6 +293,20 @@ class AgentLLMConfig(Base):
     )
 
 
+class LLMProviderHealth(Base):
+    """Last probe result per (org, scope) — console status chips. Scope is
+    'org-default' or 'agent:<persona>'; instance status is in-process only."""
+
+    __tablename__ = "llm_provider_health"
+    org_id: Mapped[UUID] = mapped_column(ForeignKey("organizations.id", ondelete="CASCADE"), primary_key=True)
+    scope: Mapped[str] = mapped_column(Text, primary_key=True)
+    provider: Mapped[str] = mapped_column(Text, nullable=False)
+    ok: Mapped[bool] = mapped_column(nullable=False)
+    latency_ms: Mapped[int | None] = mapped_column()
+    error_class: Mapped[str | None] = mapped_column(Text)
+    checked_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=text("now()"))
+
+
 # ---------------- Clickstream (self-host) ----------------
 class Event(Base):
     __tablename__ = "events"

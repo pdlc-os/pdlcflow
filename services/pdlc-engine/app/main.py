@@ -57,7 +57,18 @@ async def lifespan(_app: FastAPI):
     wire_token_streaming(settings)  # live "drafting" preview frames (off by default)
     wire_evals(settings)  # after LLM wiring so the judge can use the factory
     wire_auth(settings)  # select user store + bootstrap the env admin
+    # Optional instance-default LLM health loop (feeds /health/ready's llm
+    # field). Off by default; needs real LLM wiring to be meaningful.
+    health_task = None
+    if settings.llm_health_interval_s > 0 and settings.wire_llm:
+        import asyncio
+
+        from .llm.probe import instance_health_loop
+
+        health_task = asyncio.create_task(instance_health_loop())
     yield
+    if health_task is not None:
+        health_task.cancel()
 
 
 app = FastAPI(

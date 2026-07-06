@@ -26,7 +26,14 @@ from sqlalchemy import text
 from ...config import settings
 from ...db.rls import set_org_context
 from ...db.session import get_sync_engine
-from ...llm.factory import invalidate_secret_cache
+from ...llm import probe
+from ...llm.factory import (
+    LLMProviderFactory,
+    ProviderConfig,
+    SecretResolutionError,
+    invalidate_secret_cache,
+)
+from ...llm.tier_map import resolve_model_id
 from ._guard import admin_org
 
 router = APIRouter(prefix="/models", tags=["admin", "models"])
@@ -256,6 +263,144 @@ def clear_agent_override_key(
     _audit("admin.llm_key.cleared", org_id,
            {"scope": "agent-override", "persona": persona})
     return {"ok": True, "persona": persona}
+
+
+# ---------------------------------------------------------------------------
+# Provider connectivity testing (PRD-03). POST /test probes a CANDIDATE config
+# (pre-save, from the console form) or the SAVED config for a scope; the last
+# scoped result is persisted for the console's status chips (GET /health).
+# ---------------------------------------------------------------------------
+
+
+class ProbeRequest(BaseModel):
+    # Candidate test: provider (+ optional model_id/tier/region/endpoint/api_key).
+    provider: Provider | None = None
+    model_id: str | None = None
+    tier: Literal["premium", "balanced", "economy"] | None = None
+    region: str | None = None
+    endpoint: str | None = None
+    api_key: str | None = Field(None, min_length=1)  # WRITE-ONLY, used once, discarded
+    # Saved-config test: scope = "org-default" | "agent:<persona>".
+    scope: str | None = None
+    use_saved_key: bool = False
+
+
+def _load_scope_config(org_id: str, req: ProbeRequest) -> tuple[ProviderConfig, str]:
+    """Build (ProviderConfig, model_id) from the SAVED row for req.scope."""
+    if req.scope == "org-default":
+        with _engine().begin() as conn:
+            set_org_context(conn, org_id)
+            row = conn.execute(
+                text("select provider, region, endpoint, tier_map, secret_ref "
+                     "from org_llm_config where org_id = :o"),
+                {"o": org_id},
+            ).mappings().first()
+        if not row:
+            raise HTTPException(status_code=404, detail="no org-default config saved")
+        model_id = req.model_id or resolve_model_id(
+            row["provider"], req.tier or "balanced", row["tier_map"])
+    elif req.scope and req.scope.startswith("agent:"):
+        persona = req.scope.split(":", 1)[1]
+        with _engine().begin() as conn:
+            set_org_context(conn, org_id)
+            # Same COALESCE key inheritance as the factory's _agent_override.
+            row = conn.execute(
+                text("select a.provider, a.model_id, a.region, a.endpoint, "
+                     "coalesce(a.secret_ref, case when o.provider = a.provider "
+                     "then o.secret_ref end) as secret_ref "
+                     "from agent_llm_config a "
+                     "left join org_llm_config o on o.org_id = a.org_id "
+                     "where a.org_id = :o and a.agent_persona = :p"),
+                {"o": org_id, "p": persona},
+            ).mappings().first()
+        if not row:
+            raise HTTPException(status_code=404, detail="no override saved for that persona")
+        model_id = req.model_id or row["model_id"]
+    else:
+        raise HTTPException(status_code=422,
+                            detail="scope must be 'org-default' or 'agent:<persona>'")
+
+    secret_value = req.api_key  # inline key takes precedence (pre-rotation test)
+    if secret_value is None and req.use_saved_key and row["secret_ref"]:
+        # Same resolution (and cache) the real call path uses.
+        secret_value = LLMProviderFactory()._resolve_secret(row["secret_ref"])
+    return ProviderConfig(
+        provider=row["provider"], region=row["region"], endpoint=row["endpoint"],
+        secret_value=secret_value,
+    ), model_id
+
+
+def _persist_health(org_id: str, scope: str, provider: str, r: probe.ProbeResult) -> None:
+    """Best-effort — a failed chip write must not fail the probe response."""
+    try:
+        with _engine().begin() as conn:
+            set_org_context(conn, org_id)
+            conn.execute(
+                text("insert into llm_provider_health "
+                     "(org_id, scope, provider, ok, latency_ms, error_class, checked_at) "
+                     "values (:o, :s, :p, :k, :l, :e, now()) "
+                     "on conflict (org_id, scope) do update set "
+                     "provider = excluded.provider, ok = excluded.ok, "
+                     "latency_ms = excluded.latency_ms, "
+                     "error_class = excluded.error_class, "
+                     "checked_at = excluded.checked_at"),
+                {"o": org_id, "s": scope, "p": provider, "k": r.ok,
+                 "l": r.latency_ms, "e": r.error_class},
+            )
+    except Exception:
+        pass
+
+
+@router.post("/test")
+def test_provider(
+    req: ProbeRequest, org_id: str = Depends(admin_org("/admin/models/test"))
+) -> dict:
+    if not probe.probe_allowed(org_id):
+        raise HTTPException(status_code=429,
+                            detail=f"probe limit {probe.PROBE_LIMIT_PER_MIN}/min per org")
+    if req.scope is not None:
+        try:
+            cfg, model_id = _load_scope_config(org_id, req)
+        except SecretResolutionError:
+            result = probe.failure("secret_unresolvable")
+            _audit("admin.provider.probed", org_id,
+                   {"scope": req.scope, "ok": False, "error_class": result.error_class})
+            return result.to_dict()
+    else:
+        if req.provider is None:
+            raise HTTPException(status_code=422,
+                                detail="provider is required for a candidate test")
+        cfg = ProviderConfig(provider=req.provider, region=req.region,
+                             endpoint=req.endpoint, secret_value=req.api_key)
+        model_id = req.model_id or resolve_model_id(req.provider, req.tier or "balanced")
+
+    try:
+        probe.validate_endpoint(cfg.endpoint)
+    except probe.EndpointNotAllowed:
+        result = probe.failure("endpoint_forbidden", tested_model=model_id)
+    else:
+        result = probe.run_probe(cfg, model_id)
+
+    if req.scope is not None:
+        _persist_health(org_id, req.scope, cfg.provider, result)
+    _audit("admin.provider.probed", org_id,
+           {"provider": cfg.provider, "scope": req.scope, "ok": result.ok,
+            "error_class": result.error_class, "latency_ms": result.latency_ms})
+    return result.to_dict()
+
+
+@router.get("/health")
+def provider_health(
+    org_id: str = Depends(admin_org("/admin/models/health")),
+) -> dict:
+    with _engine().begin() as conn:
+        set_org_context(conn, org_id)
+        rows = conn.execute(
+            text("select scope, provider, ok, latency_ms, error_class, checked_at "
+                 "from llm_provider_health where org_id = :o order by scope"),
+            {"o": org_id},
+        ).mappings().all()
+    return {"health": [dict(r) for r in rows]}
 
 
 @router.delete("/agent-overrides/{persona}")

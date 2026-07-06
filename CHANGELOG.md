@@ -7,8 +7,22 @@ All notable changes to pdlcflow are documented here. This project adheres to
 
 Observability — OpenTelemetry traces + metrics, Grafana, and a Streamlit ops dashboard.
 BYOK — per-tenant LLM API keys now actually resolve and inject (Wave 1 of the cc-switch gap roadmap).
+Provider health — pre-save connectivity probes with a stable error taxonomy (Wave 1, PRD-03).
 
 ### Added
+- **Provider connectivity testing**: `POST /v1/admin/models/test` probes a
+  candidate or saved provider config with a minimal live completion (built
+  through the same factory path real turns use), returning
+  `{ok, latency_ms, error_class, tested_model, message}` with sanitized,
+  classified errors (`auth_error`, `model_not_found`, `access_denied`,
+  `endpoint_unreachable`, `rate_limited`, `timeout`, `bad_request`, …).
+  Saved-scope tests resolve the stored BYOK key; last result per scope persists
+  to a new RLS-forced `llm_provider_health` table served by
+  `GET /v1/admin/models/health`. SSRF egress guard on candidate endpoints
+  (`PDLC_ALLOW_PRIVATE_LLM_ENDPOINTS` escape hatch for local Ollama), 10/min
+  per-org probe rate limit, injectable prober port (CI stays network-free), and
+  an opt-in instance-default health loop (`PDLC_LLM_HEALTH_INTERVAL_S`) that
+  makes `/health/ready`'s `llm` check real (`ok`/`degraded`/`unprobed`).
 - **BYOK (bring-your-own-key) completion**: the LLM factory now reads
   `org_llm_config.secret_ref` / `agent_llm_config.secret_ref` and injects the
   tenant's key into every provider call for that org. The admin API gains a
