@@ -3,12 +3,11 @@
 All notable changes to pdlcflow are documented here. This project adheres to
 [Semantic Versioning](https://semver.org/).
 
-## Unreleased
+## v1.11.0 — 2026-07-05
 
-Observability — OpenTelemetry traces + metrics, Grafana, and a Streamlit ops dashboard.
-BYOK — per-tenant LLM API keys now actually resolve and inject (Wave 1 of the cc-switch gap roadmap).
-Provider health — pre-save connectivity probes with a stable error taxonomy (Wave 1, PRD-03).
-Provider Settings Console — the Studio Models page is now real (Wave 1, PRD-02).
+Provider Management (Wave 1 of the cc-switch gap roadmap: BYOK, connectivity
+probes, and a working Settings Console) + full observability (OpenTelemetry →
+Grafana, and a Streamlit ops dashboard).
 
 ### Added
 - **Provider Settings Console**: Studio's Nexus → Models page (previously a
