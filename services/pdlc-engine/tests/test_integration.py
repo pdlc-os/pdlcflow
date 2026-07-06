@@ -1168,3 +1168,31 @@ def test_migrate_entity_resolution_and_task_persistence(monkeypatch):
         assert got == "migrated task"
     finally:
         reset_task_store()
+
+
+def test_org_quota_override_roundtrip(monkeypatch):
+    """T3-5 against real Postgres: PUT sets the org's rpm_limit; the limiter
+    resolves it (overriding the global default); clearing reverts."""
+    from app.llm.rate_limit import RateLimit, invalidate_quota_cache
+    from app.main import app
+    from fastapi.testclient import TestClient
+
+    monkeypatch.setattr(settings, "task_store", "postgres")
+    monkeypatch.setattr(settings, "llm_rpm_default", 60)
+    org, _ = _seed_project()
+    c = TestClient(app)
+    q = f"?org_id={org}"
+    invalidate_quota_cache()
+
+    rl = RateLimit()  # unforced → resolves per-org
+    assert rl.effective_rpm(org) == 60  # no override yet → global default
+
+    assert c.put(f"/v1/admin/budget/quota{q}", json={"rpm_limit": 10}).status_code == 200
+    assert c.get(f"/v1/admin/budget/quota{q}").json()["rpm_limit"] == 10
+    invalidate_quota_cache()
+    assert rl.effective_rpm(org) == 10  # override wins
+
+    # clear → back to the global default
+    assert c.put(f"/v1/admin/budget/quota{q}", json={"rpm_limit": None}).status_code == 200
+    invalidate_quota_cache()
+    assert rl.effective_rpm(org) == 60

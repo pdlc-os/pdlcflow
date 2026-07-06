@@ -110,13 +110,47 @@ def http_list_tools(url: str, headers: dict, timeout_s: float) -> list[dict]:
     return _run_async(_go(), timeout_s)
 
 
+def _stdio_call_tool(command: str, args: list, tool: str, arguments: dict,
+                     timeout_s: float) -> str:
+    """Run a tool against a stdio MCP server (T3-1). Spawns the configured
+    command; single-user self-host only (guarded at the call site)."""
+    async def _go():
+        import asyncio
+
+        from mcp import ClientSession, StdioServerParameters
+        from mcp.client.stdio import stdio_client
+
+        params = StdioServerParameters(command=command, args=list(args or []))
+        async with stdio_client(params) as (r, w):
+            async with ClientSession(r, w) as session:
+                await session.initialize()
+                result = await asyncio.wait_for(
+                    session.call_tool(tool, arguments), timeout_s)
+                return "\n".join(
+                    c.text for c in result.content if getattr(c, "text", None))
+
+    return _run_async(_go(), timeout_s)
+
+
 _call_client = _http_call_tool
+_stdio_client = _stdio_call_tool
 
 
 def set_call_client(fn) -> None:
     """Tests inject a fake (url, headers, tool, arguments, timeout_s) -> str."""
     global _call_client
     _call_client = fn
+
+
+def set_stdio_client(fn) -> None:
+    """Tests inject a fake (command, args, tool, arguments, timeout_s) -> str."""
+    global _stdio_client
+    _stdio_client = fn
+
+
+def reset_stdio_client() -> None:
+    global _stdio_client
+    _stdio_client = _stdio_call_tool
 
 
 def reset_call_client() -> None:
@@ -157,7 +191,7 @@ class MCPToolBackend:
                 set_org_context(conn, org)
                 rows = conn.execute(
                     text("select distinct s.id, s.name, s.transport, s.url, s.command, "
-                         "s.auth_secret_ref, s.allowed_tools "
+                         "s.args, s.auth_secret_ref, s.allowed_tools "
                          "from mcp_servers s join mcp_bindings b on b.server_id = s.id "
                          "where s.org_id = :o and s.enabled and b.persona = :p "
                          "and (b.phase is null or b.phase = :ph)"),
@@ -197,9 +231,6 @@ class MCPToolBackend:
             guard_stdio(row["transport"])  # defense in depth (config may predate a mode flip)
         except ValueError as exc:
             return {"ok": False, "error": str(exc), "content": None}
-        if row["transport"] != "http":
-            return {"ok": False, "error": "stdio execution not implemented in v1",
-                    "content": None}
 
         # Per-turn call cap.
         from pdlc_graph.llm_port import current_thread
@@ -243,7 +274,11 @@ class MCPToolBackend:
                           attributes={"pdlc.tool.server": row["name"],
                                       "pdlc.agent_persona": persona}) as span:
             try:
-                content = _call_client(row["url"], headers, tool, arguments, timeout_s)
+                if row["transport"] == "stdio":
+                    content = _stdio_client(row["command"], row.get("args") or [],
+                                            tool, arguments, timeout_s)
+                else:
+                    content = _call_client(row["url"], headers, tool, arguments, timeout_s)
             except Exception as exc:
                 _negative_cache[neg_key] = time.monotonic() + _NEGATIVE_TTL_S
                 duration_ms = int((time.perf_counter() - t0) * 1000)

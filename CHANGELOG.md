@@ -11,6 +11,16 @@ simulations presented as results (from the
 [stub-gaps roadmap](docs/.research/stub-gaps-roadmap.md)).
 
 ### Added
+- **Per-org LLM rate-limit quotas** (T3-5) — the RPM limiter shipped with only a
+  global default; the "Quotas page" it promised now exists. A new `org_quotas`
+  table holds a per-org `rpm_limit` (RLS-forced, migration `0015`); the limiter
+  resolves it with a 60 s TTL cache (falling back to `PDLC_LLM_RPM_DEFAULT`),
+  editable from Nexus → Pricing & budget (`GET/PUT /admin/budget/quota`).
+- **MCP stdio tool execution** (T3-1) — stdio-transport MCP servers could be
+  registered and bound but every tool call returned "not implemented in v1".
+  They now execute via the `mcp` SDK's `stdio_client`, still double-gated to
+  single-user self-host (`PDLC_ENABLE_STDIO_MCP` + refused under
+  `PDLC_AUTH_REQUIRED`), with the same allowlist / caps / audit as HTTP tools.
 - **Execution arc — real test/merge/deploy/scan** (T1-1/2/3/4, T2-3). When
   enabled (`PDLC_ENABLE_EXECUTION`, **single-user self-host only** — refused
   under `PDLC_AUTH_REQUIRED`, like stdio MCP / CLI providers), the graph's

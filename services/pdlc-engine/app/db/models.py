@@ -317,6 +317,16 @@ class OrgBudget(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=text("now()"))
 
 
+class OrgQuota(Base):
+    """Per-org LLM rate-limit override (T3-5). Null rpm_limit / no row ⇒ the
+    global PDLC_LLM_RPM_DEFAULT applies."""
+
+    __tablename__ = "org_quotas"
+    org_id: Mapped[UUID] = mapped_column(ForeignKey("organizations.id", ondelete="CASCADE"), primary_key=True)
+    rpm_limit: Mapped[int | None] = mapped_column(Integer)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=text("now()"))
+
+
 class OrgBudgetAlert(Base):
     """Dedupe ledger — the PK fires each (org, month, threshold) exactly once."""
 

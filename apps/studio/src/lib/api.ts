@@ -277,6 +277,15 @@ export const admin = {
       body: JSON.stringify(body),
     }),
 
+  getQuota: (orgId: string) =>
+    json<QuotaInfo>(`/admin/budget/quota?org_id=${encodeURIComponent(orgId)}`),
+
+  putQuota: (orgId: string, rpmLimit: number | null) =>
+    json<{ ok: boolean; rpm_limit: number | null }>(
+      `/admin/budget/quota?org_id=${encodeURIComponent(orgId)}`,
+      { method: 'PUT', body: JSON.stringify({ rpm_limit: rpmLimit }) },
+    ),
+
   // ── Persona prompt overrides (PRD-10) ────────────────────────────────────
   listPersonaPrompts: (orgId: string) =>
     json<{ personas: PromptSummary[] }>(`/admin/prompts?org_id=${encodeURIComponent(orgId)}`),
@@ -432,6 +441,12 @@ export interface BudgetInfo {
   alert_pcts: number[];
   month_to_date_usd: number;
   fired: number[];
+}
+
+export interface QuotaInfo {
+  rpm_limit: number | null;
+  rpm_default: number;
+  enforced: boolean;
 }
 
 // Models settings types — mirror app/routes/admin/models.py response models.
