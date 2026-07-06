@@ -6,8 +6,20 @@ All notable changes to pdlcflow are documented here. This project adheres to
 ## Unreleased
 
 Observability — OpenTelemetry traces + metrics, Grafana, and a Streamlit ops dashboard.
+BYOK — per-tenant LLM API keys now actually resolve and inject (Wave 1 of the cc-switch gap roadmap).
 
 ### Added
+- **BYOK (bring-your-own-key) completion**: the LLM factory now reads
+  `org_llm_config.secret_ref` / `agent_llm_config.secret_ref` and injects the
+  tenant's key into every provider call for that org. The admin API gains a
+  write-only `api_key` field on `PUT /v1/admin/models/org-default` and
+  `…/agent-overrides/{persona}`, a derived `has_key` flag on reads (key material
+  and refs are never returned), and `DELETE …/key` endpoints. Same-provider agent
+  overrides inherit the org key; keys never cross provider boundaries. An
+  unresolvable stored key **fails closed** instead of silently billing the
+  operator's env key (that was the bug). Resolved keys are TTL-cached
+  (`PDLC_SECRET_CACHE_TTL_S`, default 300 s); key set/clear emits
+  `admin.llm_key.*` audit events carrying no key material.
 - **OpenTelemetry instrumentation** (opt-in, `PDLC_OTEL_ENABLED`). One trace per
   graph turn → a span per LangGraph node → a leaf span per `complete()` call with
   GenAI semantic-convention attributes (model, provider, token usage, estimated

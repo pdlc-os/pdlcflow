@@ -4,20 +4,29 @@ Persists to org_llm_config / agent_llm_config (RLS-FORCEd, scoped to the admin's
 org). The LLM factory reads these so per-tenant / per-agent model selection takes
 effect. Tiers are provider-neutral (premium / balanced / economy); the factory's
 tier_map turns a tier into a concrete model for the chosen provider.
+
+BYOK: PUT bodies accept a WRITE-ONLY `api_key`. When present it is stored via the
+secrets backend and only the resulting `secret_ref` is persisted; the plaintext
+key is never written to the DB, logs, events, or any response. GET responses
+expose only a derived `has_key` flag — not the key, not even the ref (an `enc:`
+ref IS the ciphertext). Omitting `api_key` on PUT leaves any stored key intact,
+so editing the provider/model never silently wipes credentials.
 """
 
 from __future__ import annotations
 
 import json
+import uuid
 from typing import Literal
 
-from fastapi import APIRouter, Depends
-from pydantic import BaseModel
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel, Field
 from sqlalchemy import text
 
 from ...config import settings
 from ...db.rls import set_org_context
 from ...db.session import get_sync_engine
+from ...llm.factory import invalidate_secret_cache
 from ._guard import admin_org
 
 router = APIRouter(prefix="/models", tags=["admin", "models"])
@@ -34,6 +43,19 @@ class OrgDefault(BaseModel):
     tier_map: dict[str, str]  # {"premium": "...", "balanced": "...", "economy": "..."}
     region: str | None = None
     endpoint: str | None = None
+    # WRITE-ONLY: accepted on PUT, stored via the secrets backend, never echoed.
+    # None ⇒ keep whatever key is already stored.
+    api_key: str | None = Field(None, min_length=1)
+
+
+class OrgDefaultOut(BaseModel):
+    """GET response — physically lacks key fields so they cannot leak."""
+
+    provider: Provider
+    tier_map: dict[str, str]
+    region: str | None = None
+    endpoint: str | None = None
+    has_key: bool = False
 
 
 class AgentOverride(BaseModel):
@@ -42,57 +64,136 @@ class AgentOverride(BaseModel):
     model_id: str
     region: str | None = None
     endpoint: str | None = None
+    api_key: str | None = Field(None, min_length=1)  # WRITE-ONLY (see OrgDefault)
+
+
+class AgentOverrideOut(BaseModel):
+    agent_persona: Persona
+    provider: Provider
+    model_id: str
+    region: str | None = None
+    endpoint: str | None = None
+    has_key: bool = False
 
 
 def _engine():
     return get_sync_engine(settings)
 
 
-@router.get("/org-default", response_model=OrgDefault | None)
+def _store_key(api_key: str, hint: str) -> str:
+    """Store a tenant key in the secrets backend; return the opaque ref."""
+    from ...secretstore import get_secrets
+
+    try:
+        return get_secrets().put(api_key, hint=hint)
+    except Exception as exc:
+        # Typically: PDLC_SECRETS_BACKEND=encrypted without PDLC_SECRET_KEY.
+        raise HTTPException(
+            status_code=503,
+            detail="secrets backend unavailable — check PDLC_SECRETS_BACKEND / "
+            "PDLC_SECRET_KEY before storing tenant API keys",
+        ) from exc
+
+
+def _audit(event_type: str, org_id: str, payload: dict) -> None:
+    """Best-effort clickstream audit for key lifecycle — never key material."""
+    try:
+        from ...clickstream.emitter import get_emitter
+
+        get_emitter().emit(
+            event_type,
+            {"org_id": uuid.UUID(str(org_id)), "project_id": uuid.UUID(int=0),
+             "actor": "admin"},
+            payload,
+            correlation_id=str(uuid.uuid4()),
+        )
+    except Exception:  # audit must never fail the admin call
+        pass
+
+
+@router.get("/org-default", response_model=OrgDefaultOut | None)
 def get_org_default(
     org_id: str = Depends(admin_org("/admin/models/org-default")),
-) -> OrgDefault | None:
+) -> OrgDefaultOut | None:
     with _engine().begin() as conn:
         set_org_context(conn, org_id)
         row = conn.execute(
-            text("select provider, tier_map, region, endpoint from org_llm_config where org_id = :o"),
+            text("select provider, tier_map, region, endpoint, "
+                 "secret_ref is not null as has_key "
+                 "from org_llm_config where org_id = :o"),
             {"o": org_id},
         ).mappings().first()
-    return OrgDefault(**row) if row else None
+    return OrgDefaultOut(**row) if row else None
 
 
 @router.put("/org-default")
 def set_org_default(
     cfg: OrgDefault, org_id: str = Depends(admin_org("/admin/models/org-default"))
 ) -> dict:
+    params = {"o": org_id, "p": cfg.provider, "r": cfg.region, "e": cfg.endpoint,
+              "t": json.dumps(cfg.tier_map)}
+    if cfg.api_key is not None:
+        ref = _store_key(cfg.api_key, hint=f"llm/org/{org_id}")
+        invalidate_secret_cache(ref)  # vault refs are stable paths — drop stale plaintext
+        params["sr"] = ref
+        sql = (
+            "insert into org_llm_config (org_id, provider, region, endpoint, tier_map, secret_ref) "
+            "values (:o, :p, :r, :e, cast(:t as jsonb), :sr) "
+            "on conflict (org_id) do update set "
+            "provider = excluded.provider, region = excluded.region, "
+            "endpoint = excluded.endpoint, tier_map = excluded.tier_map, "
+            "secret_ref = excluded.secret_ref"
+        )
+    else:
+        # api_key omitted ⇒ leave secret_ref untouched (edits must not wipe keys).
+        sql = (
+            "insert into org_llm_config (org_id, provider, region, endpoint, tier_map) "
+            "values (:o, :p, :r, :e, cast(:t as jsonb)) "
+            "on conflict (org_id) do update set "
+            "provider = excluded.provider, region = excluded.region, "
+            "endpoint = excluded.endpoint, tier_map = excluded.tier_map"
+        )
+    with _engine().begin() as conn:
+        set_org_context(conn, org_id)
+        conn.execute(text(sql), params)
+        has_key = bool(conn.execute(
+            text("select secret_ref is not null from org_llm_config where org_id = :o"),
+            {"o": org_id},
+        ).scalar())
+    if cfg.api_key is not None:
+        _audit("admin.llm_key.set", org_id,
+               {"scope": "org-default", "provider": cfg.provider})
+    return {"ok": True, "has_key": has_key}
+
+
+@router.delete("/org-default/key")
+def clear_org_default_key(
+    org_id: str = Depends(admin_org("/admin/models/org-default")),
+) -> dict:
     with _engine().begin() as conn:
         set_org_context(conn, org_id)
         conn.execute(
-            text(
-                "insert into org_llm_config (org_id, provider, region, endpoint, tier_map) "
-                "values (:o, :p, :r, :e, cast(:t as jsonb)) "
-                "on conflict (org_id) do update set "
-                "provider = excluded.provider, region = excluded.region, "
-                "endpoint = excluded.endpoint, tier_map = excluded.tier_map"
-            ),
-            {"o": org_id, "p": cfg.provider, "r": cfg.region, "e": cfg.endpoint,
-             "t": json.dumps(cfg.tier_map)},
+            text("update org_llm_config set secret_ref = null where org_id = :o"),
+            {"o": org_id},
         )
+    invalidate_secret_cache()
+    _audit("admin.llm_key.cleared", org_id, {"scope": "org-default"})
     return {"ok": True}
 
 
-@router.get("/agent-overrides", response_model=list[AgentOverride])
+@router.get("/agent-overrides", response_model=list[AgentOverrideOut])
 def list_agent_overrides(
     org_id: str = Depends(admin_org("/admin/models/agent-overrides")),
-) -> list[AgentOverride]:
+) -> list[AgentOverrideOut]:
     with _engine().begin() as conn:
         set_org_context(conn, org_id)
         rows = conn.execute(
-            text("select agent_persona, provider, model_id, region, endpoint "
+            text("select agent_persona, provider, model_id, region, endpoint, "
+                 "secret_ref is not null as has_key "
                  "from agent_llm_config where org_id = :o order by agent_persona"),
             {"o": org_id},
         ).mappings().all()
-    return [AgentOverride(**r) for r in rows]
+    return [AgentOverrideOut(**r) for r in rows]
 
 
 @router.put("/agent-overrides/{persona}")
@@ -101,20 +202,59 @@ def set_agent_override(
     cfg: AgentOverride,
     org_id: str = Depends(admin_org("/admin/models/agent-overrides")),
 ) -> dict:
+    params = {"o": org_id, "a": persona, "p": cfg.provider, "m": cfg.model_id,
+              "r": cfg.region, "e": cfg.endpoint}
+    if cfg.api_key is not None:
+        ref = _store_key(cfg.api_key, hint=f"llm/agent/{org_id}/{persona}")
+        invalidate_secret_cache(ref)
+        params["sr"] = ref
+        sql = (
+            "insert into agent_llm_config "
+            "(org_id, agent_persona, provider, model_id, region, endpoint, secret_ref) "
+            "values (:o, :a, :p, :m, :r, :e, :sr) "
+            "on conflict (org_id, agent_persona) do update set "
+            "provider = excluded.provider, model_id = excluded.model_id, "
+            "region = excluded.region, endpoint = excluded.endpoint, "
+            "secret_ref = excluded.secret_ref"
+        )
+    else:
+        sql = (
+            "insert into agent_llm_config "
+            "(org_id, agent_persona, provider, model_id, region, endpoint) "
+            "values (:o, :a, :p, :m, :r, :e) "
+            "on conflict (org_id, agent_persona) do update set "
+            "provider = excluded.provider, model_id = excluded.model_id, "
+            "region = excluded.region, endpoint = excluded.endpoint"
+        )
+    with _engine().begin() as conn:
+        set_org_context(conn, org_id)
+        conn.execute(text(sql), params)
+        has_key = bool(conn.execute(
+            text("select secret_ref is not null from agent_llm_config "
+                 "where org_id = :o and agent_persona = :a"),
+            {"o": org_id, "a": persona},
+        ).scalar())
+    if cfg.api_key is not None:
+        _audit("admin.llm_key.set", org_id,
+               {"scope": "agent-override", "persona": persona, "provider": cfg.provider})
+    return {"ok": True, "persona": persona, "has_key": has_key}
+
+
+@router.delete("/agent-overrides/{persona}/key")
+def clear_agent_override_key(
+    persona: Persona,
+    org_id: str = Depends(admin_org("/admin/models/agent-overrides")),
+) -> dict:
     with _engine().begin() as conn:
         set_org_context(conn, org_id)
         conn.execute(
-            text(
-                "insert into agent_llm_config "
-                "(org_id, agent_persona, provider, model_id, region, endpoint) "
-                "values (:o, :a, :p, :m, :r, :e) "
-                "on conflict (org_id, agent_persona) do update set "
-                "provider = excluded.provider, model_id = excluded.model_id, "
-                "region = excluded.region, endpoint = excluded.endpoint"
-            ),
-            {"o": org_id, "a": persona, "p": cfg.provider, "m": cfg.model_id,
-             "r": cfg.region, "e": cfg.endpoint},
+            text("update agent_llm_config set secret_ref = null "
+                 "where org_id = :o and agent_persona = :a"),
+            {"o": org_id, "a": persona},
         )
+    invalidate_secret_cache()
+    _audit("admin.llm_key.cleared", org_id,
+           {"scope": "agent-override", "persona": persona})
     return {"ok": True, "persona": persona}
 
 
@@ -129,4 +269,7 @@ def clear_agent_override(
             text("delete from agent_llm_config where org_id = :o and agent_persona = :a"),
             {"o": org_id, "a": persona},
         )
+    invalidate_secret_cache()
+    _audit("admin.llm_key.cleared", org_id,
+           {"scope": "agent-override", "persona": persona, "row_deleted": True})
     return {"ok": True, "persona": persona}

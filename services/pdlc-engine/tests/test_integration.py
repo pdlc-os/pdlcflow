@@ -462,3 +462,79 @@ def test_entity_rename_and_delete():
     assert c.request("DELETE", f"/v1/squads/{s['id']}{q}").status_code == 200
     assert c.request("DELETE", f"/v1/domains/{d['id']}{q}").status_code == 200
     assert c.patch(f"/v1/projects/{uuid.uuid4()}{q}", json={"name": "x"}).status_code == 404
+
+
+def test_byok_key_roundtrip_and_inheritance(monkeypatch):
+    """BYOK end-to-end: PUT stores a key as a secret_ref, GET exposes only
+    has_key, the factory injects the tenant key, same-provider agent overrides
+    inherit it (COALESCE), different-provider ones don't, and DELETE clears it.
+    Nowhere does the plaintext key or the ref appear in a response."""
+    from app import secretstore as S
+    from app.db.session import get_sync_engine
+    from app.llm.factory import LLMProviderFactory, invalidate_secret_cache
+    from app.main import app
+    from cryptography.fernet import Fernet
+    from fastapi.testclient import TestClient
+
+    monkeypatch.setattr(settings, "secrets_backend", "encrypted")
+    monkeypatch.setattr(settings, "secret_key", Fernet.generate_key().decode())
+    S.reset_secrets()
+    invalidate_secret_cache()
+    try:
+        org, _ = _seed_project()
+        c = TestClient(app)
+        q = f"?org_id={org}"
+        tier_map = {"premium": "claude-opus-4-8", "balanced": "claude-sonnet-4-6",
+                    "economy": "claude-haiku-4-5"}
+        key = "sk-ant-integration-test-key"
+
+        # PUT with api_key → stored as ref; nothing key-shaped in any response.
+        r = c.put(f"/v1/admin/models/org-default{q}", json={
+            "provider": "anthropic", "tier_map": tier_map, "api_key": key})
+        assert r.status_code == 200 and r.json() == {"ok": True, "has_key": True}
+        g = c.get(f"/v1/admin/models/org-default{q}")
+        assert g.json()["has_key"] is True
+        assert key not in r.text and key not in g.text
+        assert "secret_ref" not in g.json() and "api_key" not in g.json()
+
+        # Factory resolves the tenant key into ProviderConfig.secret_value.
+        f = LLMProviderFactory(db=get_sync_engine(settings))
+        assert f._org_default(org).secret_value == key
+
+        # FR-8: re-PUT without api_key must NOT wipe the stored key.
+        r2 = c.put(f"/v1/admin/models/org-default{q}", json={
+            "provider": "anthropic", "tier_map": tier_map, "region": "eu"})
+        assert r2.json()["has_key"] is True
+
+        # Same-provider agent override inherits the org key…
+        c.put(f"/v1/admin/models/agent-overrides/neo{q}", json={
+            "agent_persona": "neo", "provider": "anthropic",
+            "model_id": "claude-opus-4-8"})
+        assert f._agent_override(org, "neo").secret_value == key
+        # …a different-provider override does not (no cross-provider keys).
+        c.put(f"/v1/admin/models/agent-overrides/muse{q}", json={
+            "agent_persona": "muse", "provider": "openai", "model_id": "gpt-5.5"})
+        assert f._agent_override(org, "muse").secret_value is None
+
+        # Per-agent key beats inheritance and reads back only as has_key.
+        r3 = c.put(f"/v1/admin/models/agent-overrides/muse{q}", json={
+            "agent_persona": "muse", "provider": "openai", "model_id": "gpt-5.5",
+            "api_key": "sk-openai-muse"})
+        assert r3.json()["has_key"] is True
+        invalidate_secret_cache()
+        assert f._agent_override(org, "muse").secret_value == "sk-openai-muse"
+        listed = c.get(f"/v1/admin/models/agent-overrides{q}")
+        assert "sk-openai-muse" not in listed.text
+
+        # DELETE …/key clears the org key; inheritance dries up with it.
+        assert c.delete(f"/v1/admin/models/org-default/key{q}").status_code == 200
+        assert c.get(f"/v1/admin/models/org-default{q}").json()["has_key"] is False
+        invalidate_secret_cache()
+        assert f._org_default(org).secret_value is None
+        assert f._agent_override(org, "neo").secret_value is None
+        assert c.delete(f"/v1/admin/models/agent-overrides/muse/key{q}").status_code == 200
+        invalidate_secret_cache()
+        assert f._agent_override(org, "muse").secret_value is None
+    finally:
+        S.reset_secrets()
+        invalidate_secret_cache()

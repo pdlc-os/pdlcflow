@@ -202,7 +202,7 @@ Wiring is defensive: `wire_persistence`, `build_checkpointer`, `wire_event_bus`,
 - Misconfiguration degrades a feature (e.g. checkpoints become non-durable) instead of taking the service down.
 - Watch the startup logs (`docker compose logs -f api`) for lines like `PostgresSaver unavailable (...); falling back to MemorySaver` to confirm a real backend actually engaged — a green boot does **not** by itself prove Postgres is wired.
 
-## Secrets (per-repo VCS tokens)
+## Secrets (per-repo VCS tokens, tenant LLM keys)
 
 Sensitive values are stored via a pluggable backend. A value is written with `put()` which returns an opaque **ref** saved in the DB column (e.g. `repositories.token_secret_ref`); `resolve(ref)` returns the plaintext. **`resolve` dispatches on the ref prefix**, so a deployment can switch backends and still read old refs.
 
@@ -213,6 +213,20 @@ Sensitive values are stored via a pluggable backend. A value is written with `pu
 | `env` | `env:<NAME>` | the environment variable `NAME` | Cloud provider secrets managers (or a custom location) that inject secrets as env vars. |
 
 The bundled Vault is **off by default** to keep the stack lean. `cryptography` (Fernet) ships in the image; `hvac` (Vault) is included so `vault` works without rebuilding.
+
+### Tenant API keys (BYOK)
+
+An org admin can attach an LLM API key to the org's model config (and to any per-agent override) via `PUT /v1/admin/models/org-default` / `…/agent-overrides/{persona}` with a **write-only** `api_key` field. The key is stored through the secrets backend above; only the opaque ref lands in the DB, and reads expose only a derived `has_key` flag — never the key or the ref. `DELETE …/org-default/key` (or `…/agent-overrides/{persona}/key`) removes it.
+
+Semantics worth knowing:
+
+- **Resolution is fail-closed.** A stored key that can no longer be resolved (deleted Vault path, changed `PDLC_SECRET_KEY`, missing env var) makes that org's LLM calls **error** instead of silently falling back to the instance-wide env key — re-enter the key to fix. No stored key at all ⇒ the instance env key is used, as before.
+- **Same-provider inheritance.** An agent override without its own key inherits the org-default key only when both point at the same provider; keys never cross provider boundaries.
+- **Rotation** is just another PUT with `api_key`; replicas pick the new key up within `PDLC_SECRET_CACHE_TTL_S` (default `300`s; `0` disables the cache).
+
+| Variable | Default | Meaning |
+| --- | --- | --- |
+| `PDLC_SECRET_CACHE_TTL_S` | `300` | TTL for the engine's resolved-key cache on the LLM hot path. Bounds how long a rotated key may still be served on other replicas. `0` disables caching. |
 
 
 ---

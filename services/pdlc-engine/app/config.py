@@ -48,6 +48,10 @@ class Settings(BaseSettings):
     vault_token: str | None = None
     vault_mount: str = "secret"
     vault_path_prefix: str = "pdlcflow/repos"
+    # TTL for the factory's resolved-secret cache (BYOK hot path). 0 disables.
+    # After a key rotation, other replicas may serve the old key for up to this
+    # long — acceptable because rotation replaces a working key with another.
+    secret_cache_ttl_s: int = 300
 
     # LLM defaults
     default_llm_provider: Literal[
