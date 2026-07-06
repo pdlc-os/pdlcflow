@@ -11,6 +11,16 @@ simulations presented as results (from the
 [stub-gaps roadmap](docs/.research/stub-gaps-roadmap.md)).
 
 ### Added
+- **Project memory viewer** (T3-4) — the sidebar "Memory" panel was a static
+  mockup. It now lists the project's stored artifacts (PRD, design docs,
+  decisions, deployments, uploads, migrated memory) and shows their content on
+  click, backed by new `GET /projects/{id}/artifacts` + `…/artifacts/content`
+  routes (artifact stores gained `list`/`read`, org-scoped via the turn context).
+- **Project task board** (T3-6) — the sidebar "Tasks" panel (was an empty
+  RoadmapBoard placeholder) now shows the feature's bd-NN tasks grouped by
+  status, backed by `GET /projects/{id}/tasks`. Two dead scaffolds removed:
+  `SketchSocraticToggle` (a duplicate of ChatPanel's working `ModeToggle`) and
+  `SettingsDrawer` (an orphaned placeholder).
 - **Per-org LLM rate-limit quotas** (T3-5) — the RPM limiter shipped with only a
   global default; the "Quotas page" it promised now exists. A new `org_quotas`
   table holds a per-org `rpm_limit` (RLS-forced, migration `0015`); the limiter

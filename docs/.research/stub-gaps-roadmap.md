@@ -31,9 +31,9 @@
 | ~~T3-1~~ ✅ | MCP stdio execution (stdio_client dispatch, double-gated) — **done** | engine | 🟡 Feature | M |
 | T3-2 | Initialization phase is a passthrough (no Constitution/Intent/Roadmap flow) | pdlc-graph | 🟡 Feature | L |
 | ~~T3-3~~ ✅ | Migrate entity resolution (names → UUIDs, idempotent, DB-gated) — **done** | migrate + engine | 🟡 Feature | M |
-| T3-4 | MemoryFileViewer is a live mockup in every project sidebar | studio | 🟡 Feature | M |
+| ~~T3-4~~ ✅ | MemoryFileViewer live (artifact list/read routes + real viewer) — **done** | studio | 🟡 Feature | M |
 | ~~T3-5~~ ✅ | Per-org RPM quotas (org_quotas + resolver + console control) — **done** | engine + studio | 🟡 Feature | M |
-| T3-6 | RoadmapBoard + SettingsDrawer orphan scaffolds; SketchSocraticToggle unpersisted | studio | 🟡 Feature | M–L |
+| ~~T3-6~~ ✅ | RoadmapBoard built (tasks route); SketchSocraticToggle (dup of ChatPanel ModeToggle) + SettingsDrawer (orphan) deleted — **done** | studio | 🟡 Feature | M–L |
 | ~~T4-1~~ ✅ | Event-schema sync: registry backfilled (57 types), payloads added/fixed, check script + CI test — **done** | event-schema | 🟢 Hygiene | S |
 | ~~T4-2~~ ✅ | Dead code deleted (LLMTokenTallyCallback, pdlc_graph/tools/*, 3 orphaned Studio components) — **done** | multi | 🟢 Hygiene | S |
 | ~~T4-3~~ ✅ | Docstring truth (azure, analytics) — **done** (quick-wins) | engine | 🟢 Hygiene | S |

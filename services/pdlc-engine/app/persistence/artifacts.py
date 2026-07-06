@@ -41,6 +41,16 @@ class FilesystemArtifactStore:
         target = self._within_base(Path(uri.removeprefix("file://")))
         return target.read_text(encoding="utf-8")
 
+    def list(self, org_id: str, project_id: str) -> list[str]:
+        root = self._within_base(self._base / org_id / project_id)
+        if not root.exists():
+            return []
+        return sorted(str(p.relative_to(root)) for p in root.rglob("*") if p.is_file())
+
+    def read(self, org_id: str, project_id: str, path: str) -> str:
+        target = self._within_base(self._base / org_id / project_id / path)
+        return target.read_text(encoding="utf-8")
+
 
 class S3ArtifactStore:
     """Writes artifact bodies to S3 (or a MinIO endpoint). Lazily builds the
@@ -75,3 +85,15 @@ class S3ArtifactStore:
         bucket, _, key = rest.partition("/")
         obj = self._s3().get_object(Bucket=bucket, Key=key)
         return obj["Body"].read().decode("utf-8")
+
+    def list(self, org_id: str, project_id: str) -> list[str]:
+        prefix = f"{org_id}/{project_id}/"
+        paths: list[str] = []
+        paginator = self._s3().get_paginator("list_objects_v2")
+        for page in paginator.paginate(Bucket=self._bucket, Prefix=prefix):
+            for obj in page.get("Contents", []):
+                paths.append(obj["Key"].removeprefix(prefix))
+        return sorted(paths)
+
+    def read(self, org_id: str, project_id: str, path: str) -> str:
+        return self.get(f"s3://{self._bucket}/{org_id}/{project_id}/{path}")

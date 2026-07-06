@@ -58,6 +58,8 @@ def current_org() -> str:
 class ArtifactStore(Protocol):
     def put(self, org_id: str, project_id: str, path: str, content: str) -> str: ...
     def get(self, uri: str) -> str: ...
+    def list(self, org_id: str, project_id: str) -> list[str]: ...  # relative paths
+    def read(self, org_id: str, project_id: str, path: str) -> str: ...  # by relative path
 
 
 class InMemoryArtifactStore:
@@ -71,6 +73,13 @@ class InMemoryArtifactStore:
 
     def get(self, uri: str) -> str:
         return self._store[uri]
+
+    def list(self, org_id: str, project_id: str) -> list[str]:
+        prefix = f"memory://{org_id}/{project_id}/"
+        return sorted(k.removeprefix(prefix) for k in self._store if k.startswith(prefix))
+
+    def read(self, org_id: str, project_id: str, path: str) -> str:
+        return self._store[f"memory://{org_id}/{project_id}/{path}"]
 
 
 _store: ArtifactStore = InMemoryArtifactStore()
@@ -98,3 +107,20 @@ def put_artifact(project_id: str, path: str, content: str) -> str:
 
 def get_artifact(uri: str) -> str:
     return _store.get(uri)
+
+
+def list_artifacts(project_id: str) -> list[str]:
+    """Relative paths of the current tenant's artifacts for `project_id`. Org
+    from the turn context (never the caller). [] if the store can't list."""
+    org = current_org()
+    pid = _safe_segment(project_id, "project_id")
+    lister = getattr(_store, "list", None)
+    return lister(org, pid) if lister else []
+
+
+def read_artifact(project_id: str, path: str) -> str:
+    """Fetch one artifact by relative path for the current tenant + project."""
+    org = current_org()
+    pid = _safe_segment(project_id, "project_id")
+    rel = safe_relpath(path)
+    return _store.read(org, pid, rel)

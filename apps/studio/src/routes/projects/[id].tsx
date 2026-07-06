@@ -5,6 +5,7 @@ import { ApprovalGateModal } from '@/components/ApprovalGateModal';
 import { ChatPanel } from '@/components/ChatPanel';
 import { ContextMeter } from '@/components/ContextMeter';
 import { MemoryFileViewer } from '@/components/MemoryFileViewer';
+import { RoadmapBoard } from '@/components/RoadmapBoard';
 import { ThreadSidebar } from '@/components/ThreadSidebar';
 import { NightShiftMissionControl } from '@/components/NightShiftMissionControl';
 import { QuestionCard } from '@/components/QuestionCard';
@@ -99,6 +100,7 @@ export function ProjectView() {
       <aside className="flex flex-col gap-4">
         <ThreadSidebar />
         <ContextMeter />
+        <RoadmapBoard />
         <MemoryFileViewer />
       </aside>
 
