@@ -6,7 +6,7 @@ import { useAuth } from '@/store/useAuth';
  *  Always dismissable (Cancel / Esc / backdrop): in self-hosted simulation mode
  *  auth is optional, so the user must be able to escape back to the app. */
 export function LoginView() {
-  const { login, error, dismissLogin } = useAuth();
+  const { login, loginSso, mode, error, dismissLogin } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
@@ -41,6 +41,23 @@ export function LoginView() {
         <p className="mb-4 text-xs text-muted-fg">
           Sign in to continue. Press Esc or Cancel to dismiss.
         </p>
+        {mode === 'oidc' && (
+          <>
+            <button
+              type="button"
+              onClick={() => void loginSso()}
+              className="mb-3 w-full rounded-md bg-accent px-3 py-2 text-sm font-medium text-accent-fg"
+            >
+              Sign in with SSO
+            </button>
+            {error && <p className="mb-2 text-xs text-red-500">{error}</p>}
+            <p className="text-center text-xs text-muted-fg">
+              Your organization uses single sign-on.
+            </p>
+          </>
+        )}
+        {mode !== 'oidc' && (
+        <>
         <label className="mb-2 block text-xs text-muted-fg">
           Email
           <input
@@ -79,6 +96,8 @@ export function LoginView() {
             Cancel
           </button>
         </div>
+        </>
+        )}
       </form>
     </div>
   );

@@ -77,7 +77,7 @@ flowchart TB
 pdlcflow ships two deployment tracks:
 
 - **Self-host (single-tenant)** — `infra/compose/docker-compose.yml`. One `docker compose up` brings up Postgres, Redis, MinIO, the API, the Arq worker, and Studio (with an optional Caddy auto-TLS profile). This is the path documented in these pages. Auth is open (JWT scaffolded, enforcement deferred); artifacts default to a mounted filesystem volume; analytics + checkpoints + tasks live in the bundled Postgres.
-- **SaaS (multi-tenant)** — `infra/cdk/`, an AWS CDK app (network/data/compute/edge/auth/events/bedrock/observability stacks) targeting Bedrock, Cognito/SSO, per-tenant KMS, Firehose→S3 telemetry, and forced row-level-security. The same engine code runs in both; the difference is which flag-gated backends are wired (see the configuration page).
+- **SaaS (multi-tenant)** — `infra/cdk/`, an AWS CDK app (network/data/compute/edge/auth/events/bedrock/observability stacks) targeting Bedrock, OIDC/SSO (Cognito), per-tenant KMS, Firehose→S3 telemetry, and forced row-level-security. The same engine code runs in both; the difference is which flag-gated backends are wired (see the configuration page).
 
 A key design property: **every backend defaults to in-memory and falls back to in-memory if its infrastructure is unreachable**, so the engine always boots — even with no Postgres, Redis, or object store present. That makes dev and the hermetic test suite infra-free, and makes the production adapters opt-in via `PDLC_` flags.
 

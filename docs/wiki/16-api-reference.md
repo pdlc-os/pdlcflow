@@ -5,7 +5,7 @@
 
 The pdlc-engine (`services/pdlc-engine/`) is a FastAPI app. All REST endpoints
 are mounted under `/v1` except the health probes (root) and the WebSocket
-(`/ws/...`). Auth is currently open (Cognito/JWT enforcement is deferred).
+(`/ws/...`). Auth is open by default; set `PDLC_AUTH_REQUIRED=true` for Bearer-token enforcement (local JWT or OIDC/SSO — see the Configuration page).
 
 Router mounts (`app/main.py`):
 

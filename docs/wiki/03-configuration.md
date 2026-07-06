@@ -13,7 +13,7 @@ All engine configuration is environment-driven through Pydantic settings with th
 | `PDLC_LOG_LEVEL` | `info` | `debug` \| `info` \| `warning` \| `error`. |
 | `PDLC_DB_URL` | `postgresql+asyncpg://postgres:pdlc@localhost:5432/pdlc` | SQLAlchemy async DB URL. The Postgres checkpointer/task-store/analytics derive their sync `psycopg` connection from this. |
 | `PDLC_REDIS_URL` | `redis://localhost:6379/0` | Redis DSN — used by the Redis event bus and the Arq queue. |
-| `PDLC_AUTH_MODE` | `local` | `local` (self-host JWT) \| `cognito` (SaaS). Auth enforcement is currently deferred (open API). |
+| `PDLC_AUTH_MODE` | `local` | `local` (self-host HS256 JWT) \| `oidc` (SSO — validate against an external issuer's JWKS). An unknown mode, or `oidc` without issuer+audience, refuses to boot. |
 | `PDLC_JWT_SECRET` | `change-me-in-production` | HS256 signing secret — **set this in any real deployment**. |
 | `PDLC_JWT_ALG` | `HS256` | JWT algorithm. |
 | `PDLC_JWT_TTL_S` | `43200` | Token TTL in seconds (12 h). |
@@ -162,7 +162,7 @@ Each seam is independently switchable. The left column is the dev/test default; 
 
 - **Self-host** — the `.env.example` profile: Postgres checkpointer + task store + analytics + clickstream, Redis bus, filesystem (or MinIO) artifacts, `auth_mode=local`. Everything runs in the compose stack on one host.
 - **Dev / hermetic** — leave the flags off: every seam is in-memory, no external infra, `PDLC_WIRE_LLM=false`. This is what the test suite and `uvicorn --reload` use.
-- **SaaS** — `auth_mode=cognito`, `clickstream_sink=firehose`, S3 artifacts/events buckets, Bedrock provider, and the CDK-provisioned multi-tenant infrastructure (`infra/cdk/`). The same flags select the cloud-backed adapters.
+- **SaaS** — `auth_mode=oidc` (SSO), `clickstream_sink=firehose`, S3 artifacts/events buckets, Bedrock provider, and the CDK-provisioned multi-tenant infrastructure (`infra/cdk/`). The same flags select the cloud-backed adapters.
 
 ## Authentication (Phase 1 — flag-gated)
 
@@ -177,7 +177,31 @@ Auth is **enforced only when `PDLC_AUTH_REQUIRED=true`** (default off = open API
   # → {"access_token":"…","identity":{…}}   then send  Authorization: Bearer <token>
   ```
 
-  Create more users via the admin-only `POST /v1/auth/users`. Accounts live in the user store (in-memory in dev/test; Postgres `users`/`org_members` when `PDLC_TASK_STORE=postgres`). `PDLC_AUTH_MODE=cognito` (SSO) is scaffolded for a later phase.
+  Create more users via the admin-only `POST /v1/auth/users`. Accounts live in the user store (in-memory in dev/test; Postgres `users`/`org_members` when `PDLC_TASK_STORE=postgres`).
+
+### OIDC / SSO (`PDLC_AUTH_MODE=oidc`)
+
+For SaaS/multi-tenant deployments, generic **OIDC** replaces local passwords with
+single sign-on against any spec-compliant issuer — **AWS Cognito, Google Identity
+Platform, Entra/AD B2C, Auth0**. The engine validates every Bearer token against
+the issuer's **JWKS** (discovery-resolved, TTL-cached) with **issuer + audience**
+checks, then maps claims to the PDLC identity. On **first login** the user's org
+and role are **provisioned from configurable claims**; after that the user store
+is authoritative.
+
+Config: `PDLC_OIDC_ISSUER`, `PDLC_OIDC_AUDIENCE` (required — the engine refuses to
+boot without them), `PDLC_OIDC_CLIENT_ID`, `PDLC_OIDC_REDIRECT_URI` (the Studio
+origin), `PDLC_OIDC_SCOPES`, and claim mappings `PDLC_OIDC_ORG_CLAIM` /
+`PDLC_OIDC_ROLE_CLAIM` (a list role claim like Cognito groups resolves to the
+highest of owner/admin/member/viewer; empty ⇒ `member`, single `default` org).
+
+The **Studio** detects the mode via `GET /v1/auth/mode`; in `oidc` mode the login
+overlay shows **Sign in with SSO**, which runs the OAuth **auth-code + PKCE** flow
+(`GET /v1/auth/oidc/config` → redirect to the IdP → callback → `POST
+/v1/auth/oidc/exchange` returns the validated session). Register the Studio
+redirect URI as an allowed callback for a public PKCE client in the IdP. Org/role
+enforcement (and RLS) are identical to local mode — the token is just the
+trustworthy source of `org_id`.
 
 > Auth asserts the principal at the app layer; **RLS FORCE** (Phase 3) makes Postgres enforce the same org boundary at the wire. They compose — auth is the trustworthy source of `org_id` that RLS keys on. See *Row-level security* below.
 
