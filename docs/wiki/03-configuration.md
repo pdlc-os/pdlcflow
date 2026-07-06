@@ -228,6 +228,16 @@ Semantics worth knowing:
 | --- | --- | --- |
 | `PDLC_SECRET_CACHE_TTL_S` | `300` | TTL for the engine's resolved-key cache on the LLM hot path. Bounds how long a rotated key may still be served on other replicas. `0` disables caching. |
 
+### Provider connectivity probes
+
+`POST /v1/admin/models/test` runs a minimal live completion against a **candidate** config (provider/model/region/endpoint + optional one-shot `api_key`) or the **saved** config for a scope (`{"scope": "org-default", "use_saved_key": true}` or `"agent:<persona>"`) — so a bad key, model id, or endpoint is caught **before** it breaks a turn. Responses are `{ok, latency_ms, error_class, tested_model, message}` with a stable error taxonomy (`auth_error`, `model_not_found`, `access_denied`, `endpoint_unreachable`, `rate_limited`, `timeout`, `bad_request`, …). The last result per scope is kept in `llm_provider_health` and served by `GET /v1/admin/models/health` for status chips. Probes are limited to 10/min per org.
+
+| Variable | Default | Meaning |
+| --- | --- | --- |
+| `PDLC_LLM_PROBE_TIMEOUT_S` | `10` | Hard wall-clock budget per probe; expiry reports `error_class: "timeout"`. |
+| `PDLC_LLM_HEALTH_INTERVAL_S` | `0` | Opt-in background probe of the **instance default** provider feeding `/health/ready`'s `llm` field (`ok`/`degraded`/`unprobed`). `0` disables; also requires `PDLC_WIRE_LLM=true`. Tenant configs are never probed in the background (that would spend tenants' keys on synthetic traffic). |
+| `PDLC_ALLOW_PRIVATE_LLM_ENDPOINTS` | `false` | SSRF guard escape hatch: allow probing endpoints that resolve to private/loopback/link-local addresses. Needed for self-host with a local Ollama; keep off for SaaS. |
+
 
 ---
 

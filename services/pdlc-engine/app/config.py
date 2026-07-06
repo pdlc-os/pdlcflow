@@ -53,6 +53,16 @@ class Settings(BaseSettings):
     # long — acceptable because rotation replaces a working key with another.
     secret_cache_ttl_s: int = 300
 
+    # Provider connectivity probes (POST /admin/models/test). The probe is a
+    # minimal live completion; the timeout is the hard wall-clock budget.
+    llm_probe_timeout_s: float = 10.0
+    # Background probe of the INSTANCE default provider for /health/ready's llm
+    # field. 0 (default) disables; also requires wire_llm.
+    llm_health_interval_s: int = 0
+    # SSRF escape hatch: allow probing endpoints that resolve to private /
+    # loopback addresses (self-host with a local Ollama). Keep off for SaaS.
+    allow_private_llm_endpoints: bool = False
+
     # LLM defaults
     default_llm_provider: Literal[
         "bedrock", "anthropic", "vertex", "azure", "openai", "gemini", "ollama",

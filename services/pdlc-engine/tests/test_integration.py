@@ -538,3 +538,79 @@ def test_byok_key_roundtrip_and_inheritance(monkeypatch):
     finally:
         S.reset_secrets()
         invalidate_secret_cache()
+
+
+def test_provider_probe_saved_scope_and_health_table(monkeypatch):
+    """Saved-scope probes load the org/agent rows (with key inheritance),
+    resolve the stored key when asked, persist the last result per (org, scope)
+    to llm_provider_health, and GET /health returns it — RLS-scoped."""
+    from app import secretstore as S
+    from app.llm import probe
+    from app.llm.factory import invalidate_secret_cache
+    from app.main import app
+    from cryptography.fernet import Fernet
+    from fastapi.testclient import TestClient
+
+    monkeypatch.setattr(settings, "secrets_backend", "encrypted")
+    monkeypatch.setattr(settings, "secret_key", Fernet.generate_key().decode())
+    S.reset_secrets()
+    invalidate_secret_cache()
+    probe.reset_probe_limiter()
+    seen: list = []
+
+    def fake_prober(cfg, model_id, timeout_s):
+        seen.append((cfg.provider, cfg.secret_value, model_id))
+        ok = cfg.secret_value is not None
+        return probe.ProbeResult(ok=ok, latency_ms=7, tested_model=model_id,
+                                 error_class=None if ok else "auth_error")
+
+    probe.set_prober(fake_prober)
+    try:
+        org, _ = _seed_project()
+        c = TestClient(app)
+        q = f"?org_id={org}"
+        c.put(f"/v1/admin/models/org-default{q}", json={
+            "provider": "anthropic",
+            "tier_map": {"premium": "claude-opus-4-8",
+                         "balanced": "claude-sonnet-4-6",
+                         "economy": "claude-haiku-4-5"},
+            "api_key": "sk-ant-probe-me"})
+        c.put(f"/v1/admin/models/agent-overrides/neo{q}", json={
+            "agent_persona": "neo", "provider": "anthropic",
+            "model_id": "claude-opus-4-8"})
+
+        # org-default scope: model comes from the saved tier_map; saved key used.
+        r = c.post(f"/v1/admin/models/test{q}",
+                   json={"scope": "org-default", "use_saved_key": True})
+        assert r.status_code == 200 and r.json()["ok"] is True
+        assert seen[-1] == ("anthropic", "sk-ant-probe-me", "claude-sonnet-4-6")
+        assert "sk-ant-probe-me" not in r.text
+
+        # agent scope inherits the org key (same provider) + its own model_id.
+        r2 = c.post(f"/v1/admin/models/test{q}",
+                    json={"scope": "agent:neo", "use_saved_key": True})
+        assert r2.json()["ok"] is True
+        assert seen[-1] == ("anthropic", "sk-ant-probe-me", "claude-opus-4-8")
+
+        # without use_saved_key the probe runs keyless → fake reports auth_error.
+        r3 = c.post(f"/v1/admin/models/test{q}", json={"scope": "org-default"})
+        assert r3.json()["error_class"] == "auth_error"
+
+        # last result per scope persisted; GET /health returns both scopes.
+        rows = {h["scope"]: h for h in c.get(f"/v1/admin/models/health{q}").json()["health"]}
+        assert set(rows) == {"org-default", "agent:neo"}
+        assert rows["agent:neo"]["ok"] is True
+        assert rows["org-default"]["ok"] is False  # r3 overwrote r1's result
+
+        # RLS: another org sees nothing.
+        other, _ = _seed_project()
+        assert c.get(f"/v1/admin/models/health?org_id={other}").json()["health"] == []
+
+        # unknown scope rows
+        assert c.post(f"/v1/admin/models/test{q}",
+                      json={"scope": "agent:muse"}).status_code == 404
+    finally:
+        probe.reset_prober()
+        probe.reset_probe_limiter()
+        S.reset_secrets()
+        invalidate_secret_cache()
