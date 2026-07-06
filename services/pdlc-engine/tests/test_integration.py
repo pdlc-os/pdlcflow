@@ -924,3 +924,44 @@ def test_pricing_and_budget_lifecycle(monkeypatch):
     c.post(f"/v1/admin/models/import?org_id={other}", json=doc)
     imported = c.get(f"/v1/admin/pricing?org_id={other}").json()
     assert imported["effective"]["anthropic/claude-opus-4-8"]["source"] == "override"
+
+
+def test_extra_headers_roundtrip():
+    """Org extra_headers persist, read back, reach the factory's NetworkConfig
+    (and the agent-override join), and travel with export/import."""
+    from app.llm.factory import LLMProviderFactory
+    from app.main import app
+    from fastapi.testclient import TestClient
+
+    org, _ = _seed_project()
+    c = TestClient(app)
+    q = f"?org_id={org}"
+    tiers = {"premium": "claude-opus-4-8", "balanced": "claude-sonnet-4-6",
+             "economy": "claude-haiku-4-5"}
+
+    r = c.put(f"/v1/admin/models/org-default{q}", json={
+        "provider": "anthropic", "tier_map": tiers,
+        "extra_headers": {"X-Gateway-Key": "route-a"}})
+    assert r.status_code == 200
+    assert c.get(f"/v1/admin/models/org-default{q}").json()["extra_headers"] == {
+        "X-Gateway-Key": "route-a"}
+
+    f = LLMProviderFactory(db=get_sync_engine_for_tests())
+    cfg = f._org_default(org)
+    assert cfg.network is not None
+    assert cfg.network.extra_headers == {"X-Gateway-Key": "route-a"}
+    # agent override inherits the org headers through the join
+    c.put(f"/v1/admin/models/agent-overrides/neo{q}", json={
+        "agent_persona": "neo", "provider": "anthropic",
+        "model_id": "claude-opus-4-8"})
+    ov = f._agent_override(org, "neo")
+    assert ov.network is not None and ov.network.extra_headers == {
+        "X-Gateway-Key": "route-a"}
+
+    # export → import carries them
+    doc = c.get(f"/v1/admin/models/export{q}").json()
+    assert doc["org_default"]["extra_headers"] == {"X-Gateway-Key": "route-a"}
+    other, _ = _seed_project()
+    c.post(f"/v1/admin/models/import?org_id={other}", json=doc)
+    assert c.get(f"/v1/admin/models/org-default?org_id={other}").json()[
+        "extra_headers"] == {"X-Gateway-Key": "route-a"}

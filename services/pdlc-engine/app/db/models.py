@@ -272,6 +272,8 @@ class OrgLLMConfig(Base):
     # Org price-sheet corrections for estimate_usd (PRD-07):
     # {"<provider>/<model_id>": {"in": $/1M, "out": $/1M}}. Dashboards only.
     pricing_override: Mapped[dict | None] = mapped_column(JSONB)
+    # Relay-gateway routing headers (PRD-08). API-guardrailed; never credentials.
+    extra_headers: Mapped[dict | None] = mapped_column(JSONB)
     __table_args__ = (
         CheckConstraint(
             "provider in ('bedrock','anthropic','vertex','azure','openai','gemini',"

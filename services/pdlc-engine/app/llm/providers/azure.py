@@ -21,4 +21,14 @@ def build(cfg, model_id: str) -> BaseChatModel:
         kwargs["azure_endpoint"] = cfg.endpoint  # else AZURE_OPENAI_ENDPOINT from env
     if cfg.secret_value:
         kwargs["api_key"] = cfg.secret_value  # else AZURE_OPENAI_API_KEY from env
+    from ._net import httpx_clients, merged_headers
+
+    net = getattr(cfg, "network", None)
+    sync_c, async_c = httpx_clients(net, cfg.endpoint)
+    if sync_c is not None:
+        kwargs["http_client"] = sync_c
+        kwargs["http_async_client"] = async_c
+    headers = merged_headers(net)
+    if headers:
+        kwargs["default_headers"] = headers
     return AzureChatOpenAI(**kwargs)

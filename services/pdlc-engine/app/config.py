@@ -76,6 +76,13 @@ class Settings(BaseSettings):
     # Config versioning (PRD-06): versions kept per (org, scope); pruned on write.
     llm_config_version_keep: int = 50
 
+    # Egress network controls (PRD-08) — explicit outbound networking for LLM
+    # calls (never reliant on ambient env vars). All default off. Support
+    # varies per provider SDK — see the boot-time egress report + wiki matrix.
+    egress_proxy_url: str | None = None   # e.g. "http://proxy.corp:3128"
+    egress_no_proxy: str = ""             # comma-separated host suffixes (in-cluster Ollama etc.)
+    egress_ca_bundle: str | None = None   # PEM bundle path for TLS-inspecting proxies
+
     # LLM defaults
     default_llm_provider: Literal[
         "bedrock", "anthropic", "vertex", "azure", "openai", "gemini", "ollama",

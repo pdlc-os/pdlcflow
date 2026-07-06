@@ -389,10 +389,33 @@ def wire_llm_backend(settings) -> bool:
             db = get_sync_engine(settings)
         factory = LLMProviderFactory(db=db)
         set_completion_backend(FactoryCompletionBackend(factory, org_id="self-host"))
+        _log_egress_report(settings)
         return True
     except Exception as exc:  # never block boot on this
         log.warning("LLM backend wiring failed (%s); using offline stub", exc)
         return False
+
+
+def _log_egress_report(settings) -> None:
+    """Boot-time honesty about which providers honor the egress config
+    (PRD-08 FR-5) + loud CA-path validation."""
+    proxy = getattr(settings, "egress_proxy_url", None)
+    ca = getattr(settings, "egress_ca_bundle", None)
+    if not (proxy or ca):
+        return
+    if ca:
+        from pathlib import Path
+
+        if not Path(ca).exists():
+            log.error("PDLC_EGRESS_CA_BUNDLE=%s does not exist — every TLS "
+                      "verification will fail; fix the path or unset it", ca)
+    log.info(
+        "egress proxy=%s ca=%s — full: anthropic, openai, azure, "
+        "openai_compatible, ollama · partial: bedrock (proxy full; CA via "
+        "AWS_CA_BUNDLE), gemini (env fallback) · unsupported: vertex (gRPC — "
+        "use network-level egress), CLI providers (inherit process env)",
+        proxy or "-", ca or "-",
+    )
 
 
 def wire_token_streaming(settings) -> bool:
