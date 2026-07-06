@@ -253,6 +253,9 @@ you opt in.
 
 ## Documentation
 
+- **[Onboarding](./docs/onboarding/README.md)** — the fast on-ramp for teams adopting pdlcflow:
+  greenfield vs brownfield setup, a step-by-step walkthrough, the day-two `/brainstorm → /build
+  → /ship` loop, bug-fixing, shipping, and a one-page [visual journey](./docs/onboarding/journey.html).
 - **[Wiki](./docs/wiki/README.md)** — install, launch, use & monitor pdlcflow; the core PDLC
   flow and the specialized flows (agents, party mode, night-shift, utilities, migration,
   evals), with diagrams.
