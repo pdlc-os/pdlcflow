@@ -162,6 +162,10 @@ emits an `admin.access.denied` audit event and returns **403** (cross-org ban).
 | `DELETE /v1/admin/models/agent-overrides/{persona}/key` | `org_id` | `{ok, persona}` |
 | `POST /v1/admin/models/test` | `org_id`, body candidate `{provider, model_id?/tier?, region?, endpoint?, api_key?}` or saved `{scope, use_saved_key?}` | `{ok, latency_ms, error_class, tested_model, message}` (10/min per org) |
 | `GET /v1/admin/models/health` | `org_id` | `{health: [{scope, provider, ok, latency_ms, error_class, checked_at}]}` |
+| `GET /v1/admin/models/versions` | `org_id`, `scope?`, `limit?` | `{versions: [{id, scope, change_kind, actor_label, created_at, diff}]}` — immutable config history (secrets render only as set/changed/cleared) |
+| `POST /v1/admin/models/versions/{id}/rollback` | `org_id` | `{ok, restored_scope, secret_requires_reentry}` — appends a `rollback` version, never rewrites history |
+| `GET /v1/admin/models/export` | `org_id` | Self-describing provider-set JSON — **never contains key material** (`enc:` refs stripped; `vault:`/`env:` export as pointers) |
+| `POST /v1/admin/models/import` | `org_id`, `dry_run?`, `strategy=merge\|replace`, body = export document | dry-run: `{plan: [{scope, action, reasons, secret}]}`; apply: `{ok, applied, plan}` — atomic, reuses the write-path validators |
 
 Notes:
 - `from`/`to` are query aliases (mapped to `frm` internally).

@@ -249,6 +249,12 @@ A Redis-backed **circuit breaker** per (org, provider[:gateway-host]) skips a re
 | `PDLC_RATE_LIMIT_ENABLED` | `false` | Enforce the per-org RPM quota. |
 | `PDLC_LLM_RPM_DEFAULT` | `60` | Calls/min per (org, provider, tier) bucket until per-org quotas ship. |
 
+### Config history, rollback & promotion
+
+Every change to the org/agent model config (console, API, preset apply, import) records the **full prior state** in an immutable, RLS-isolated history (`llm_config_versions`) — who, when, and a field-level diff (secrets render only as *set/changed/cleared*). The console's **History** panel shows the timeline; **Rollback** restores any version in one click (the rollback itself becomes a new history entry, and a stored key that no longer resolves is dropped with a re-enter prompt rather than restored blind). Retention: `PDLC_LLM_CONFIG_VERSION_KEEP` (default `50`) versions per scope.
+
+**Export/Import** moves a proven provider set between orgs (the staging → production promotion flow): `GET /v1/admin/models/export` produces a JSON document that **never contains key material**; `POST /v1/admin/models/import?dry_run=true` returns a reviewable per-item plan (create/overwrite/error + whether each secret is reusable or needs re-entry), and the real import applies atomically, re-using the same validators as the PUT routes — an import cannot smuggle in a config the API would reject.
+
 ### Provider connectivity probes
 
 `POST /v1/admin/models/test` runs a minimal live completion against a **candidate** config (provider/model/region/endpoint + optional one-shot `api_key`) or the **saved** config for a scope (`{"scope": "org-default", "use_saved_key": true}` or `"agent:<persona>"`) — so a bad key, model id, or endpoint is caught **before** it breaks a turn. Responses are `{ok, latency_ms, error_class, tested_model, message}` with a stable error taxonomy (`auth_error`, `model_not_found`, `access_denied`, `endpoint_unreachable`, `rate_limited`, `timeout`, `bad_request`, …). The last result per scope is kept in `llm_provider_health` and served by `GET /v1/admin/models/health` for status chips. Probes are limited to 10/min per org.

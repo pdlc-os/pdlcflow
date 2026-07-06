@@ -6,9 +6,31 @@ All notable changes to pdlcflow are documented here. This project adheres to
 ## Unreleased
 
 Provider presets & the open gateway ecosystem (Wave 2 of the cc-switch gap roadmap, PRD-04)
-+ resilient LLM routing: failover chains, circuit breaker, real rate limiting (PRD-05).
++ resilient LLM routing: failover chains, circuit breaker, real rate limiting (PRD-05)
++ config versioning, rollback, export/import (PRD-06 — Wave 2 complete).
 
 ### Added
+- **Config history & rollback** — every org/agent model-config mutation
+  (console, API, preset apply, import) records the full prior state in an
+  immutable RLS-forced `llm_config_versions` table (migration `0010`), written
+  in the same transaction as the change. `GET /admin/models/versions` returns
+  the timeline with field-level diffs (secrets render only as
+  set/changed/cleared); one-click rollback restores any version — appending a
+  `rollback` entry, never rewriting history — and drops stored keys that no
+  longer resolve with a `secret_requires_reentry` flag instead of restoring
+  them blind. Count-based retention (`PDLC_LLM_CONFIG_VERSION_KEEP`, default
+  50/scope). Console gains a **History** panel.
+- **Provider-set export/import** — `GET /admin/models/export` produces a
+  self-describing JSON document with **zero key material** (`enc:` refs are
+  Fernet ciphertext and are stripped; `vault:`/`env:` refs export as safe
+  pointers); `POST /admin/models/import` supports dry-run plans
+  (create/overwrite/error + secret reusability per item), merge/replace
+  strategies, atomic apply, and reuses the write-path validators so an import
+  can't smuggle in a config the API would reject. Console Export/Import panel
+  with dry-run preview — the staging → production promotion flow.
+- **Failover-chain editor** in the console (deferred from PRD-05): ordered
+  entries with per-entry provider/endpoint/region/tier-map/key, reorder and
+  remove, saved with the org default.
 - **Failover chains** — an org can declare up to 3 ordered fallback provider
   configs (`failover_chain` on the org model config), each with its own
   region/endpoint/tier_map and its **own write-only API key** (keyed providers

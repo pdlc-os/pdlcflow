@@ -23,6 +23,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy import text
 
+from ...auth.local import Identity, get_principal
 from ...config import settings
 from ...db.rls import set_org_context
 from ...db.session import get_sync_engine
@@ -81,6 +82,7 @@ def list_presets(
 def apply_preset(
     preset_id: str,
     org_id: str = Depends(admin_org("/admin/models/presets")),
+    principal: Identity | None = Depends(get_principal),
 ) -> dict:
     """Upsert the org default from a curated preset (endpoints in the vendored
     catalog are trusted — tenant-typed endpoints go through the SSRF guard on
@@ -93,6 +95,7 @@ def apply_preset(
         raise HTTPException(status_code=404, detail="unknown preset")
     with _engine().begin() as conn:
         set_org_context(conn, org_id)
+        record_version(conn, org_id, "org", "preset_apply", principal)
         conn.execute(
             text(
                 "insert into org_llm_config (org_id, provider, region, endpoint, tier_map) "
@@ -305,6 +308,60 @@ def _store_key(api_key: str, hint: str) -> str:
         ) from exc
 
 
+# ---------------------------------------------------------------------------
+# Config versioning (PRD-06). Every mutation records the FULL PRIOR state in
+# llm_config_versions IN THE SAME TRANSACTION — no drift possible. Snapshots
+# store secret_ref as-is (refs, never values — same trust boundary as the
+# config tables); the export boundary is where refs get transformed/stripped
+# (see models_versions.py).
+# ---------------------------------------------------------------------------
+
+
+def _read_current_config(conn, org_id: str, scope: str) -> dict | None:
+    """Live row for a scope ('org' or a persona name), as a plain dict."""
+    if scope == "org":
+        row = conn.execute(
+            text("select provider, region, endpoint, tier_map, secret_ref, "
+                 "failover_chain from org_llm_config where org_id = :o"),
+            {"o": org_id},
+        ).mappings().first()
+    else:
+        row = conn.execute(
+            text("select provider, model_id, region, endpoint, secret_ref "
+                 "from agent_llm_config where org_id = :o and agent_persona = :p"),
+            {"o": org_id, "p": scope},
+        ).mappings().first()
+    return dict(row) if row else None
+
+
+def record_version(conn, org_id: str, scope: str, change_kind: str,
+                   principal: Identity | None = None) -> None:
+    prior = _read_current_config(conn, org_id, scope)
+    actor_uid = None
+    if principal is not None:
+        try:
+            actor_uid = str(uuid.UUID(str(principal.user_id)))
+        except (ValueError, TypeError):
+            actor_uid = None
+    conn.execute(
+        text("insert into llm_config_versions "
+             "(id, org_id, scope, change_kind, snapshot, actor_user_id, actor_label) "
+             "values (:i, :o, :s, :k, cast(:sn as jsonb), :au, :al)"),
+        {"i": str(uuid.uuid4()), "o": org_id, "s": scope, "k": change_kind,
+         "sn": json.dumps(prior) if prior is not None else None,
+         "au": actor_uid, "al": principal.email if principal else None},
+    )
+    # Count-based retention, oldest-first (FR-9).
+    conn.execute(
+        text("delete from llm_config_versions where org_id = :o and scope = :s "
+             "and id not in (select id from llm_config_versions "
+             "where org_id = :o and scope = :s "
+             "order by created_at desc, id desc limit :keep)"),
+        {"o": org_id, "s": scope,
+         "keep": getattr(settings, "llm_config_version_keep", 50)},
+    )
+
+
 def _audit(event_type: str, org_id: str, payload: dict) -> None:
     """Best-effort clickstream audit for key lifecycle — never key material."""
     try:
@@ -342,7 +399,9 @@ def get_org_default(
 
 @router.put("/org-default")
 def set_org_default(
-    cfg: OrgDefault, org_id: str = Depends(admin_org("/admin/models/org-default"))
+    cfg: OrgDefault,
+    org_id: str = Depends(admin_org("/admin/models/org-default")),
+    principal: Identity | None = Depends(get_principal),
 ) -> dict:
     _validate_provider_config(cfg.provider, cfg.endpoint, tier_map=cfg.tier_map)
     _validate_chain(cfg.failover_chain)
@@ -385,6 +444,7 @@ def set_org_default(
         )
     with _engine().begin() as conn:
         set_org_context(conn, org_id)
+        record_version(conn, org_id, "org", "update", principal)
         conn.execute(text(sql), params)
         has_key = bool(conn.execute(
             text("select secret_ref is not null from org_llm_config where org_id = :o"),
@@ -393,15 +453,18 @@ def set_org_default(
     if cfg.api_key is not None:
         _audit("admin.llm_key.set", org_id,
                {"scope": "org-default", "provider": cfg.provider})
+    _audit("llm_config.changed", org_id, {"scope": "org", "change_kind": "update"})
     return {"ok": True, "has_key": has_key}
 
 
 @router.delete("/org-default/key")
 def clear_org_default_key(
     org_id: str = Depends(admin_org("/admin/models/org-default")),
+    principal: Identity | None = Depends(get_principal),
 ) -> dict:
     with _engine().begin() as conn:
         set_org_context(conn, org_id)
+        record_version(conn, org_id, "org", "update", principal)
         conn.execute(
             text("update org_llm_config set secret_ref = null where org_id = :o"),
             {"o": org_id},
@@ -431,6 +494,7 @@ def set_agent_override(
     persona: Persona,
     cfg: AgentOverride,
     org_id: str = Depends(admin_org("/admin/models/agent-overrides")),
+    principal: Identity | None = Depends(get_principal),
 ) -> dict:
     _validate_provider_config(cfg.provider, cfg.endpoint)  # model_id is required by schema
     params = {"o": org_id, "a": persona, "p": cfg.provider, "m": cfg.model_id,
@@ -459,6 +523,7 @@ def set_agent_override(
         )
     with _engine().begin() as conn:
         set_org_context(conn, org_id)
+        record_version(conn, org_id, persona, "update", principal)
         conn.execute(text(sql), params)
         has_key = bool(conn.execute(
             text("select secret_ref is not null from agent_llm_config "
@@ -468,6 +533,7 @@ def set_agent_override(
     if cfg.api_key is not None:
         _audit("admin.llm_key.set", org_id,
                {"scope": "agent-override", "persona": persona, "provider": cfg.provider})
+    _audit("llm_config.changed", org_id, {"scope": persona, "change_kind": "update"})
     return {"ok": True, "persona": persona, "has_key": has_key}
 
 
@@ -475,9 +541,11 @@ def set_agent_override(
 def clear_agent_override_key(
     persona: Persona,
     org_id: str = Depends(admin_org("/admin/models/agent-overrides")),
+    principal: Identity | None = Depends(get_principal),
 ) -> dict:
     with _engine().begin() as conn:
         set_org_context(conn, org_id)
+        record_version(conn, org_id, persona, "update", principal)
         conn.execute(
             text("update agent_llm_config set secret_ref = null "
                  "where org_id = :o and agent_persona = :a"),
@@ -631,9 +699,11 @@ def provider_health(
 def clear_agent_override(
     persona: Persona,
     org_id: str = Depends(admin_org("/admin/models/agent-overrides")),
+    principal: Identity | None = Depends(get_principal),
 ) -> dict:
     with _engine().begin() as conn:
         set_org_context(conn, org_id)
+        record_version(conn, org_id, persona, "delete", principal)
         conn.execute(
             text("delete from agent_llm_config where org_id = :o and agent_persona = :a"),
             {"o": org_id, "a": persona},
