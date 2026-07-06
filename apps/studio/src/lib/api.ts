@@ -711,7 +711,28 @@ export const entities = {
   repoFile: (org: string, repoId: string, path: string) =>
     json<{ path: string; name: string; content: string }>(
       `/repositories/${e(repoId)}/file?org_id=${e(org)}&path=${e(path)}`),
+
+  // Project memory artifacts (PRD/design/decisions/deployments/uploads/…).
+  projectArtifacts: (org: string, projectId: string) =>
+    json<{ project_id: string; artifacts: string[] }>(
+      `/projects/${e(projectId)}/artifacts?org_id=${e(org)}`),
+  projectArtifact: (org: string, projectId: string, path: string) =>
+    json<{ path: string; content: string }>(
+      `/projects/${e(projectId)}/artifacts/content?org_id=${e(org)}&path=${e(path)}`),
+
+  projectTasks: (org: string, projectId: string) =>
+    json<{ project_id: string; tasks: ProjectTask[] }>(
+      `/projects/${e(projectId)}/tasks?org_id=${e(org)}`),
 };
+
+export interface ProjectTask {
+  external_id: string;
+  title: string;
+  status: string;
+  labels: string[];
+  branch: string | null;
+  claimed_by: string | null;
+}
 
 export interface RepoEntry { name: string; path: string; type: 'file' | 'dir'; size: number }
 

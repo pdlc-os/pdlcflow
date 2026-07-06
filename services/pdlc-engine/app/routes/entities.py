@@ -14,7 +14,13 @@ from datetime import UTC, datetime
 
 import httpx
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
-from pdlc_graph.ports import put_artifact, reset_current_org, set_current_org
+from pdlc_graph.ports import (
+    list_artifacts,
+    put_artifact,
+    read_artifact,
+    reset_current_org,
+    set_current_org,
+)
 from pydantic import BaseModel
 from sqlalchemy import text
 
@@ -317,6 +323,53 @@ async def upload_file(
     return {"id": uuid.uuid4().hex[:12], "filename": name, "stored_as": stored,
             "conversation_id": conv, "size": len(raw), "content_type": file.content_type,
             "is_text": is_text, "uri": uri, "text": (text_content[:20000] if text_content else None)}
+
+
+@router.get("/projects/{project_id}/tasks")
+def list_project_tasks(
+    project_id: str, org: str = Depends(current_org("/projects"))
+) -> dict:
+    """The project's tasks (bd-NN) for the roadmap board. Org-scoped."""
+    from pdlc_graph.ports import get_task_store
+
+    rows = get_task_store().list(org, project_id)
+    tasks = [
+        {"external_id": r.get("external_id"), "title": r.get("title"),
+         "status": r.get("status") or "open", "labels": r.get("labels") or [],
+         "branch": r.get("branch"), "claimed_by": r.get("claimed_by")}
+        for r in rows
+    ]
+    return {"project_id": project_id, "tasks": tasks}
+
+
+@router.get("/projects/{project_id}/artifacts")
+def list_project_artifacts(
+    project_id: str, org: str = Depends(current_org("/projects"))
+) -> dict:
+    """Relative paths of the project's stored artifacts (PRD/design/decisions/
+    deployments/uploads/…). Org-scoped via the turn context."""
+    tok = set_current_org(org)
+    try:
+        paths = list_artifacts(project_id)
+    finally:
+        reset_current_org(tok)
+    return {"project_id": project_id, "artifacts": paths}
+
+
+@router.get("/projects/{project_id}/artifacts/content")
+def get_project_artifact(
+    project_id: str, path: str, org: str = Depends(current_org("/projects"))
+) -> dict:
+    """Fetch one artifact's text by relative path."""
+    tok = set_current_org(org)
+    try:
+        try:
+            content = read_artifact(project_id, path)
+        except (KeyError, FileNotFoundError):
+            raise HTTPException(status_code=404, detail="artifact not found") from None
+    finally:
+        reset_current_org(tok)
+    return {"project_id": project_id, "path": path, "content": content}
 
 
 @router.post("/projects")
