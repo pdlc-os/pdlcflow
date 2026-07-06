@@ -16,9 +16,9 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.execute("alter table org_llm_config add column pricing_override jsonb")
+    op.execute("alter table org_llm_config add column if not exists pricing_override jsonb")
     op.execute(
-        "create table org_budgets ("
+        "create table if not exists org_budgets ("
         "  org_id uuid primary key references organizations(id) on delete cascade,"
         "  monthly_limit_usd numeric(12,2) not null,"
         "  alert_pcts jsonb not null default '[50, 80, 100]'::jsonb,"
@@ -26,7 +26,7 @@ def upgrade() -> None:
         ")"
     )
     op.execute(
-        "create table org_budget_alerts ("
+        "create table if not exists org_budget_alerts ("
         "  org_id uuid not null references organizations(id) on delete cascade,"
         "  month date not null,"
         "  pct integer not null,"

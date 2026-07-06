@@ -16,7 +16,7 @@ depends_on = None
 
 def upgrade() -> None:
     op.execute(
-        "create table mcp_servers ("
+        "create table if not exists mcp_servers ("
         "  id uuid primary key,"
         "  org_id uuid not null references organizations(id) on delete cascade,"
         "  name text not null,"
@@ -34,7 +34,7 @@ def upgrade() -> None:
         ")"
     )
     op.execute(
-        "create table mcp_bindings ("
+        "create table if not exists mcp_bindings ("
         "  id uuid primary key,"
         "  org_id uuid not null references organizations(id) on delete cascade,"
         "  server_id uuid not null references mcp_servers(id) on delete cascade,"
@@ -45,7 +45,7 @@ def upgrade() -> None:
         ")"
     )
     op.execute(
-        "create unique index mcp_bindings_unique on mcp_bindings "
+        "create unique index if not exists mcp_bindings_unique on mcp_bindings "
         "(server_id, persona, coalesce(phase, ''))"
     )
     for t in ("mcp_servers", "mcp_bindings"):

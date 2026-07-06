@@ -15,7 +15,7 @@ depends_on = None
 
 def upgrade() -> None:
     op.execute(
-        "create table llm_config_versions ("
+        "create table if not exists llm_config_versions ("
         "  id uuid primary key,"
         "  org_id uuid not null references organizations(id) on delete cascade,"
         "  scope text not null,"                      # 'org' | '<persona>'
@@ -28,7 +28,7 @@ def upgrade() -> None:
         ")"
     )
     op.execute(
-        "create index ix_llmcv_org_scope_created on llm_config_versions "
+        "create index if not exists ix_llmcv_org_scope_created on llm_config_versions "
         "(org_id, scope, created_at desc)"
     )
     op.execute("alter table llm_config_versions enable row level security")

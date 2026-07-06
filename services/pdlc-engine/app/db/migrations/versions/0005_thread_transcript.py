@@ -15,7 +15,7 @@ depends_on = None
 
 def upgrade() -> None:
     op.execute(
-        "create table thread_transcript ("
+        "create table if not exists thread_transcript ("
         "  id bigserial primary key,"
         "  org_id uuid not null,"
         "  thread_id text not null,"
@@ -26,8 +26,8 @@ def upgrade() -> None:
         "  ts timestamptz not null default now()"
         ")"
     )
-    op.execute("create index ix_thread_transcript_thread on thread_transcript (thread_id, seq)")
-    op.execute("create index ix_thread_transcript_org on thread_transcript (org_id, project_id)")
+    op.execute("create index if not exists ix_thread_transcript_thread on thread_transcript (thread_id, seq)")
+    op.execute("create index if not exists ix_thread_transcript_org on thread_transcript (org_id, project_id)")
     op.execute("alter table thread_transcript enable row level security")
     op.execute("alter table thread_transcript force row level security")
     op.execute(
