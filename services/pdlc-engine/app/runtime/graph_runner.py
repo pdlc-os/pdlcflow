@@ -163,6 +163,15 @@ class GraphRunner:
         try:
             with observability.turn_span(thread_id, org, project):
                 self._graph.invoke(invoke_input, cfg)
+            # Reconcile the pending interrupt WHILE the tenant is still bound. This
+            # read hits the checkpointer's get_state; with the RLS-FORCEd Postgres
+            # checkpointer the tenant pool stamps `app.org_id` = current_org(), and
+            # the checkpoint-table policy is `thread_id like app.org_id || ':%'`.
+            # Run after reset_current_org (org → "default") and the policy hides
+            # this thread's own `__interrupt__` writes, so the gate/question never
+            # surfaces and every turn looks "completed". Must stay inside the org
+            # scope (before the finally).
+            pending = self._sync_pending(thread_id, cfg)
         except Exception:
             observability.record_turn("error", (time.perf_counter() - t0) * 1000)
             raise
@@ -171,7 +180,6 @@ class GraphRunner:
                 _reset_execution_context(exec_tok)
             reset_current_org(org_tok)
             reset_thread_context(tok)
-        pending = self._sync_pending(thread_id, cfg)
         observability.record_turn("paused" if pending else "completed", (time.perf_counter() - t0) * 1000)
         return pending
 
