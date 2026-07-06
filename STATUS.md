@@ -219,3 +219,33 @@ Delivered incrementally (one PR per bundle). Auth deferred. Every adapter is fla
 - [x] **Validated** with `tofu validate` (schema-correct vs real provider schemas) for all three clouds. **Not deploy-tested** (no live cloud creds here) — documented as such.
 - [x] README with the service-mapping table, deploy steps, and honest app-portability caveats (object storage S3-only → GCS via S3-compat / Azure Blob needs an adapter; cognito auth is AWS-specific → local-JWT/OIDC elsewhere; native clickstream sink only on AWS → Postgres sink default on GCP/Azure). Root README + repo layout updated.
 - [ ] Follow-ons (app adapters, not infra): Azure Blob artifact adapter; OIDC auth against Identity Platform / AD B2C; native Pub/Sub + Event Hubs clickstream sinks.
+
+## Observability — OpenTelemetry + Grafana + Streamlit Nexus dashboard (✅ v1.10.0 → v1.11.0)
+
+- [x] **Dep-free tracer port** in `pdlc-graph` (`pdlc_graph/tracing.py`) mirroring `set_emitter`/`set_completion_backend`; the engine injects an OTel-backed tracer at boot so the graph package keeps zero OpenTelemetry deps and CI/dev stay hermetic (byte-identical, no-op when disabled).
+- [x] **Signal tree**: one trace per turn → a span per LangGraph node → a leaf span per `complete()` call with GenAI semantic-convention attributes (model, provider, token usage, estimated cost). Metrics for turns, LLM calls/tokens/cost, latency histograms, gates. FastAPI request spans. OTLP export.
+- [x] **`observability` compose profile** (opt-in): OTel Collector → **Tempo** (traces) + **Prometheus** (metrics), a provisioned **Grafana** dashboard, and the **Nexus Dashboard** — a Streamlit ops console with a per-thread trace explorer. `pdlcflow observability up|down|status` CLI; `pdlcflow-nexus-dashboard` in the released image set.
+- [x] Docs: [`docs/wiki/19-observability.md`](docs/wiki/19-observability.md). Guarded by `PDLC_OTEL_ENABLED` (default off).
+
+## Provider Management & Agent Capabilities — cc-switch gap roadmap (✅ Waves 1–3, v1.11.0 → v1.13.0)
+
+A functional comparison against [cc-switch](https://github.com/farion1231/cc-switch) turned into 10 assessment PRDs + a prioritized roadmap ([`docs/.research/cc-switch/`](docs/.research/cc-switch/)), then built feature-by-feature across three waves. All org-scoped, RLS-isolated, versioned, and hermetic-CI-safe behind injectable ports. Migrations `0007`–`0014`.
+
+### Wave 1 — Make the provider backend real (v1.11.0)
+- [x] **PRD-01 BYOK** (#80): the factory now resolves `org_llm_config.secret_ref` / `agent_llm_config.secret_ref` and injects the tenant's key on every call (previously stored keys were silently ignored — every tenant billed the operator's env key). Write-only admin API + `has_key` reads; same-provider agent-override key inheritance; **fail-closed** on an unresolvable ref (no silent env fallback); TTL-cached resolution.
+- [x] **PRD-03 Provider health & connectivity** (#81): `POST /admin/models/test` runs a minimal live completion (candidate or saved config) with a stable error taxonomy, SSRF egress guard, per-org rate limit, and an RLS-forced `llm_provider_health` table; `/health/ready`'s `llm` check becomes real. Injectable prober keeps CI network-free.
+- [x] **PRD-02 Provider Settings Console** (#82): the Studio Models page goes from a static mockup to a working view→test→switch loop — org default + per-persona overrides, tier-map editing, BYOK key entry, and a per-row Test button.
+
+### Wave 2 — Provider resilience & the open ecosystem (v1.12.0)
+- [x] **PRD-04 Preset catalog + OpenAI-compatible gateways** (#84): a curated, versioned preset catalog (one-click apply) + a generic `openai_compatible` provider opening the relay/gateway ecosystem (OpenRouter, DeepSeek, Kimi, GLM, SiliconFlow, LiteLLM, vLLM…) with zero per-vendor code. `resolve_model_id` raises a typed error instead of a mid-turn `KeyError`; a registration-agreement test pins the three provider lists.
+- [x] **PRD-05 Resilient routing** (#85): org **failover chains** (per-entry keys), a Redis **circuit breaker** keyed `(org, provider[:gateway-host])` with half-open probes, and a real fixed-window **rate limiter** replacing the always-True stub — all fail-open. Streaming fails over only before the first token; resilience telemetry + a Grafana row.
+- [x] **PRD-06 Config versioning, rollback & export/import** (#86): every mutation snapshots prior state in the same transaction (immutable `llm_config_versions`); one-click rollback (unresolvable keys flagged for re-entry, never restored blind); secret-free JSON **export/import** with dry-run for org→org promotion; console History + Export/Import panels.
+
+### Wave 3 — Cost, egress, prompts, tools (v1.13.0)
+- [x] **PRD-07 Cost analytics** (#88): per-org **pricing overrides** on a versioned catalog, monthly **budgets** with deduped threshold alerts, unpriced≠free (`usd_estimate: null`, not `$0`), and — a latent-bug fix — **real `llm.tokens_spent` emission** (the callback existed but was never constructed, so production spend rollups were producer-less).
+- [x] **PRD-08 Egress controls** (#89): explicit `PDLC_EGRESS_PROXY_URL` / `_NO_PROXY` / `_CA_BUNDLE` threaded per-builder with an honest support matrix + boot report; org `extra_headers` for relay gateways (credential headers rejected).
+- [x] **PRD-10 Persona prompt overrides & packs** (#90): org-level soul-spec overrides (immutable versions, activate/rollback) + portable prompt packs (import as drafts). **M0 fix** — persona soul-specs now actually reach models (they had no consumer); behavior-change-noted for `wire_llm` deployments (outputs shift, +2–4 KiB input tokens/call). Hermetic stub output byte-identical.
+- [x] **PRD-09 MCP tool servers** (#91): agents gain external tools — org-scoped registry with deny-all allowlists, write-only bearer tokens, live test probes, persona/phase **bindings**, and engine-side execution via a new dep-free `tool_port`. Hard multi-tenant security boundary (stdio double-gated to single-user self-host; SSRF-checked URLs; timeout/truncation/per-turn caps). Flag-gated (`PDLC_WIRE_MCP`); flagship flow grounds Muse's ideation in bound search tools. Also fixed: the event registry was silently dropping every audit event added since Wave 1.
+- [x] Docs: new [`docs/wiki/20-mcp-tools.md`](docs/wiki/20-mcp-tools.md) + provider-management sections across the configuration, studio, and API-reference wiki pages.
+
+**Roadmap complete.** All 10 PRDs shipped across PRs #80–#92 (v1.11.0 → v1.13.0), 8 migrations, multi-arch images published to GHCR. Three latent production bugs found and fixed along the way (tenant keys silently ignored, spend events with no producer, audit events silently dropped). Full hermetic suite green throughout.

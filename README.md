@@ -10,8 +10,9 @@ pdlcflow is an open-source, multi-tenant platform that turns a structured Produc
 Lifecycle (PDLC) into a browser-based, multi-agent system. A cast of specialized AI agents
 moves each feature through **brainstorm → build → ship**, with human approval gates, persistent
 memory, automatic quality evaluation, and full audit telemetry. It runs on **your choice of
-LLM provider**, self-hosted or as multi-tenant SaaS on **AWS, GCP, or Azure**, with tenant
-isolation enforced at the database.
+LLM provider** — with per-tenant keys (BYOK), a one-click provider console, automatic failover,
+cost budgets, and optional external tools for agents (MCP) — self-hosted or as multi-tenant SaaS
+on **AWS, GCP, or Azure**, with tenant isolation enforced at the database.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
 [![Release](https://img.shields.io/github/v/release/pdlc-os/pdlcflow?sort=semver)](https://github.com/pdlc-os/pdlcflow/releases)
@@ -61,19 +62,39 @@ the guardrails a real organization needs.
   **3-Strike escalation** protocol keep humans in control of consequential decisions.
 - **Autonomy when you want it** — a `/night-shift` loop advances work unattended within
   guardrails, with episode reports for everything it did.
-- **Bring your own LLM** — a 7-provider factory (Bedrock, Anthropic, OpenAI, Google Gemini,
-  Vertex AI, Azure OpenAI, Ollama) selectable per deployment, with a deterministic offline
-  stub for hermetic dev and CI.
+- **Bring your own LLM** — an 8-provider factory (Bedrock, Anthropic, OpenAI, Google Gemini,
+  Vertex AI, Azure OpenAI, Ollama, plus a generic **OpenAI-compatible** provider for any
+  gateway/relay or local server) selectable per deployment, with a deterministic offline stub
+  for hermetic dev and CI.
+- **Provider management, built for tenants** — a **Provider Settings console** to switch
+  providers and models in a click; **BYOK** per-org/per-agent API keys (write-only, resolved
+  server-side, fail-closed); a **preset catalog** (OpenRouter, DeepSeek, Kimi, GLM, SiliconFlow,
+  LiteLLM, vLLM…) for one-minute onboarding; **pre-save connectivity probes** that catch a bad
+  key or model before it breaks a turn; and immutable **config versioning** with one-click
+  rollback and org-to-org export/import.
+- **Resilient by default** — org-level **failover chains** with a Redis **circuit breaker**
+  turn a provider incident into a logged fallback instead of a broken turn, plus per-org **rate
+  limiting** — all fail-open so the resilience layer never becomes the outage.
+- **Cost control** — per-org **pricing overrides** on a versioned price catalog, monthly
+  **budgets** with soft threshold alerts, and real per-completion spend telemetry (estimates for
+  dashboards, never billing).
+- **Customizable agents** — org-level **persona prompt overrides** (immutable versions,
+  one-click activate/rollback) and portable **prompt packs**; optional **MCP tool servers** give
+  agents external tools (docs search, ticket lookup, …) with deny-all allowlists, persona/phase
+  bindings, and a hard multi-tenant security boundary.
+- **Enterprise egress** — explicit outbound **proxy / CA-bundle / custom-header** controls for
+  air-gapped and TLS-inspecting environments.
 - **Quality you can measure** — a built-in **evaluation harness** scores agent output at major
   steps: per-agent quality, groundedness / hallucination, citation & faithful-relay, spec
   adherence, production-safety, plus drift/regression tracking and nightly real-LLM evals.
 - **Multi-tenant by design** — JWT authentication, role-based admin, and **PostgreSQL
   Row-Level Security (FORCE)** so tenant isolation is enforced by the database — not just the
   app. Artifacts (PRDs, design docs, reviews) are namespaced per tenant.
-- **Observability built in** — a 40-event clickstream taxonomy (every event tagged
+- **Observability built in** — a 50+-event clickstream taxonomy (every event tagged
   human / agent / system) feeds analytics and the **Nexus Console** admin dashboard:
   live runs, cost/usage rollups, per-agent metrics, and a **Work Narrative** that turns a
-  date window into stats + an LLM story of what humans vs agents did.
+  date window into stats + an LLM story of what humans vs agents did. Opt-in **OpenTelemetry**
+  traces + metrics export to Grafana/Tempo/Prometheus with a Streamlit ops dashboard.
 - **Live experience** — a React **Studio** with real-time WebSocket updates and live token
   "drafting" previews.
 - **Organized like a real org** — a first-class hierarchy: **Org → Domain → Squad → GitHub
@@ -94,8 +115,9 @@ the guardrails a real organization needs.
 ## Bring your own LLM
 
 pdlcflow is **provider-neutral**. Persona completions, the eval judge, and token streaming all
-flow through one pluggable LLM factory; pick the backend per deployment with a single setting
-(`PDLC_DEFAULT_LLM_PROVIDER`) and supply that provider's credentials.
+flow through one pluggable LLM factory; pick the instance default with a single setting
+(`PDLC_DEFAULT_LLM_PROVIDER`), or let each org pick its own from the **Provider Settings
+console** and bring its own key.
 
 | Provider | Key | Notes |
 | --- | --- | --- |
@@ -106,6 +128,7 @@ flow through one pluggable LLM factory; pick the backend per deployment with a s
 | **Google Vertex AI** | `vertex` | Gemini/Claude on GCP |
 | **Azure OpenAI** | `azure` | Azure-hosted OpenAI |
 | **Ollama** | `ollama` | Local / air-gapped models |
+| **OpenAI-compatible** | `openai_compatible` | Any OpenAI-protocol gateway/relay or local server (OpenRouter, DeepSeek, Kimi, GLM, SiliconFlow, LiteLLM, vLLM…) via a custom base URL — no per-vendor code |
 
 Agents stay provider-neutral by declaring a **capability tier** (`premium` = highest
 capability, `balanced` = general purpose, `economy` = low token / fast) rather than a model.
@@ -114,6 +137,14 @@ providers keep real Opus/Sonnet/Haiku, while OpenAI/Gemini auto-select their
 highest/general/economy equivalent — so switching providers preserves each agent's intended
 capability level. Defaults are overridable per tenant or per agent (see the
 [configuration guide](./docs/wiki/03-configuration.md#per-agent-model-tiers-provider-neutral)).
+
+**Per-tenant provider management** (all org-scoped, RLS-isolated, versioned): each org sets its
+own provider + model tiers and **brings its own API key** (write-only, stored via the pluggable
+secrets backend, resolved server-side and fail-closed — a broken key errors rather than silently
+billing the operator). Start from the **preset catalog**, hit **Test** to validate connectivity
+before saving, declare a **failover chain** so incidents degrade gracefully, and set a monthly
+**budget**. Every change is an immutable version you can roll back or export to another org. See
+the [configuration guide](./docs/wiki/03-configuration.md).
 
 Leave the LLM unwired (`PDLC_WIRE_LLM=false`, the default) and pdlcflow runs against a
 deterministic offline stub — so the full stack boots, tests, and demos with **no credentials**.
@@ -131,13 +162,15 @@ flowchart LR
   U["Browser · Studio<br/>(React + Vite)"] -->|REST + WebSocket| API["pdlc-engine<br/>FastAPI"]
   API --> G["pdlc-graph<br/>LangGraph meta-graph"]
   G --> P["Phase subgraphs · 10 personas<br/>party mode · Sentinel evaluator"]
-  API --> LLM{"LLM factory<br/>7 providers"}
-  LLM --> PROV["Bedrock · Anthropic · OpenAI<br/>Gemini · Vertex · Azure · Ollama"]
+  G --> MCP["Tool port<br/>MCP servers (opt-in)"]
+  API --> LLM{"LLM factory<br/>8 providers · BYOK<br/>failover · circuit breaker"}
+  LLM --> PROV["Bedrock · Anthropic · OpenAI · Gemini<br/>Vertex · Azure · Ollama · OpenAI-compatible"]
   API --> EV["Eval harness<br/>LLM-as-judge"]
   API --> PG[("PostgreSQL<br/>RLS + graph checkpoints")]
-  API --> RD[("Redis<br/>event bus + job queue")]
+  API --> RD[("Redis<br/>event bus · queue · breaker")]
   API --> OBJ[("S3 / MinIO<br/>tenant-namespaced artifacts")]
-  API --> CS["Clickstream<br/>40-event taxonomy"] --> AD["Nexus Console<br/>admin dashboard"]
+  API --> CS["Clickstream<br/>50+-event taxonomy"] --> AD["Nexus Console<br/>admin dashboard"]
+  API -.OTel.-> OT["Grafana · Tempo<br/>Prometheus (opt-in)"]
 ```
 
 Every side effect sits behind an injectable port with an in-memory default, so the system is
@@ -209,7 +242,10 @@ pdlcflow is configured entirely through environment variables (see
 | `PDLC_DEFAULT_LLM_PROVIDER` / `PDLC_WIRE_LLM` | Choose the LLM provider; wire real models (else offline stub) |
 | `PDLC_AUTH_REQUIRED` | Enforce JWT auth; derive tenant from the token |
 | `PDLC_DB_URL` / `PDLC_MIGRATION_DB_URL` | App connects as a non-superuser role (RLS); migrations run as owner |
+| `PDLC_SECRETS_BACKEND` / `PDLC_SECRET_KEY` | Where tenant API keys (BYOK) live: encrypted-in-DB, Vault, or env |
+| `PDLC_RATE_LIMIT_ENABLED` / `PDLC_EGRESS_PROXY_URL` | Per-org RPM limiting; outbound proxy for LLM egress |
 | `PDLC_RUN_EVALS` / `PDLC_EVAL_BLOCKING` | Score agent output; optionally block on failures |
+| `PDLC_OTEL_ENABLED` / `PDLC_WIRE_MCP` | Export OpenTelemetry traces/metrics; enable MCP tool servers for agents |
 | `PDLC_STREAM_TOKENS` | Live token streaming to the Studio |
 
 Sensible defaults keep dev hermetic; every backend gracefully falls back to in-memory until
@@ -220,6 +256,10 @@ you opt in.
 - **[Wiki](./docs/wiki/README.md)** — install, launch, use & monitor pdlcflow; the core PDLC
   flow and the specialized flows (agents, party mode, night-shift, utilities, migration,
   evals), with diagrams.
+- **[Provider management & resilience](./docs/wiki/03-configuration.md)** — BYOK, the preset
+  catalog + OpenAI-compatible gateways, connectivity probes, failover/rate-limits, config
+  versioning & promotion, pricing overrides & budgets, egress controls.
+- **[Observability](./docs/wiki/19-observability.md)** · **[MCP Tool Servers](./docs/wiki/20-mcp-tools.md)** — OpenTelemetry/Grafana stack; external tools for agents.
 - **[Deploy guide](./deploy/README.md)** — install / update / uninstall from published images.
 - **[Configuration](./docs/wiki/03-configuration.md)** · **[Changelog](./CHANGELOG.md)** · **[Phase tracker](./STATUS.md)**
 - **[Self-host README](./infra/compose/README.md)** · **[Multi-cloud Terraform (AWS/GCP/Azure)](./infra/terraform/README.md)** · **[SaaS / CDK README](./infra/cdk/README.md)**
@@ -246,10 +286,10 @@ pdlcflow/
 ├── apps/
 │   └── studio/          # React + Vite + Tailwind + shadcn/ui front end
 ├── packages/
-│   ├── event-schema/    # Pydantic event envelope + 40-event taxonomy
+│   ├── event-schema/    # Pydantic event envelope + 50+-event taxonomy
 │   └── pdlc-graph/      # LangGraph engine: meta-graph, phase subgraphs, personas, party mode, evals
 ├── services/
-│   └── pdlc-engine/     # FastAPI: REST + WebSocket, clickstream, DB models, 7-provider LLM factory, Alembic
+│   └── pdlc-engine/     # FastAPI: REST + WebSocket, clickstream, DB models, 8-provider LLM factory (BYOK, failover, presets), MCP tool backend, Alembic
 ├── infra/
 │   ├── compose/         # Docker Compose (self-host, single-tenant)
 │   ├── terraform/       # Multi-cloud SaaS IaC — full-parity AWS / GCP / Azure modules
@@ -262,7 +302,7 @@ pdlcflow/
 
 ## Testing & CI
 
-- **~223 hermetic tests** (no external services) plus a live integration suite that exercises
+- **~380 hermetic tests** (no external services) plus a live integration suite that exercises
   the real Postgres / Redis / MinIO adapters and Row-Level Security.
 - GitHub Actions runs Python (×4 workspace members), Node (Studio + CDK), the eval suite, and
   a docker-compose integration job on every push.

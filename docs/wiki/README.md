@@ -6,17 +6,20 @@ and an admin dashboard — runnable self-host via Docker Compose or as multi-ten
 on AWS, GCP, or Azure.
 
 This wiki walks you through installing, launching, using, and monitoring the infrastructure,
-the **core PDLC flow** (Inception → Construction → Operation), and the **specialized flows**
-(Night-Shift autonomy, the utility commands, the 10-agent party meetings, and migration).
+the **core PDLC flow** (Inception → Construction → Operation), the **specialized flows**
+(Night-Shift autonomy, the utility commands, the 10-agent party meetings, and migration), and
+the **per-tenant provider platform** (BYOK, presets & gateways, failover, cost budgets, config
+versioning, prompt overrides, and MCP tool servers).
 
 ```mermaid
 graph LR
   U[User browser] -->|REST + WebSocket| ENG[pdlc-engine<br/>FastAPI]
   ENG -->|graph turns| GRAPH[pdlc-graph<br/>LangGraph engine]
   GRAPH -->|checkpoint| PG[(Postgres)]
-  ENG -->|pub/sub| RED[(Redis)]
+  ENG -->|pub/sub · breaker| RED[(Redis)]
   GRAPH -->|artifacts| OBJ[(Filesystem / S3·MinIO)]
-  GRAPH -->|LLM| LLM[Bedrock / 6 other providers]
+  GRAPH -->|LLM · BYOK · failover| LLM[8 providers + gateways]
+  GRAPH -->|tools opt-in| MCP[MCP servers]
   GRAPH -->|events| AN[Analytics store]
   AN --> NEXUS[Nexus Console]
   U --> NEXUS

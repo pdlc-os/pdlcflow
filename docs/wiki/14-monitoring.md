@@ -5,7 +5,7 @@
 
 pdlcflow instruments every graph node with a clickstream of typed events,
 feeds them into an analytics read store, and surfaces rollups through the
-**Nexus Console** admin API + SPA. This page covers the 40-event taxonomy, the
+**Nexus Console** admin API + SPA. This page covers the 50+-event taxonomy, the
 tenancy/traceability dimensions every event carries, the analytics pipeline, the
 admin routes, the cross-org ban, and live night-shift verdicts.
 
@@ -16,9 +16,9 @@ admin routes, the cross-org ban, and live night-shift verdicts.
 > are complementary pipes: business facts live in Postgres (RLS), operational
 > signals flow through OpenTelemetry.
 
-## The 40-event taxonomy
+## The 50+-event taxonomy
 
-Every event the clickstream emits is one of **40 typed event types in 16
+Every event the clickstream emits is one of **50+ typed event types across ~20
 categories**, defined in `packages/event-schema/event_schema/registry.md` (the
 source of truth) and `envelope.py` (`EVENT_TYPES`). Categories and counts:
 
@@ -38,9 +38,14 @@ source of truth) and `envelope.py` (`EVENT_TYPES`). Categories and counts:
 | Deploy | 3 | `deploy.requested`, `deploy.succeeded`, `deploy.blocked` |
 | Night-shift | 4 | `night_shift.started/verdict/completed/aborted` |
 | Decision / override | 2 | `decision.recorded`, `override.invoked` |
-| LLM | 1 | `llm.tokens_spent` |
+| LLM | 3 | `llm.tokens_spent`, `llm.failover`, `llm.rate_limited` |
 | Context / UI / error | 3 | `context.warning`, `ui.viewed`, `error` |
-| Admin / audit | 1 | `admin.access.denied` |
+| Eval | 2 | `eval.scored`, `eval.blocked` |
+| Admin / audit | 5 | `admin.access.denied`, `admin.llm_key.set/cleared`, `admin.provider.probed`, `admin.preset.applied` |
+| Provider config (PRD-06) | 4 | `llm_config.changed`, `.rolled_back`, `.imported`, `.exported` |
+| Budget (PRD-07) | 2 | `budget.configured`, `budget.threshold` |
+| Persona prompts (PRD-10) | 4 | `prompt.activated`, `.deactivated`, `prompt_pack.exported`, `.imported` |
+| MCP tools (PRD-09) | 1 | `tool.called` |
 
 Adding an event requires a synced change across `EVENT_TYPES`, a typed payload
 class, this registry, and a CI check (`scripts/check_event_registry.py`).
