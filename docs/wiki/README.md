@@ -25,6 +25,10 @@ graph LR
   U --> NEXUS
 ```
 
+> **New to pdlcflow? Start with the [Onboarding guide](../onboarding/README.md)** — a
+> fast on-ramp (greenfield vs brownfield setup, the day-two loop, a one-page
+> [visual journey](../onboarding/journey.html)) that lands you back here for depth.
+
 ## Contents
 
 | # | Page | What's inside |

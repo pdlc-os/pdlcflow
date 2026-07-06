@@ -1,0 +1,307 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>pdlcflow · Onboarding Journey</title>
+<style>
+  :root {
+    --bg: #f7f8fa; --panel: #ffffff; --ink: #1a1d24; --muted: #5b6472;
+    --line: #e2e6ec; --accent: #4f46e5; --accent-soft: #eef0fe;
+    --green: #16a34a; --green-soft: #e7f6ec; --amber: #b45309; --amber-soft: #fdf3e3;
+    --blue: #0369a1; --blue-soft: #e6f2fb; --rose: #be123c; --rose-soft: #fbe9ee;
+    --gate: #7c3aed; --gate-soft: #f1eafe;
+    --shadow: 0 1px 3px rgba(20,25,40,.06), 0 6px 20px rgba(20,25,40,.05);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0e1116; --panel: #161b22; --ink: #e6e9ef; --muted: #9aa4b2;
+      --line: #262d38; --accent: #a5b4fc; --accent-soft: #1e213a;
+      --green: #4ade80; --green-soft: #12251a; --amber: #fbbf24; --amber-soft: #2a2113;
+      --blue: #7dd3fc; --blue-soft: #10222e; --rose: #fb7185; --rose-soft: #2a141c;
+      --gate: #c4b5fd; --gate-soft: #1e1830;
+      --shadow: 0 1px 3px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.35);
+    }
+  }
+  :root[data-theme="light"] {
+    --bg: #f7f8fa; --panel: #ffffff; --ink: #1a1d24; --muted: #5b6472; --line: #e2e6ec;
+    --accent: #4f46e5; --accent-soft: #eef0fe; --green: #16a34a; --green-soft: #e7f6ec;
+    --amber: #b45309; --amber-soft: #fdf3e3; --blue: #0369a1; --blue-soft: #e6f2fb;
+    --rose: #be123c; --rose-soft: #fbe9ee; --gate: #7c3aed; --gate-soft: #f1eafe;
+    --shadow: 0 1px 3px rgba(20,25,40,.06), 0 6px 20px rgba(20,25,40,.05);
+  }
+  :root[data-theme="dark"] {
+    --bg: #0e1116; --panel: #161b22; --ink: #e6e9ef; --muted: #9aa4b2; --line: #262d38;
+    --accent: #a5b4fc; --accent-soft: #1e213a; --green: #4ade80; --green-soft: #12251a;
+    --amber: #fbbf24; --amber-soft: #2a2113; --blue: #7dd3fc; --blue-soft: #10222e;
+    --rose: #fb7185; --rose-soft: #2a141c; --gate: #c4b5fd; --gate-soft: #1e1830;
+    --shadow: 0 1px 3px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.35);
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 15px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 40px 22px 72px; }
+  header.masthead { text-align: center; margin-bottom: 14px; }
+  h1 { font-size: 30px; margin: 0 0 6px; letter-spacing: -.02em; }
+  .tag { color: var(--muted); font-size: 15px; margin: 0 auto; max-width: 640px; }
+  .kicker {
+    display: inline-block; font-size: 12px; font-weight: 600; letter-spacing: .08em;
+    text-transform: uppercase; color: var(--accent); background: var(--accent-soft);
+    padding: 4px 10px; border-radius: 999px; margin-bottom: 12px;
+  }
+  .step { margin-top: 30px; }
+  .step-head { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+  .step-num {
+    flex: 0 0 auto; width: 26px; height: 26px; border-radius: 50%;
+    background: var(--accent); color: #fff; display: grid; place-items: center;
+    font-size: 13px; font-weight: 700;
+  }
+  @media (prefers-color-scheme: dark) { .step-num { color: #0e1116; } }
+  :root[data-theme="dark"] .step-num { color: #0e1116; }
+  .step-title { font-size: 18px; font-weight: 650; margin: 0; }
+  .step-sub { color: var(--muted); font-size: 13.5px; margin: 2px 0 0; }
+  .card {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 14px;
+    padding: 16px 18px; box-shadow: var(--shadow);
+  }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .road-title { font-weight: 650; margin: 0 0 6px; display: flex; align-items: center; gap: 8px; }
+  .pill {
+    display: inline-block; font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 12.5px; padding: 2px 8px; border-radius: 6px; background: var(--accent-soft);
+    color: var(--accent); border: 1px solid color-mix(in srgb, var(--accent) 25%, transparent);
+    white-space: nowrap;
+  }
+  ul.tight { margin: 8px 0 0; padding-left: 18px; }
+  ul.tight li { margin: 3px 0; }
+  .muted { color: var(--muted); }
+  .flow { display: flex; align-items: stretch; gap: 10px; flex-wrap: wrap; }
+  .phase {
+    flex: 1 1 200px; border-radius: 12px; padding: 12px 14px; border: 1px solid var(--line);
+  }
+  .phase.inception { background: var(--blue-soft); }
+  .phase.construction { background: var(--amber-soft); }
+  .phase.operation { background: var(--green-soft); }
+  .phase h4 { margin: 0 0 4px; font-size: 13px; text-transform: uppercase; letter-spacing: .05em; }
+  .phase.inception h4 { color: var(--blue); }
+  .phase.construction h4 { color: var(--amber); }
+  .phase.operation h4 { color: var(--green); }
+  .cmd { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-weight: 650; font-size: 14px; }
+  .gate {
+    display: inline-block; font-family: ui-monospace, monospace; font-size: 11.5px;
+    background: var(--gate-soft); color: var(--gate); padding: 2px 7px; border-radius: 5px;
+    margin: 3px 4px 0 0; border: 1px solid color-mix(in srgb, var(--gate) 25%, transparent);
+  }
+  .arrow { align-self: center; color: var(--muted); font-size: 22px; flex: 0 0 auto; }
+  @media (max-width: 720px) { .grid2 { grid-template-columns: 1fr; } .arrow { display: none; } }
+  .tools { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  @media (max-width: 720px) { .tools { grid-template-columns: 1fr; } }
+  .tool { border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; background: var(--panel); }
+  .tool b { display: block; margin-bottom: 3px; }
+  .tiers { display: grid; grid-template-columns: repeat(3,1fr); gap: 12px; }
+  @media (max-width: 720px) { .tiers { grid-template-columns: 1fr; } }
+  .tier { border-radius: 10px; padding: 12px 14px; border: 1px solid var(--line); background: var(--panel); }
+  .tier h4 { margin: 0 0 6px; font-size: 13.5px; }
+  .tier .n { color: var(--muted); font-size: 12px; }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .docmap { margin-top: 34px; }
+  .docmap table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  .docmap td { padding: 7px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  .docmap td:first-child { white-space: nowrap; width: 1%; }
+  .banner {
+    margin-top: 26px; border-radius: 12px; padding: 12px 16px; font-size: 13.5px;
+    background: var(--green-soft); border: 1px solid color-mix(in srgb, var(--green) 30%, transparent);
+    color: var(--ink);
+  }
+  footer { margin-top: 40px; text-align: center; color: var(--muted); font-size: 13px; }
+  .legend { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="masthead">
+    <div class="kicker">Onboarding · one-page map</div>
+    <h1>The pdlcflow journey</h1>
+    <p class="tag">From nothing installed to shipping a feature — and where each
+      onboarding doc fits. Drive it all by typing slash-commands in the Studio
+      chat; it runs autonomously and <b>pauses at gates</b> for you.</p>
+  </header>
+
+  <!-- STEP 1 -->
+  <section class="step">
+    <div class="step-head">
+      <span class="step-num">1</span>
+      <div><p class="step-title">Install &amp; open the Studio</p>
+        <p class="step-sub">One command. No clone, no API keys to start.</p></div>
+    </div>
+    <div class="card">
+      <div class="pill">bash -c "$(curl -fsSL …/deploy/install.sh)"</div>
+      <ul class="tight">
+        <li>Answer a short setup wizard (version · login? · real LLM? · evals?).</li>
+        <li>Studio UI → <b>localhost:8080</b> &nbsp;·&nbsp; API health → <b>localhost:8000/health</b>.</li>
+        <li>The LLM runs an <b>offline stub</b> until you wire a provider — explore freely.</li>
+      </ul>
+      <p class="muted" style="margin:10px 0 0;font-size:13px;">→ <a href="2-getting-started.md">2 · Getting started</a> · <a href="2a-setup-walkthrough.md">2a · Setup walkthrough</a></p>
+    </div>
+  </section>
+
+  <!-- STEP 2 -->
+  <section class="step">
+    <div class="step-head">
+      <span class="step-num">2</span>
+      <div><p class="step-title">Pick your road</p>
+        <p class="step-sub">Where you start from decides your first move.</p></div>
+    </div>
+    <div class="grid2">
+      <div class="card" style="border-color: color-mix(in srgb, var(--green) 35%, var(--line));">
+        <p class="road-title">🌱 Greenfield <span class="muted" style="font-weight:400;">— brand-new product</span></p>
+        <p class="muted" style="margin:0;">Little/no code, no prior roadmap.</p>
+        <ul class="tight">
+          <li>Run <span class="cmd">/init</span> — author <b>Constitution · Intent · seed Roadmap</b>.</li>
+          <li>Ends at the <span class="gate">init_approve</span> gate → into Inception.</li>
+          <li>Then work features (step 3).</li>
+        </ul>
+        <p class="muted" style="margin:8px 0 0;font-size:13px;">→ <a href="4-bringing-your-own-spec.md">have a spec?</a></p>
+      </div>
+      <div class="card" style="border-color: color-mix(in srgb, var(--blue) 35%, var(--line));">
+        <p class="road-title">🏛️ Brownfield <span class="muted" style="font-weight:400;">— existing app</span></p>
+        <p class="muted" style="margin:0;">Bring your code, history &amp; roadmap.</p>
+        <ul class="tight">
+          <li>Upstream <span class="cmd">pdlc</span> project → <span class="cmd">pdlc-migrate</span> <span class="muted">scan→push→taxonomy→backfill</span>. Dashboards fill day one.</li>
+          <li>Any git repo → <b>connect it</b> + <span class="cmd">/init</span> to seed your roadmap.</li>
+        </ul>
+        <p class="muted" style="margin:8px 0 0;font-size:13px;">→ <a href="5-bringing-your-own-roadmap.md">5 · Bringing your own roadmap</a></p>
+      </div>
+    </div>
+  </section>
+
+  <!-- STEP 3 -->
+  <section class="step">
+    <div class="step-head">
+      <span class="step-num">3</span>
+      <div><p class="step-title">The everyday loop</p>
+        <p class="step-sub">Turn one requirement into shipped, tested code. Approve a gate to move on.</p></div>
+    </div>
+    <div class="card">
+      <div class="flow">
+        <div class="phase inception">
+          <h4>/brainstorm · Inception</h4>
+          <div class="cmd">idea → plan</div>
+          <div class="muted" style="font-size:12.5px;margin-top:4px;">Discover · Define · Design · Plan</div>
+          <div class="legend">
+            <span class="gate">discover_summary</span><span class="gate">prd_approve</span>
+            <span class="gate">design_docs_approve</span><span class="gate">beads_tasklist_approve</span>
+          </div>
+        </div>
+        <div class="arrow">→</div>
+        <div class="phase construction">
+          <h4>/build · Construction</h4>
+          <div class="cmd">plan → code</div>
+          <div class="muted" style="font-size:12.5px;margin-top:4px;">TDD loop · 3-Strike · 7 test layers</div>
+          <div class="legend"><span class="gate">review_md_approve</span></div>
+        </div>
+        <div class="arrow">→</div>
+        <div class="phase operation">
+          <h4>/ship · Operation</h4>
+          <div class="cmd">code → shipped</div>
+          <div class="muted" style="font-size:12.5px;margin-top:4px;">Ship · Verify · Reflect</div>
+          <div class="legend">
+            <span class="gate">merge_and_deploy_approve</span><span class="gate">smoke_signoff</span><span class="gate">episode_approve</span>
+          </div>
+        </div>
+      </div>
+      <p class="muted" style="margin:12px 0 0;font-size:13px;">
+        At each gate: <b>approve · reject · edit</b>. Want it hands-off? <span class="cmd">/night-shift</span> auto-runs Build→Ship behind one human Contract Party gate (production always refused).
+        &nbsp;→ <a href="6-implementing-a-requirement.md">6 · Implementing a requirement</a></p>
+    </div>
+  </section>
+
+  <!-- STEP 4 -->
+  <section class="step">
+    <div class="step-head">
+      <span class="step-num">4</span>
+      <div><p class="step-title">Day-two tools</p>
+        <p class="step-sub">Fixing bugs, deploying for real, staying sharp.</p></div>
+    </div>
+    <div class="tools">
+      <div class="tool">
+        <b>🐞 Fixing a bug</b>
+        <span class="muted" style="font-size:13px;">Normal loop for ordinary bugs · <span class="cmd">/hotfix</span> for emergencies · <span class="cmd">/rollback</span> to go back.</span>
+        <div style="margin-top:6px;font-size:13px;">→ <a href="7-fixing-a-bug.md">7 · Fixing a bug</a></div>
+      </div>
+      <div class="tool">
+        <b>🚀 Shipping &amp; release</b>
+        <span class="muted" style="font-size:13px;">Wire <span class="cmd">PDLC_DEPLOY_CMD</span>/webhook for real deploys; otherwise an <b>honest simulated</b> no-op. Prod-deploy ban always on.</span>
+        <div style="margin-top:6px;font-size:13px;">→ <a href="8-shipping-and-release.md">8 · Shipping &amp; release</a></div>
+      </div>
+      <div class="tool">
+        <b>🧭 Operating well</b>
+        <span class="muted" style="font-size:13px;">Gate fluency · Sketch vs Socratic · <span class="cmd">/compact</span> · <span class="cmd">/decide</span> · Nexus dashboards.</span>
+        <div style="margin-top:6px;font-size:13px;">→ <a href="9-operating-effectively.md">9 · Operating effectively</a></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- STEP 5 -->
+  <section class="step">
+    <div class="step-head">
+      <span class="step-num">5</span>
+      <div><p class="step-title">Go deeper</p>
+        <p class="step-sub">A tiered route into the 20-page wiki — read a tier, go build, come back.</p></div>
+    </div>
+    <div class="tiers">
+      <div class="tier">
+        <h4>Tier 1 · Get running</h4>
+        <span class="n">Overview · Installation · Configuration · Launching · Core Flow · Studio</span>
+      </div>
+      <div class="tier">
+        <h4>Tier 2 · Use it daily</h4>
+        <span class="n">Agents · Party · Inception · Construction · Operation · Night-Shift · Utilities · Migration</span>
+      </div>
+      <div class="tier">
+        <h4>Tier 3 · Extend &amp; operate</h4>
+        <span class="n">Monitoring · API · Evals · Data Model · Observability · MCP Tools</span>
+      </div>
+    </div>
+    <p class="muted" style="margin:10px 2px 0;font-size:13px;">→ <a href="3-going-deeper.md">3 · Going deeper</a> · <a href="../wiki/README.md">the full wiki</a></p>
+  </section>
+
+  <div class="banner">
+    <b>The one rule that explains everything:</b> pdlcflow runs autonomously and
+    <b>pauses at gates</b> for a human. Approving resumes it. Nothing is ever
+    faked — when a backend isn't wired, it does an honest no-op and says so.
+  </div>
+
+  <!-- DOC MAP -->
+  <section class="docmap">
+    <div class="step-head"><span class="step-num" style="background:var(--muted)">✦</span>
+      <p class="step-title">All the onboarding docs</p></div>
+    <div class="card" style="padding:6px 14px;">
+      <table>
+        <tr><td><a href="README.md">README</a></td><td>Index &amp; "which doc when"</td></tr>
+        <tr><td><a href="2-getting-started.md">2</a></td><td>Getting started — greenfield 🌱 vs brownfield 🏛️</td></tr>
+        <tr><td><a href="2a-setup-walkthrough.md">2a</a></td><td>Setup walkthrough — do this, then this</td></tr>
+        <tr><td><a href="3-going-deeper.md">3</a></td><td>Going deeper — tiered route into the wiki</td></tr>
+        <tr><td><a href="4-bringing-your-own-spec.md">4</a></td><td>Bringing your own spec — document-driven build</td></tr>
+        <tr><td><a href="5-bringing-your-own-roadmap.md">5</a></td><td>Bringing your own roadmap — onboard an existing app</td></tr>
+        <tr><td><a href="6-implementing-a-requirement.md">6</a></td><td>Implementing a requirement — the day-two loop</td></tr>
+        <tr><td><a href="7-fixing-a-bug.md">7</a></td><td>Fixing a bug — /hotfix vs loop vs /rollback</td></tr>
+        <tr><td><a href="8-shipping-and-release.md">8</a></td><td>Shipping &amp; release — deploys with/without your infra</td></tr>
+        <tr><td><a href="9-operating-effectively.md">9</a></td><td>Operating effectively — habits &amp; pitfalls</td></tr>
+      </table>
+    </div>
+  </section>
+
+  <footer>
+    pdlcflow onboarding · the 9 gates, in order:
+    <span class="gate">init_approve</span><span class="gate">discover_summary</span><span class="gate">prd_approve</span><span class="gate">design_docs_approve</span><span class="gate">beads_tasklist_approve</span><span class="gate">review_md_approve</span><span class="gate">merge_and_deploy_approve</span><span class="gate">smoke_signoff</span><span class="gate">episode_approve</span>
+  </footer>
+
+</div>
+</body>
+</html>
