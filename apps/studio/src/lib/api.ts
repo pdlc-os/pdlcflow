@@ -237,10 +237,48 @@ export const admin = {
     json<PresetCatalog>(
       `/admin/models/presets?org_id=${encodeURIComponent(orgId)}${q ? `&q=${encodeURIComponent(q)}` : ''}`,
     ),
+
+  listVersions: (orgId: string, scope?: string, limit = 20) =>
+    json<{ versions: ConfigVersion[] }>(
+      `/admin/models/versions?org_id=${encodeURIComponent(orgId)}${scope ? `&scope=${encodeURIComponent(scope)}` : ''}&limit=${limit}`,
+    ),
+
+  rollbackVersion: (orgId: string, versionId: string) =>
+    json<{ ok: boolean; restored_scope: string; secret_requires_reentry: boolean }>(
+      `/admin/models/versions/${encodeURIComponent(versionId)}/rollback?org_id=${encodeURIComponent(orgId)}`,
+      { method: 'POST' },
+    ),
+
+  exportModels: (orgId: string) =>
+    json<object>(`/admin/models/export?org_id=${encodeURIComponent(orgId)}`),
+
+  importModels: (orgId: string, doc: object, opts?: { dryRun?: boolean; strategy?: 'merge' | 'replace' }) =>
+    json<ImportResult>(
+      `/admin/models/import?org_id=${encodeURIComponent(orgId)}` +
+        `${opts?.dryRun ? '&dry_run=true' : ''}&strategy=${opts?.strategy ?? 'merge'}`,
+      { method: 'POST', body: JSON.stringify(doc) },
+    ),
 };
 
 // Models settings types — mirror app/routes/admin/models.py response models.
 export type TierName = 'premium' | 'balanced' | 'economy';
+
+export interface FallbackEntryView {
+  provider: string;
+  region: string | null;
+  endpoint: string | null;
+  tier_map: Record<TierName, string> | null;
+  has_key: boolean;
+}
+
+/** Chain entry on PUT: api_key is WRITE-ONLY (omit = carry the stored key over). */
+export interface FallbackEntryBody {
+  provider: string;
+  region?: string | null;
+  endpoint?: string | null;
+  tier_map?: Record<TierName, string> | null;
+  api_key?: string;
+}
 
 export interface OrgDefault {
   provider: string;
@@ -248,6 +286,7 @@ export interface OrgDefault {
   region: string | null;
   endpoint: string | null;
   has_key: boolean;
+  failover_chain: FallbackEntryView[];
 }
 
 /** PUT body: api_key is WRITE-ONLY (omit = keep the stored key). */
@@ -257,6 +296,30 @@ export interface OrgDefaultBody {
   region?: string | null;
   endpoint?: string | null;
   api_key?: string;
+  failover_chain?: FallbackEntryBody[];
+}
+
+export interface ConfigVersion {
+  id: string;
+  scope: string;
+  change_kind: 'update' | 'delete' | 'rollback' | 'import' | 'preset_apply';
+  actor_label: string | null;
+  created_at: string;
+  diff: { field: string; from: unknown; to: unknown }[];
+}
+
+export interface ImportPlanItem {
+  scope: string;
+  action: 'create' | 'overwrite' | 'skip' | 'error' | 'pending';
+  reasons: string[];
+  secret: string;
+}
+
+export interface ImportResult {
+  ok?: boolean;
+  applied?: number;
+  plan: ImportPlanItem[];
+  strategy?: string;
 }
 
 export interface AgentOverride {

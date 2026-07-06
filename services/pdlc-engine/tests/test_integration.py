@@ -725,3 +725,112 @@ def test_failover_chain_roundtrip(monkeypatch):
     finally:
         S.reset_secrets()
         invalidate_secret_cache()
+
+
+def test_config_versioning_lifecycle(monkeypatch):
+    """History accrues per mutation with prior-state snapshots; rollback
+    restores (and re-versions); unresolvable secrets are dropped with a flag;
+    export strips enc: refs; import promotes into another org; retention
+    prunes; RLS isolates."""
+    from app import secretstore as S
+    from app.llm.factory import invalidate_secret_cache
+    from app.main import app
+    from cryptography.fernet import Fernet
+    from fastapi.testclient import TestClient
+
+    monkeypatch.setattr(settings, "secrets_backend", "encrypted")
+    monkeypatch.setattr(settings, "secret_key", Fernet.generate_key().decode())
+    monkeypatch.setattr(settings, "llm_config_version_keep", 5)
+    S.reset_secrets()
+    invalidate_secret_cache()
+    try:
+        org, _ = _seed_project()
+        c = TestClient(app)
+        q = f"?org_id={org}"
+        t1 = {"premium": "claude-opus-4-8", "balanced": "claude-sonnet-4-6",
+              "economy": "claude-haiku-4-5"}
+        t2 = {**t1, "economy": "claude-haiku-4-5-fast"}
+
+        # v1: create (prior = None); v2: update tier_map + key
+        c.put(f"/v1/admin/models/org-default{q}",
+              json={"provider": "anthropic", "tier_map": t1})
+        c.put(f"/v1/admin/models/org-default{q}",
+              json={"provider": "anthropic", "tier_map": t2, "api_key": "sk-v2"})
+
+        vs = c.get(f"/v1/admin/models/versions{q}").json()["versions"]
+        assert [v["change_kind"] for v in vs] == ["update", "update"]
+        assert vs[1]["diff"][0]["from"] is None  # oldest: created from nothing
+        newest_fields = {d["field"] for d in vs[0]["diff"]}
+        assert {"tier_map", "secret"} <= newest_fields
+        assert "sk-v2" not in str(vs) and "enc:" not in str(vs)
+
+        # rollback to the state BEFORE v2 (i.e. v2's snapshot: t1, no key)
+        rb = c.post(f"/v1/admin/models/versions/{vs[0]['id']}/rollback{q}")
+        assert rb.status_code == 200 and rb.json()["ok"] is True
+        g = c.get(f"/v1/admin/models/org-default{q}").json()
+        assert g["tier_map"] == t1 and g["has_key"] is False
+        vs2 = c.get(f"/v1/admin/models/versions{q}").json()["versions"]
+        assert vs2[0]["change_kind"] == "rollback"  # history append-only
+
+        # restore the keyed state; then rotate the Fernet key so the stored
+        # enc: ref no longer resolves → rollback flags re-entry
+        c.put(f"/v1/admin/models/org-default{q}",
+              json={"provider": "anthropic", "tier_map": t2, "api_key": "sk-v3"})
+        keyed_version = c.get(f"/v1/admin/models/versions{q}").json()["versions"][0]
+        c.put(f"/v1/admin/models/org-default{q}",
+              json={"provider": "anthropic", "tier_map": t1})  # snapshot now has enc: ref
+        broken = c.get(f"/v1/admin/models/versions{q}").json()["versions"][0]
+        monkeypatch.setattr(settings, "secret_key", Fernet.generate_key().decode())
+        S.reset_secrets()
+        invalidate_secret_cache()
+        rb2 = c.post(f"/v1/admin/models/versions/{broken['id']}/rollback{q}")
+        assert rb2.json()["secret_requires_reentry"] is True
+        assert c.get(f"/v1/admin/models/org-default{q}").json()["has_key"] is False
+        assert keyed_version  # (id referenced above; keeps the narrative clear)
+
+        # export: enc: material stripped by construction
+        c.put(f"/v1/admin/models/org-default{q}",
+              json={"provider": "anthropic", "tier_map": t1, "api_key": "sk-export"})
+        c.put(f"/v1/admin/models/agent-overrides/neo{q}", json={
+            "agent_persona": "neo", "provider": "openai", "model_id": "gpt-5.5",
+            "api_key": "sk-neo"})
+        doc = c.get(f"/v1/admin/models/export{q}").json()
+        assert doc["org_default"]["secret"] == {"required": True, "ref_kind": "encrypted"}
+        assert "enc:" not in str(doc) and "sk-export" not in str(doc)
+        assert doc["agent_overrides"][0]["agent_persona"] == "neo"
+
+        # promotion: import the export into a second org (dry-run then apply)
+        other, _ = _seed_project()
+        oq = f"?org_id={other}"
+        plan = c.post(f"/v1/admin/models/import{oq}&dry_run=true", json=doc).json()["plan"]
+        assert {p["scope"]: p["action"] for p in plan} == {"org": "create", "neo": "create"}
+        assert all(p["secret"] == "re-entry required" for p in plan)
+        applied = c.post(f"/v1/admin/models/import{oq}", json=doc)
+        assert applied.status_code == 200 and applied.json()["applied"] == 2
+        g2 = c.get(f"/v1/admin/models/org-default{oq}").json()
+        assert g2["provider"] == "anthropic" and g2["has_key"] is False
+        assert c.get(f"/v1/admin/models/versions{oq}").json()["versions"][0]["change_kind"] == "import"
+
+        # replace strategy drops overrides absent from the doc
+        c.put(f"/v1/admin/models/agent-overrides/muse{oq}", json={
+            "agent_persona": "muse", "provider": "openai", "model_id": "gpt-5.4"})
+        c.post(f"/v1/admin/models/import{oq}&strategy=replace", json=doc)
+        remaining = {o["agent_persona"] for o in
+                     c.get(f"/v1/admin/models/agent-overrides{oq}").json()}
+        assert remaining == {"neo"}
+
+        # retention: keep=5 per scope
+        for i in range(8):
+            c.put(f"/v1/admin/models/org-default{q}",
+                  json={"provider": "anthropic",
+                        "tier_map": {**t1, "premium": f"model-{i}"}})
+        org_versions = [v for v in
+                        c.get(f"/v1/admin/models/versions{q}&scope=org&limit=100").json()["versions"]]
+        assert len(org_versions) == 5
+
+        # RLS: the other org sees only its own history
+        scopes = {v["scope"] for v in c.get(f"/v1/admin/models/versions{oq}&limit=100").json()["versions"]}
+        assert scopes <= {"org", "neo", "muse"}
+    finally:
+        S.reset_secrets()
+        invalidate_secret_cache()

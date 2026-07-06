@@ -301,6 +301,28 @@ class AgentLLMConfig(Base):
     )
 
 
+class LLMConfigVersion(Base):
+    """Append-only history of org/agent LLM config mutations (PRD-06). The
+    snapshot is the PRIOR row state (null = didn't exist); rollback writes a
+    snapshot back and records itself as a new version — history never rewrites."""
+
+    __tablename__ = "llm_config_versions"
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    org_id: Mapped[UUID] = mapped_column(ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False)
+    scope: Mapped[str] = mapped_column(Text, nullable=False)  # 'org' | '<persona>'
+    change_kind: Mapped[str] = mapped_column(Text, nullable=False)
+    snapshot: Mapped[dict | None] = mapped_column(JSONB)
+    actor_user_id: Mapped[UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    actor_label: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=text("now()"))
+    __table_args__ = (
+        CheckConstraint(
+            "change_kind in ('update','delete','rollback','import','preset_apply')"
+        ),
+        Index("ix_llmcv_org_scope_created", "org_id", "scope", "created_at"),
+    )
+
+
 class LLMProviderHealth(Base):
     """Last probe result per (org, scope) — console status chips. Scope is
     'org-default' or 'agent:<persona>'; instance status is in-process only."""

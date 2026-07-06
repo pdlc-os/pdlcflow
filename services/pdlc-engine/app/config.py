@@ -73,6 +73,9 @@ class Settings(BaseSettings):
     rate_limit_enabled: bool = False  # per-org RPM enforcement (Redis)
     llm_rpm_default: int = 60
 
+    # Config versioning (PRD-06): versions kept per (org, scope); pruned on write.
+    llm_config_version_keep: int = 50
+
     # LLM defaults
     default_llm_provider: Literal[
         "bedrock", "anthropic", "vertex", "azure", "openai", "gemini", "ollama",

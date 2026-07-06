@@ -13,6 +13,7 @@ from .features import router as features_router
 from .initiatives import router as initiatives_router
 from .live import router as live_router
 from .models import router as models_router
+from .models_versions import router as models_versions_router
 from .narrative import router as narrative_router
 from .squads import router as squads_router
 from .threads import router as threads_router
@@ -27,6 +28,7 @@ router.include_router(agents_router)
 router.include_router(features_router)
 router.include_router(exports_router)
 router.include_router(models_router)
+router.include_router(models_versions_router)
 router.include_router(evals_router)
 router.include_router(narrative_router)
 router.include_router(context_router)

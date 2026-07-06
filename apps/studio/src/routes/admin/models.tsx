@@ -9,6 +9,9 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   admin,
   type AgentOverride,
+  type ConfigVersion,
+  type FallbackEntryBody,
+  type ImportPlanItem,
   type ModelDefaults,
   type OrgDefault,
   type Preset,
@@ -22,6 +25,18 @@ import { ErrorNotice, Loading, PageHeader } from './_shared';
 const TIERS: TierName[] = ['premium', 'balanced', 'economy'];
 const REGION_PROVIDERS = new Set(['bedrock', 'vertex', 'azure']);
 const ENDPOINT_PROVIDERS = new Set(['ollama', 'azure', 'openai_compatible']);
+// Providers whose builders would fall back to the operator's env key — chain
+// entries for these require their own key (mirrors the backend rule).
+const KEYED_PROVIDERS = new Set(['anthropic', 'openai', 'gemini', 'azure']);
+
+interface ChainDraft {
+  provider: string;
+  endpoint: string;
+  region: string;
+  tierMap: Record<TierName, string> | null;
+  keyInput: string;
+  hasKey: boolean;
+}
 
 const inputCls = 'rounded border border-border bg-bg px-2 py-1';
 const btnCls =
@@ -114,7 +129,7 @@ export function AdminModels() {
         />
       </section>
 
-      <section className="rounded-xl border border-border p-4">
+      <section className="mb-6 rounded-xl border border-border p-4">
         <h3 className="mb-2 text-sm font-medium">Per-agent overrides</h3>
         <div className="space-y-2">
           {defaults.data.personas.map((p) => (
@@ -127,6 +142,16 @@ export function AdminModels() {
             />
           ))}
         </div>
+      </section>
+
+      <section className="mb-6 rounded-xl border border-border p-4">
+        <h3 className="mb-2 text-sm font-medium">History</h3>
+        <HistoryPanel orgId={orgId} />
+      </section>
+
+      <section className="rounded-xl border border-border p-4">
+        <h3 className="mb-2 text-sm font-medium">Export / import</h3>
+        <ExportImportPanel orgId={orgId} />
       </section>
     </div>
   );
@@ -151,20 +176,44 @@ function OrgDefaultCard({
   const [region, setRegion] = useState(saved?.region ?? '');
   const [endpoint, setEndpoint] = useState(saved?.endpoint ?? '');
   const [keyInput, setKeyInput] = useState('');
+  const [chain, setChain] = useState<ChainDraft[]>(() =>
+    (saved?.failover_chain ?? []).map((e) => ({
+      provider: e.provider,
+      endpoint: e.endpoint ?? '',
+      region: e.region ?? '',
+      tierMap: e.tier_map,
+      keyInput: '',
+      hasKey: e.has_key,
+    })),
+  );
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [test, setTest] = useState<TestState>('idle');
 
+  const savedChainNorm = useMemo(
+    () =>
+      JSON.stringify(
+        (saved?.failover_chain ?? []).map((e) => ({
+          p: e.provider, e: e.endpoint ?? '', r: e.region ?? '', t: e.tier_map,
+        })),
+      ),
+    [saved],
+  );
+  const chainNorm = JSON.stringify(
+    chain.map((e) => ({ p: e.provider, e: e.endpoint, r: e.region, t: e.tierMap })),
+  );
+
   const dirty = useMemo(() => {
-    if (keyInput) return true;
+    if (keyInput || chain.some((e) => e.keyInput)) return true;
     if (!saved) return true; // nothing saved yet — saving creates the org row
     return (
       provider !== saved.provider ||
       TIERS.some((t) => tierMap[t] !== saved.tier_map[t]) ||
       (region || null) !== saved.region ||
-      (endpoint || null) !== saved.endpoint
+      (endpoint || null) !== saved.endpoint ||
+      chainNorm !== savedChainNorm
     );
-  }, [saved, provider, tierMap, region, endpoint, keyInput]);
+  }, [saved, provider, tierMap, region, endpoint, keyInput, chain, chainNorm, savedChainNorm]);
   useDirtyGuard(dirty);
 
   const onProviderChange = (p: string) => {
@@ -198,15 +247,24 @@ function OrgDefaultCard({
     setBusy(true);
     setError(null);
     try {
+      const chainBody: FallbackEntryBody[] = chain.map((e) => ({
+        provider: e.provider,
+        endpoint: e.endpoint || null,
+        region: e.region || null,
+        tier_map: e.tierMap,
+        ...(e.keyInput ? { api_key: e.keyInput } : {}),
+      }));
       await admin.putOrgDefault(orgId, {
         provider,
         tier_map: tierMap,
         region: region || null,
         endpoint: endpoint || null,
+        failover_chain: chainBody,
         ...(keyInput ? { api_key: keyInput } : {}),
       });
       setKeyInput('');
       await qc.invalidateQueries({ queryKey: ['admin', 'orgDefault', orgId] });
+      await qc.invalidateQueries({ queryKey: ['admin', 'modelVersions', orgId] });
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -330,6 +388,45 @@ function OrgDefaultCard({
         </div>
       </div>
 
+      <div className="grid grid-cols-[120px_1fr] items-start gap-2">
+        <div className="pt-1 text-muted-fg">
+          Failover
+          <div className="text-[10px]">tried in order on provider incidents</div>
+        </div>
+        <div className="space-y-1.5">
+          {chain.map((e, i) => (
+            <ChainEntryRow
+              key={i}
+              index={i}
+              entry={e}
+              providers={defaults.providers}
+              onChange={(next) => setChain(chain.map((c, j) => (j === i ? next : c)))}
+              onRemove={() => setChain(chain.filter((_, j) => j !== i))}
+              onMove={(dir) => {
+                const j = i + dir;
+                if (j < 0 || j >= chain.length) return;
+                const copy = [...chain];
+                [copy[i], copy[j]] = [copy[j], copy[i]];
+                setChain(copy);
+              }}
+            />
+          ))}
+          {chain.length < 3 ? (
+            <button
+              onClick={() =>
+                setChain([...chain, {
+                  provider: 'bedrock', endpoint: '', region: '',
+                  tierMap: null, keyInput: '', hasKey: false,
+                }])
+              }
+              className={btnCls}
+            >
+              + Add fallback
+            </button>
+          ) : null}
+        </div>
+      </div>
+
       <div className="flex items-center gap-2 pt-1">
         <button onClick={save} disabled={busy || !dirty} className={btnCls}>
           {busy ? 'Saving…' : 'Save'}
@@ -341,6 +438,97 @@ function OrgDefaultCard({
         {dirty && !busy ? <span className="text-xs text-muted-fg">unsaved changes</span> : null}
         {error ? <span className="text-xs text-red-400">{error}</span> : null}
       </div>
+    </div>
+  );
+}
+
+function ChainEntryRow({
+  index,
+  entry,
+  providers,
+  onChange,
+  onRemove,
+  onMove,
+}: {
+  index: number;
+  entry: ChainDraft;
+  providers: string[];
+  onChange: (e: ChainDraft) => void;
+  onRemove: () => void;
+  onMove: (dir: -1 | 1) => void;
+}) {
+  const isGateway = entry.provider === 'openai_compatible';
+  const needsKey = KEYED_PROVIDERS.has(entry.provider) && !entry.hasKey;
+  return (
+    <div className="space-y-1 rounded border border-border p-2 text-xs">
+      <div className="flex items-center gap-1.5">
+        <span className="text-muted-fg">#{index + 1}</span>
+        <select
+          value={entry.provider}
+          onChange={(e) =>
+            onChange({
+              ...entry,
+              provider: e.target.value,
+              hasKey: false,
+              tierMap: e.target.value === 'openai_compatible'
+                ? entry.tierMap ?? { premium: '', balanced: '', economy: '' }
+                : entry.tierMap,
+            })
+          }
+          className={inputCls}
+        >
+          {providers.map((p) => (
+            <option key={p} value={p}>
+              {p}
+            </option>
+          ))}
+        </select>
+        {ENDPOINT_PROVIDERS.has(entry.provider) ? (
+          <input
+            value={entry.endpoint}
+            onChange={(e) => onChange({ ...entry, endpoint: e.target.value })}
+            placeholder="endpoint (base_url)"
+            className={`${inputCls} flex-1`}
+          />
+        ) : null}
+        {REGION_PROVIDERS.has(entry.provider) ? (
+          <input
+            value={entry.region}
+            onChange={(e) => onChange({ ...entry, region: e.target.value })}
+            placeholder="region"
+            className={`${inputCls} w-24`}
+          />
+        ) : null}
+        <input
+          type="password"
+          autoComplete="off"
+          value={entry.keyInput}
+          onChange={(e) => onChange({ ...entry, keyInput: e.target.value })}
+          placeholder={entry.hasKey ? '●●● rotate' : needsKey ? 'key (required)' : 'key (optional)'}
+          className={`${inputCls} w-28`}
+        />
+        <button onClick={() => onMove(-1)} className={btnCls} title="Move up">↑</button>
+        <button onClick={() => onMove(1)} className={btnCls} title="Move down">↓</button>
+        <button onClick={onRemove} className={btnCls} title="Remove">✕</button>
+      </div>
+      {isGateway && entry.tierMap ? (
+        <div className="flex items-center gap-1.5 pl-6">
+          {TIERS.map((t) => (
+            <input
+              key={t}
+              value={entry.tierMap?.[t] ?? ''}
+              onChange={(e) =>
+                onChange({
+                  ...entry,
+                  tierMap: { ...(entry.tierMap ?? { premium: '', balanced: '', economy: '' }), [t]: e.target.value },
+                })
+              }
+              placeholder={`${t} model`}
+              className={`${inputCls} flex-1`}
+            />
+          ))}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -444,6 +632,213 @@ function PresetPicker({ orgId, onPick }: { orgId: string; onPick: (p: Preset) =>
   );
 }
 
+// ── History (versions + rollback) ───────────────────────────────────────────
+
+function fmtDiff(d: { field: string; from: unknown; to: unknown }): string {
+  if (typeof d.from === 'object' || typeof d.to === 'object') return `${d.field} changed`;
+  return `${d.field}: ${d.from ?? '—'} → ${d.to ?? '—'}`;
+}
+
+function HistoryPanel({ orgId }: { orgId: string }) {
+  const qc = useQueryClient();
+  const versions = useQuery({
+    queryKey: ['admin', 'modelVersions', orgId],
+    queryFn: () => admin.listVersions(orgId, undefined, 20),
+    refetchOnWindowFocus: false,
+  });
+  const [busy, setBusy] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+
+  const rollback = async (v: ConfigVersion) => {
+    const summary = v.diff.map(fmtDiff).join('\n') || '(no field changes)';
+    if (!window.confirm(
+      `Roll back "${v.scope}" to the state before this ${v.change_kind}?\n\nThis will undo:\n${summary}`))
+      return;
+    setBusy(v.id);
+    setNotice(null);
+    try {
+      const r = await admin.rollbackVersion(orgId, v.id);
+      setNotice(r.secret_requires_reentry
+        ? 'Rolled back — the stored key could not be restored; re-enter it above.'
+        : 'Rolled back.');
+      await qc.invalidateQueries({ queryKey: ['admin'] });
+    } catch (e) {
+      setNotice(`Rollback failed: ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const rows = versions.data?.versions ?? [];
+  if (versions.isLoading) return <div className="text-xs text-muted-fg">Loading history…</div>;
+  return (
+    <div className="space-y-1.5 text-xs">
+      {notice ? <div className="text-muted-fg">{notice}</div> : null}
+      {rows.length === 0 ? (
+        <div className="text-muted-fg">
+          No changes recorded yet — history starts with the next edit.
+        </div>
+      ) : null}
+      {rows.map((v) => (
+        <div key={v.id} className="flex items-center gap-2 rounded border border-border px-2 py-1.5">
+          <span className="whitespace-nowrap text-muted-fg">
+            {new Date(v.created_at).toLocaleString()}
+          </span>
+          <span className="rounded bg-border/50 px-1 capitalize">{v.scope}</span>
+          <span className="text-muted-fg">{v.change_kind}</span>
+          {v.actor_label ? <span className="text-muted-fg">by {v.actor_label}</span> : null}
+          <span className="flex-1 truncate" title={v.diff.map(fmtDiff).join(' · ')}>
+            {v.diff.slice(0, 3).map(fmtDiff).join(' · ') || '—'}
+            {v.diff.length > 3 ? ` · +${v.diff.length - 3} more` : ''}
+          </span>
+          <button onClick={() => rollback(v)} disabled={busy !== null} className={btnCls}>
+            {busy === v.id ? 'Rolling back…' : 'Rollback'}
+          </button>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ── Export / import ─────────────────────────────────────────────────────────
+
+function ExportImportPanel({ orgId }: { orgId: string }) {
+  const qc = useQueryClient();
+  const [importOpen, setImportOpen] = useState(false);
+  const [docText, setDocText] = useState('');
+  const [strategy, setStrategy] = useState<'merge' | 'replace'>('merge');
+  const [plan, setPlan] = useState<ImportPlanItem[] | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+
+  const exportNow = async () => {
+    setBusy(true);
+    try {
+      const doc = await admin.exportModels(orgId);
+      const blob = new Blob([JSON.stringify(doc, null, 2)], { type: 'application/json' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'pdlcflow-models-export.json';
+      a.click();
+      URL.revokeObjectURL(a.href);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const parseDoc = (): object | null => {
+    try {
+      return JSON.parse(docText) as object;
+    } catch {
+      setMsg('Not valid JSON.');
+      return null;
+    }
+  };
+
+  const dryRun = async () => {
+    const doc = parseDoc();
+    if (!doc) return;
+    setBusy(true);
+    setMsg(null);
+    try {
+      const r = await admin.importModels(orgId, doc, { dryRun: true, strategy });
+      setPlan(r.plan);
+    } catch (e) {
+      setMsg(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const apply = async () => {
+    const doc = parseDoc();
+    if (!doc) return;
+    if (!window.confirm(`Apply this import (strategy: ${strategy})? This overwrites current config.`)) return;
+    setBusy(true);
+    setMsg(null);
+    try {
+      const r = await admin.importModels(orgId, doc, { strategy });
+      setMsg(`Imported — ${r.applied} item(s) applied. Re-enter any required keys above.`);
+      setPlan(r.plan);
+      await qc.invalidateQueries({ queryKey: ['admin'] });
+    } catch (e) {
+      setMsg(`Import failed: ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="space-y-2 text-xs">
+      <div className="flex items-center gap-2">
+        <button onClick={exportNow} disabled={busy} className={btnCls}>
+          Export provider set (JSON)
+        </button>
+        <button onClick={() => setImportOpen(!importOpen)} className={btnCls}>
+          {importOpen ? 'Hide import' : 'Import…'}
+        </button>
+        <span className="text-muted-fg">
+          Exports never contain API keys — re-enter them on the target org.
+        </span>
+      </div>
+      {importOpen ? (
+        <div className="space-y-2">
+          <textarea
+            value={docText}
+            onChange={(e) => {
+              setDocText(e.target.value);
+              setPlan(null);
+            }}
+            placeholder="Paste an exported provider-set JSON document"
+            rows={6}
+            className={`${inputCls} w-full font-mono`}
+          />
+          <div className="flex items-center gap-2">
+            <select
+              value={strategy}
+              onChange={(e) => setStrategy(e.target.value as 'merge' | 'replace')}
+              className={inputCls}
+            >
+              <option value="merge">merge (upsert items in the document)</option>
+              <option value="replace">replace (also drop rows absent from it)</option>
+            </select>
+            <button onClick={dryRun} disabled={busy || !docText} className={btnCls}>
+              Dry-run
+            </button>
+            <button
+              onClick={apply}
+              disabled={busy || !plan || plan.some((p) => p.action === 'error')}
+              className={btnCls}
+              title={!plan ? 'Dry-run first' : undefined}
+            >
+              Apply
+            </button>
+          </div>
+          {plan ? (
+            <div className="space-y-1">
+              {plan.map((p) => (
+                <div key={p.scope} className="flex items-center gap-2">
+                  <span className="rounded bg-border/50 px-1 capitalize">{p.scope}</span>
+                  <span className={p.action === 'error' ? 'text-red-400' : 'text-muted-fg'}>
+                    {p.action}
+                  </span>
+                  <span className="text-muted-fg">secret: {p.secret}</span>
+                  {p.reasons.length ? (
+                    <span className="truncate text-red-400" title={p.reasons.join(' · ')}>
+                      {p.reasons[0]}
+                    </span>
+                  ) : null}
+                </div>
+              ))}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+      {msg ? <div className="text-muted-fg">{msg}</div> : null}
+    </div>
+  );
+}
+
 // ── Per-agent overrides ─────────────────────────────────────────────────────
 
 function PersonaRow({
@@ -473,7 +868,10 @@ function PersonaRow({
   );
   useDirtyGuard(dirty);
 
-  const refresh = () => qc.invalidateQueries({ queryKey: ['admin', 'agentOverrides', orgId] });
+  const refresh = async () => {
+    await qc.invalidateQueries({ queryKey: ['admin', 'agentOverrides', orgId] });
+    await qc.invalidateQueries({ queryKey: ['admin', 'modelVersions', orgId] });
+  };
 
   const save = async () => {
     setBusy(true);
