@@ -51,7 +51,9 @@ migrations: `… run --rm api uv run alembic upgrade head` against the new datab
 **Validated, not deploy-tested.** Every module passes `terraform validate` / `tofu validate`
 (schema-correct against the real provider schemas), but has **not** been applied to a live
 cloud account. Before production: pin provider versions, run `terraform plan` in your account,
-and review IAM/networking for your security posture.
+and review IAM/networking for your security posture. **The first apply is a milestone** —
+walk the [deploy runbook](DEPLOY_RUNBOOK.md) (state backend · secrets · image refs · DNS ·
+auth · verification · rollback) rather than assuming `apply` works.
 
 **App portability** — what works as-is vs. needs an adapter:
 
@@ -61,8 +63,11 @@ and review IAM/networking for your security posture.
   works via its S3-compatible endpoint (set `PDLC_S3_ENDPOINT_URL` + HMAC keys); **Azure Blob is
   not S3-compatible** — use the DB/filesystem artifact store there until a Blob adapter lands.
   (The buckets are provisioned on all three.)
-- ⚠️ **Managed identity:** the app's `cognito` auth mode is AWS-specific. On GCP/Azure use
-  `PDLC_AUTH_MODE=local` (JWT) or wire OIDC against Identity Platform / AD B2C (a follow-on).
+- ✅ **Managed identity / SSO:** the app now ships **generic OIDC**
+  (`PDLC_AUTH_MODE=oidc`) that validates against any spec-compliant issuer —
+  Cognito, Google Identity Platform, Entra/AD B2C, Auth0 — so SSO is portable
+  across all three clouds. (Self-host stays on `PDLC_AUTH_MODE=local` JWT.) See
+  the [deploy runbook](DEPLOY_RUNBOOK.md) §6.
 - ⚠️ **Clickstream streaming:** only AWS has a native Firehose sink in the app today, so the
   GCP/Azure modules default the app to the **Postgres clickstream sink**; the provisioned
   Pub/Sub+BigQuery / Event Hubs are ready for a native sink adapter (a follow-on).

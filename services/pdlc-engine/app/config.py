@@ -21,14 +21,29 @@ class Settings(BaseSettings):
     # Redis (pub/sub, rate limit, Arq queue)
     redis_url: str = "redis://localhost:6379/0"
 
-    # Auth — local JWT (self-host) or cognito (SaaS)
-    auth_mode: Literal["local", "cognito"] = "local"
+    # Auth — local JWT (self-host) or generic OIDC (SaaS/SSO: Cognito, Google
+    # Identity Platform, Entra/AD B2C, Auth0, …).
+    auth_mode: Literal["local", "oidc"] = "local"
     jwt_secret: str = "change-me-in-production"
     jwt_alg: str = "HS256"
     jwt_ttl_s: int = 60 * 60 * 12
     # Enforce auth: when True, protected routes require a valid JWT and derive
     # org_id from the token (not the request). Off => open API (today's default).
     auth_required: bool = False
+
+    # OIDC (auth_mode="oidc"). issuer + audience are validated on every request;
+    # keys come from the issuer's JWKS (discovery-resolved, TTL-cached). Claims
+    # map to the PDLC identity; org/role are provisioned from the token on first
+    # login, then the user store is the source of truth.
+    oidc_issuer: str = ""              # e.g. https://cognito-idp.us-east-1.amazonaws.com/us-east-1_ABC
+    oidc_audience: str = ""            # expected `aud` (often the client id)
+    oidc_client_id: str = ""           # public client id used by the Studio PKCE flow
+    oidc_redirect_uri: str = ""        # Studio callback, e.g. https://studio.example.com/
+    oidc_scopes: str = "openid email profile"
+    oidc_email_claim: str = "email"
+    oidc_org_claim: str = ""           # claim carrying the org (name/id); empty ⇒ single "default" org
+    oidc_role_claim: str = ""          # claim carrying the role; empty ⇒ "member"
+    oidc_jwks_ttl_s: int = 3600
     # Env-bootstrapped first admin: on boot, if set and no users exist, create an
     # org + admin user. Further users come from the admin-only /v1/auth/users.
     bootstrap_admin_email: str | None = None

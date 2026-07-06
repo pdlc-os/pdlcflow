@@ -631,6 +631,23 @@ export const api = {
       body: JSON.stringify({ email, password }),
     }),
 
+  authMode: () => json<{ mode: 'local' | 'oidc'; auth_required: boolean }>('/auth/mode'),
+
+  oidcConfig: () =>
+    json<{
+      issuer: string;
+      authorization_endpoint: string;
+      client_id: string;
+      redirect_uri: string;
+      scopes: string;
+    }>('/auth/oidc/config'),
+
+  oidcExchange: (code: string, codeVerifier: string, redirectUri: string) =>
+    json<LoginResponse>('/auth/oidc/exchange', {
+      method: 'POST',
+      body: JSON.stringify({ code, code_verifier: codeVerifier, redirect_uri: redirectUri }),
+    }),
+
   me: () => json<Identity>('/auth/me'),
 
   invokeCommand: (body: InvokeBody) =>

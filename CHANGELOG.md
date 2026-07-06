@@ -11,6 +11,22 @@ simulations presented as results (from the
 [stub-gaps roadmap](docs/.research/stub-gaps-roadmap.md)).
 
 ### Added
+- **OIDC / SSO authentication** (T2-4) — `PDLC_AUTH_MODE=oidc` replaces the inert
+  Cognito stub with **generic OIDC** against any spec-compliant issuer (AWS
+  Cognito, Google Identity Platform, Entra/AD B2C, Auth0). The engine validates
+  every Bearer token against the issuer's **JWKS** (discovery-resolved,
+  TTL-cached) with issuer + audience checks, maps claims to the PDLC identity,
+  and **provisions the org + role from claims on first login**; thereafter the
+  user store is authoritative. New `/v1/auth/mode`, `/v1/auth/oidc/config`, and
+  `/v1/auth/oidc/exchange` endpoints; the **Studio** detects the mode and runs a
+  **PKCE auth-code redirect** ("Sign in with SSO"). The boot guard now accepts
+  `local`/`oidc` and refuses `oidc` without issuer+audience (and any unknown
+  mode). Local JWT auth is unchanged.
+- **First cloud-deploy runbook** (T4-4) — the Terraform modules stay honestly
+  "validated, not deploy-tested"; the first apply is now backed by
+  [`infra/terraform/DEPLOY_RUNBOOK.md`](infra/terraform/DEPLOY_RUNBOOK.md) — a
+  milestone checklist (remote state backend, secrets, pinned image refs, apply,
+  migrations, DNS/TLS, auth, verification, rollback).
 - **Initialization phase** (T3-2) — was a single passthrough node. It is now a
   real interactive genesis flow: three `interaction.ask` rounds (product intent,
   constitution choices, seed roadmap) → deterministic renderers assemble

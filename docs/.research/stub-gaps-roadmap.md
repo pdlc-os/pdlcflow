@@ -26,7 +26,7 @@
 | ~~T2-1~~ ✅ | `/health/ready` real db/redis probes — **done** (quick-wins) | engine | 🟠 Operational | S |
 | ~~T2-2~~ ✅ | Python CI teeth: ruff+pytest blocking (mypy ratchet kept) — **done** | CI | 🟠 Operational | S |
 | ~~T2-3~~ ✅ | Sentinel `_stalled` real (progress-fingerprint) + smoke-failed marker reachable — **done** | pdlc-graph | 🟠 Operational | M |
-| T2-4 (partial ✅) | `PDLC_AUTH_MODE` boot-guard done (no longer inert); real OIDC still open | engine | 🟠 Operational | L |
+| ~~T2-4~~ ✅ | Real generic OIDC/SSO (JWKS validation + first-login provisioning + Studio PKCE) — **done** | engine + studio | 🟠 Operational | L |
 | ~~T2-5~~ ✅ | CDK image from context w/ GHCR default — **done** (quick-wins) | infra | 🟠 Operational | S |
 | ~~T3-1~~ ✅ | MCP stdio execution (stdio_client dispatch, double-gated) — **done** | engine | 🟡 Feature | M |
 | ~~T3-2~~ ✅ | Initialization phase built: interactive Constitution/Intent/Roadmap flow + `init_approve` (9th gate) — **done** | pdlc-graph | 🟡 Feature | L |
@@ -37,7 +37,7 @@
 | ~~T4-1~~ ✅ | Event-schema sync: registry backfilled (57 types), payloads added/fixed, check script + CI test — **done** | event-schema | 🟢 Hygiene | S |
 | ~~T4-2~~ ✅ | Dead code deleted (LLMTokenTallyCallback, pdlc_graph/tools/*, 3 orphaned Studio components) — **done** | multi | 🟢 Hygiene | S |
 | ~~T4-3~~ ✅ | Docstring truth (azure, analytics) — **done** (quick-wins) | engine | 🟢 Hygiene | S |
-| T4-4 | Terraform modules validate-only (never deploy-tested) | infra | 🟢 Note | — |
+| ~~T4-4~~ ✅ | Terraform still validate-only (correct) — first-deploy **runbook/checklist** written | infra | 🟢 Note | — |
 
 **The theme of Tier 1:** the PDLC *workflow* engine (gates, phases, artifacts, telemetry,
 provider platform) is real, but the **outermost side-effects of Construction/Operation —

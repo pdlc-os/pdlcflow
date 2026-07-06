@@ -20,6 +20,7 @@ class UserStore(Protocol):
     def get_by_email(self, email: str) -> UserRecord | None: ...
     def create_org(self, name: str) -> str: ...
     def create_user(self, *, org_id: str, email: str, pw_hash: str, role: str) -> str: ...
+    def get_org_by_name(self, name: str) -> str | None: ...  # idempotent OIDC provisioning
 
 
 class InMemoryUserStore:
@@ -37,6 +38,12 @@ class InMemoryUserStore:
         org_id = str(uuid4())
         self._orgs[org_id] = name
         return org_id
+
+    def get_org_by_name(self, name: str) -> str | None:
+        for org_id, org_name in self._orgs.items():
+            if org_name == name:
+                return org_id
+        return None
 
     def create_user(self, *, org_id: str, email: str, pw_hash: str, role: str) -> str:
         key = email.lower()
@@ -92,6 +99,16 @@ class PostgresUserStore:
             conn.execute(insert(Organization).values(
                 id=org_id, name=name, slug=f"{name}-{org_id.hex[:8]}".lower(), settings={}))
         return str(org_id)
+
+    def get_org_by_name(self, name: str) -> str | None:
+        from sqlalchemy import text
+
+        with self._engine.begin() as conn:
+            row = conn.execute(
+                text("select id from organizations where name = :n order by created_at limit 1"),
+                {"n": name},
+            ).first()
+        return str(row.id) if row else None
 
     def create_user(self, *, org_id: str, email: str, pw_hash: str, role: str) -> str:
         from sqlalchemy import insert

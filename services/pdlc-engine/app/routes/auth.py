@@ -8,6 +8,7 @@ from pydantic import BaseModel
 from ..auth.local import Identity, authenticate, current_identity, issue_token
 from ..auth.passwords import hash_password
 from ..auth.store import get_user_store
+from ..config import settings
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -29,6 +30,39 @@ def login(req: LoginRequest) -> TokenResponse:
     if identity is None:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail="invalid credentials")
     return TokenResponse(access_token=issue_token(identity), identity=identity)
+
+
+@router.get("/mode")
+def auth_mode() -> dict:
+    """Which auth mode the Studio should render — password form or SSO redirect."""
+    return {"mode": settings.auth_mode, "auth_required": settings.auth_required}
+
+
+@router.get("/oidc/config")
+def oidc_config() -> dict:
+    """Public OIDC params the Studio needs to start an auth-code + PKCE login."""
+    if settings.auth_mode != "oidc":
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="OIDC is not enabled")
+    from ..auth.oidc import public_config
+
+    return public_config()
+
+
+class OIDCExchangeRequest(BaseModel):
+    code: str
+    code_verifier: str
+    redirect_uri: str | None = None
+
+
+@router.post("/oidc/exchange", response_model=TokenResponse)
+def oidc_exchange(req: OIDCExchangeRequest) -> TokenResponse:
+    """Exchange an auth code (+ PKCE verifier) for a validated session token."""
+    if settings.auth_mode != "oidc":
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="OIDC is not enabled")
+    from ..auth.oidc import exchange_code
+
+    result = exchange_code(req.code, req.code_verifier, req.redirect_uri or "")
+    return TokenResponse(access_token=result["access_token"], identity=result["identity"])
 
 
 @router.get("/me", response_model=Identity)

@@ -33,6 +33,13 @@ def issue_token(identity: Identity) -> str:
 
 
 def _decode(token: str) -> Identity:
+    # OIDC mode validates the token against the issuer's JWKS + maps claims;
+    # local mode verifies our own HS256 JWT. Both entry points (current_identity
+    # and get_principal) route through here.
+    if settings.auth_mode == "oidc":
+        from .oidc import current_identity_oidc
+
+        return current_identity_oidc(token)
     try:
         claims = jwt.decode(token, settings.jwt_secret, algorithms=[settings.jwt_alg])
     except JWTError as exc:
