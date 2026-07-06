@@ -3,13 +3,18 @@
 All notable changes to pdlcflow are documented here. This project adheres to
 [Semantic Versioning](https://semver.org/).
 
-## Unreleased
+## v1.13.0 — 2026-07-06
 
-Cost analytics — pricing overrides, versioned price catalog, budgets, and real
-spend events (Wave 3 of the cc-switch gap roadmap, PRD-07)
-+ egress network controls: explicit proxy/CA/headers for LLM calls (PRD-08)
-+ persona prompt overrides & packs (PRD-10)
-+ MCP tool servers for agents (PRD-09 — cc-switch gap roadmap complete).
+Wave 3 of the cc-switch gap roadmap — roadmap complete: cost analytics
+(pricing overrides, versioned catalog, budgets, real spend events; PRD-07),
+egress network controls (PRD-08), persona prompt overrides & packs (PRD-10),
+and MCP tool servers for agents (PRD-09).
+
+> **Upgrade notes:** (1) `alembic upgrade head` applies migrations
+> `0011`–`0014` (the deploy stack does this automatically). (2) For
+> `PDLC_WIRE_LLM=true` deployments, persona soul-specs now reach models as
+> system prompts — real-model outputs shift and input tokens rise ~2–4 KiB per
+> call (visible in the spend stream). Hermetic/stub deployments are unchanged.
 
 ### Changed
 - **Persona soul-specs now actually reach models** (PRD-10 M0). The persona
