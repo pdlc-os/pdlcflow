@@ -121,6 +121,14 @@ class ClickstreamEmitter:
                     self._analytics.ingest(batch)
                 except Exception as exc:
                     log.warning("analytics ingest failed: %s", exc)
+            # Budget threshold alerts (PRD-07) — memoized + fail-silent; must
+            # never slow ingestion.
+            try:
+                from .budget import check_budgets
+
+                check_budgets(batch)
+            except Exception:
+                pass
 
 
 def _build_sink(settings: Settings) -> _Sink:

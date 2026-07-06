@@ -94,6 +94,12 @@ def reset_thread_context(token) -> None:
     _current_thread.reset(token)
 
 
+def current_thread() -> str | None:
+    """The thread id bound for this turn (None outside a turn). The engine's
+    spend/telemetry emitters use it to attribute LLM calls to org/project."""
+    return _current_thread.get()
+
+
 def complete(
     persona: str, prompt: str, *, tier: str | None = None, system: str | None = None
 ) -> str:

@@ -7,12 +7,13 @@ these models are the typed access layer.
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 from uuid import UUID, uuid4
 
 from sqlalchemy import (
     ARRAY,
     CheckConstraint,
+    Date,
     DateTime,
     ForeignKey,
     Index,
@@ -268,6 +269,9 @@ class OrgLLMConfig(Base):
     # secret_ref}] — tried in order on retriable primary failures (PRD-05).
     failover_chain: Mapped[list] = mapped_column(
         JSONB, nullable=False, server_default=text("'[]'::jsonb"))
+    # Org price-sheet corrections for estimate_usd (PRD-07):
+    # {"<provider>/<model_id>": {"in": $/1M, "out": $/1M}}. Dashboards only.
+    pricing_override: Mapped[dict | None] = mapped_column(JSONB)
     __table_args__ = (
         CheckConstraint(
             "provider in ('bedrock','anthropic','vertex','azure','openai','gemini',"
@@ -299,6 +303,26 @@ class AgentLLMConfig(Base):
             name="ck_agent_llm_config_provider",
         ),
     )
+
+
+class OrgBudget(Base):
+    """Monthly soft budget (estimate-only, never billing) + alert thresholds."""
+
+    __tablename__ = "org_budgets"
+    org_id: Mapped[UUID] = mapped_column(ForeignKey("organizations.id", ondelete="CASCADE"), primary_key=True)
+    monthly_limit_usd: Mapped[float] = mapped_column(Numeric(12, 2), nullable=False)
+    alert_pcts: Mapped[list] = mapped_column(JSONB, nullable=False, server_default=text("'[50, 80, 100]'::jsonb"))
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=text("now()"))
+
+
+class OrgBudgetAlert(Base):
+    """Dedupe ledger — the PK fires each (org, month, threshold) exactly once."""
+
+    __tablename__ = "org_budget_alerts"
+    org_id: Mapped[UUID] = mapped_column(ForeignKey("organizations.id", ondelete="CASCADE"), primary_key=True)
+    month: Mapped[date] = mapped_column(Date, primary_key=True)  # first of month
+    pct: Mapped[int] = mapped_column(Integer, primary_key=True)
+    fired_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=text("now()"))
 
 
 class LLMConfigVersion(Base):

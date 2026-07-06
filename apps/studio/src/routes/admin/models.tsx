@@ -15,6 +15,7 @@ import {
   type ModelDefaults,
   type OrgDefault,
   type Preset,
+  type PriceInOut,
   type ProbeBody,
   type TestResult,
   type TierName,
@@ -142,6 +143,11 @@ export function AdminModels() {
             />
           ))}
         </div>
+      </section>
+
+      <section className="mb-6 rounded-xl border border-border p-4">
+        <h3 className="mb-2 text-sm font-medium">Pricing &amp; budget</h3>
+        <PricingBudgetPanel orgId={orgId} />
       </section>
 
       <section className="mb-6 rounded-xl border border-border p-4">
@@ -628,6 +634,246 @@ function PresetPicker({ orgId, onPick }: { orgId: string; onPick: (p: Preset) =>
           key, Test, then Save.
         </div>
       ) : null}
+    </div>
+  );
+}
+
+// ── Pricing & budget ────────────────────────────────────────────────────────
+
+interface OverrideDraft {
+  key: string;
+  inPrice: string;
+  outPrice: string;
+}
+
+function PricingBudgetPanel({ orgId }: { orgId: string }) {
+  const qc = useQueryClient();
+  const pricing = useQuery({
+    queryKey: ['admin', 'pricing', orgId],
+    queryFn: () => admin.getPricing(orgId),
+    refetchOnWindowFocus: false,
+  });
+  const budget = useQuery({
+    queryKey: ['admin', 'budget', orgId],
+    queryFn: () => admin.getBudget(orgId),
+    refetchOnWindowFocus: false,
+  });
+
+  // Budget card state
+  const [limitInput, setLimitInput] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+
+  // Overrides editor state (full-replace semantics; seeded on toggle)
+  const [editOpen, setEditOpen] = useState(false);
+  const [drafts, setDrafts] = useState<OverrideDraft[]>([]);
+  const [filter, setFilter] = useState('');
+
+  const openEditor = () => {
+    const eff = pricing.data?.effective ?? {};
+    setDrafts(
+      Object.entries(eff)
+        .filter(([, p]) => p.source === 'override')
+        .map(([key, p]) => ({ key, inPrice: String(p.in), outPrice: String(p.out) })),
+    );
+    setEditOpen(true);
+  };
+
+  const saveOverrides = async () => {
+    const body: Record<string, PriceInOut> = {};
+    for (const d of drafts) {
+      const i = parseFloat(d.inPrice);
+      const o = parseFloat(d.outPrice);
+      if (!d.key.includes('/') || Number.isNaN(i) || Number.isNaN(o) || i < 0 || o < 0) {
+        setMsg(`Invalid override row: ${d.key || '(empty key)'}`);
+        return;
+      }
+      body[d.key] = { in: i, out: o };
+    }
+    setBusy(true);
+    setMsg(null);
+    try {
+      await admin.putPricingOverrides(orgId, body);
+      setEditOpen(false);
+      await qc.invalidateQueries({ queryKey: ['admin', 'pricing', orgId] });
+      await qc.invalidateQueries({ queryKey: ['admin', 'modelVersions', orgId] });
+    } catch (e) {
+      setMsg(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const saveBudget = async () => {
+    const limit = parseFloat(limitInput);
+    if (Number.isNaN(limit) || limit <= 0) {
+      setMsg('Budget must be a positive number.');
+      return;
+    }
+    setBusy(true);
+    setMsg(null);
+    try {
+      await admin.putBudget(orgId, { monthly_limit_usd: limit });
+      setLimitInput('');
+      await qc.invalidateQueries({ queryKey: ['admin', 'budget', orgId] });
+    } catch (e) {
+      setMsg(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const sheet = pricing.data?.effective ?? {};
+  const rows = Object.entries(sheet)
+    .filter(([key]) => !filter || key.toLowerCase().includes(filter.toLowerCase()))
+    .sort(([a], [b]) => a.localeCompare(b));
+  const b = budget.data;
+  const pct = b ? Math.min(100, Math.round((b.month_to_date_usd / b.monthly_limit_usd) * 100)) : 0;
+
+  return (
+    <div className="space-y-3 text-xs">
+      {/* Budget card */}
+      <div className="rounded border border-border p-2">
+        {b ? (
+          <div className="space-y-1.5">
+            <div className="flex items-center gap-2">
+              <span className="text-muted-fg">Monthly budget</span>
+              <span className="font-medium">
+                ${b.month_to_date_usd.toFixed(2)} / ${b.monthly_limit_usd.toFixed(2)} ({pct}%)
+              </span>
+              {b.fired.map((p) => (
+                <span
+                  key={p}
+                  className={`rounded px-1 ${p >= 100 ? 'bg-red-500/20 text-red-400' : 'bg-border/60 text-muted-fg'}`}
+                >
+                  {p}% reached
+                </span>
+              ))}
+            </div>
+            <div className="h-1.5 w-full overflow-hidden rounded bg-border/40">
+              <div
+                className={`h-full ${pct >= 100 ? 'bg-red-500' : pct >= 80 ? 'bg-yellow-500' : 'bg-green-600'}`}
+                style={{ width: `${pct}%` }}
+              />
+            </div>
+          </div>
+        ) : (
+          <span className="text-muted-fg">No budget configured. </span>
+        )}
+        <div className="mt-1.5 flex items-center gap-2">
+          <input
+            value={limitInput}
+            onChange={(e) => setLimitInput(e.target.value)}
+            placeholder={b ? `change limit (now $${b.monthly_limit_usd})` : 'monthly limit (USD)'}
+            className={`${inputCls} w-44`}
+          />
+          <button onClick={saveBudget} disabled={busy || !limitInput} className={btnCls}>
+            Set budget
+          </button>
+          <span className="text-muted-fg">Alerts at 50 / 80 / 100% — soft, never blocking.</span>
+        </div>
+      </div>
+
+      {/* Effective price sheet */}
+      <div className="flex items-center gap-2">
+        <input
+          value={filter}
+          onChange={(e) => setFilter(e.target.value)}
+          placeholder="Filter price sheet (provider/model)…"
+          className={`${inputCls} w-64`}
+        />
+        <button onClick={editOpen ? () => setEditOpen(false) : openEditor} className={btnCls}>
+          {editOpen ? 'Close overrides' : 'Edit overrides…'}
+        </button>
+        {pricing.data ? (
+          <span className="text-muted-fg">
+            Catalog {pricing.data.catalog_version} · {pricing.data.disclaimer}
+          </span>
+        ) : null}
+      </div>
+
+      {editOpen ? (
+        <div className="space-y-1.5 rounded border border-border p-2">
+          {drafts.map((d, i) => (
+            <div key={i} className="flex items-center gap-1.5">
+              <input
+                value={d.key}
+                onChange={(e) => setDrafts(drafts.map((x, j) => (j === i ? { ...x, key: e.target.value } : x)))}
+                placeholder="provider/model_id"
+                className={`${inputCls} flex-1 font-mono`}
+              />
+              <input
+                value={d.inPrice}
+                onChange={(e) => setDrafts(drafts.map((x, j) => (j === i ? { ...x, inPrice: e.target.value } : x)))}
+                placeholder="$/1M in"
+                className={`${inputCls} w-24`}
+              />
+              <input
+                value={d.outPrice}
+                onChange={(e) => setDrafts(drafts.map((x, j) => (j === i ? { ...x, outPrice: e.target.value } : x)))}
+                placeholder="$/1M out"
+                className={`${inputCls} w-24`}
+              />
+              <button onClick={() => setDrafts(drafts.filter((_, j) => j !== i))} className={btnCls}>
+                ✕
+              </button>
+            </div>
+          ))}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setDrafts([...drafts, { key: '', inPrice: '', outPrice: '' }])}
+              className={btnCls}
+            >
+              + Add override
+            </button>
+            <button onClick={saveOverrides} disabled={busy} className={btnCls}>
+              Save overrides
+            </button>
+            <span className="text-muted-fg">
+              Full sheet is replaced on save — remove a row to drop that override.
+            </span>
+          </div>
+        </div>
+      ) : null}
+
+      {msg ? <div className="text-red-400">{msg}</div> : null}
+
+      <div className="max-h-56 overflow-y-auto rounded border border-border">
+        <table className="w-full">
+          <thead className="sticky top-0 bg-border/40 text-left text-[10px] uppercase tracking-wide text-muted-fg">
+            <tr>
+              <th className="px-2 py-1 font-medium">provider/model</th>
+              <th className="px-2 py-1 text-right font-medium">$/1M in</th>
+              <th className="px-2 py-1 text-right font-medium">$/1M out</th>
+              <th className="px-2 py-1 font-medium">source</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map(([key, p]) => (
+              <tr key={key} className="border-t border-border">
+                <td className="px-2 py-1 font-mono">{key}</td>
+                <td className="px-2 py-1 text-right tabular-nums">{p.in}</td>
+                <td className="px-2 py-1 text-right tabular-nums">{p.out}</td>
+                <td className="px-2 py-1">
+                  <span
+                    className={
+                      p.source === 'override'
+                        ? 'rounded bg-green-500/20 px-1 text-green-500'
+                        : 'text-muted-fg'
+                    }
+                  >
+                    {p.source}
+                  </span>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <div className="text-[10px] text-muted-fg">
+        Models not on this sheet report as <span className="font-medium">unpriced</span> (not
+        $0) in dashboards — add an override to price them.
+      </div>
     </div>
   );
 }

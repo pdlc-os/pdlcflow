@@ -249,6 +249,12 @@ A Redis-backed **circuit breaker** per (org, provider[:gateway-host]) skips a re
 | `PDLC_RATE_LIMIT_ENABLED` | `false` | Enforce the per-org RPM quota. |
 | `PDLC_LLM_RPM_DEFAULT` | `60` | Calls/min per (org, provider, tier) bucket until per-org quotas ship. |
 
+### Pricing overrides & budgets
+
+Spend numbers on the dashboards are **estimates for visibility — never used for billing**. The price sheet is a versioned catalog shipped with each release (`pricing_catalog.json`), layered under per-org **pricing overrides** (`PUT /v1/admin/pricing/overrides`, or Settings → Models → Pricing & budget): resolution is *override → catalog → preset hint → provider wildcard → **unpriced***. Unknown models now report `usd_estimate: null` — visible as *unpriced*, not disguised as $0. Overrides are versioned like any other config change and travel with export/import.
+
+An org can set a **monthly soft budget** (`PUT /v1/admin/budget`): month-to-date estimated spend is evaluated on the clickstream path (memoized, fail-silent) and crossing 50/80/100% fires a `budget.threshold` event exactly once per org/month/threshold — surfaced as chips + a progress bar on the console. Alerts never block turns.
+
 ### Config history, rollback & promotion
 
 Every change to the org/agent model config (console, API, preset apply, import) records the **full prior state** in an immutable, RLS-isolated history (`llm_config_versions`) — who, when, and a field-level diff (secrets render only as *set/changed/cleared*). The console's **History** panel shows the timeline; **Rollback** restores any version in one click (the rollback itself becomes a new history entry, and a stored key that no longer resolves is dropped with a re-enter prompt rather than restored blind). Retention: `PDLC_LLM_CONFIG_VERSION_KEEP` (default `50`) versions per scope.
