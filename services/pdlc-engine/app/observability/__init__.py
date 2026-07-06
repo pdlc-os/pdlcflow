@@ -8,8 +8,11 @@ no-op when `PDLC_OTEL_ENABLED` is false, so dev/test/CI stay hermetic.
 
 from .tracing import (
     llm_span,
+    record_breaker,
+    record_fallback,
     record_gate,
     record_llm,
+    record_rate_limited,
     record_turn,
     turn_span,
     wire_tracing,
@@ -17,8 +20,11 @@ from .tracing import (
 
 __all__ = [
     "llm_span",
+    "record_breaker",
+    "record_fallback",
     "record_gate",
     "record_llm",
+    "record_rate_limited",
     "record_turn",
     "turn_span",
     "wire_tracing",

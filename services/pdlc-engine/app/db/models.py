@@ -264,6 +264,10 @@ class OrgLLMConfig(Base):
     endpoint: Mapped[str | None] = mapped_column(Text)
     secret_ref: Mapped[str | None] = mapped_column(Text)
     tier_map: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    # Ordered fallback configs (≤3): [{provider, region, endpoint, tier_map,
+    # secret_ref}] — tried in order on retriable primary failures (PRD-05).
+    failover_chain: Mapped[list] = mapped_column(
+        JSONB, nullable=False, server_default=text("'[]'::jsonb"))
     __table_args__ = (
         CheckConstraint(
             "provider in ('bedrock','anthropic','vertex','azure','openai','gemini',"

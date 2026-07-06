@@ -154,7 +154,7 @@ emits an `admin.access.denied` audit event and returns **403** (cross-org ban).
 | `GET /v1/admin/models/presets` | `org_id`, `q?` | `{catalog_version, presets: [{id, label, provider, endpoint, tier_map, docs_url, key_hint, tags, needs_secret}]}` |
 | `POST /v1/admin/models/presets/{id}/apply` | `org_id` | `{ok, applied: {provider, endpoint, region, tier_map}, needs_secret}` — one-click org default |
 | `GET /v1/admin/models/org-default` | `org_id` | `OrgDefault \| null` (incl. `has_key`; never key/ref material) |
-| `PUT /v1/admin/models/org-default` | `org_id`, body `OrgDefault` (+ write-only `api_key?`) | `{ok, has_key}` |
+| `PUT /v1/admin/models/org-default` | `org_id`, body `OrgDefault` (+ write-only `api_key?`, `failover_chain?` ≤3 entries each with write-only `api_key?`) | `{ok, has_key}` |
 | `DELETE /v1/admin/models/org-default/key` | `org_id` | `{ok: true}` — clears the stored BYOK key |
 | `GET /v1/admin/models/agent-overrides` | `org_id` | `[AgentOverride]` (incl. `has_key`) |
 | `PUT /v1/admin/models/agent-overrides/{persona}` | `org_id`, body `AgentOverride` (+ write-only `api_key?`) | `{ok, persona, has_key}` |

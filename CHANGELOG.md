@@ -5,9 +5,31 @@ All notable changes to pdlcflow are documented here. This project adheres to
 
 ## Unreleased
 
-Provider presets & the open gateway ecosystem (Wave 2 of the cc-switch gap roadmap, PRD-04).
+Provider presets & the open gateway ecosystem (Wave 2 of the cc-switch gap roadmap, PRD-04)
++ resilient LLM routing: failover chains, circuit breaker, real rate limiting (PRD-05).
 
 ### Added
+- **Failover chains** — an org can declare up to 3 ordered fallback provider
+  configs (`failover_chain` on the org model config), each with its own
+  region/endpoint/tier_map and its **own write-only API key** (keyed providers
+  require one — a fallback must never silently bill the operator's env key).
+  On retriable errors (429/5xx/timeout/connection) the engine retries the same
+  persona+tier on the next candidate; auth/validation errors surface
+  immediately. Streaming fails over only before the first token (no mid-answer
+  model splicing). Chainless orgs are byte-identical to before (the chain is
+  only queried after a retriable primary failure). Migration `0009`.
+- **Circuit breaker** per (org, provider[:gateway-host]) in Redis — open after
+  N failures/window, cooldown skip, half-open single probe (`SET NX`), fail-open
+  when Redis is down. `PDLC_LLM_BREAKER_*` knobs.
+- **Real rate limiting** — `rate_limit.py`'s always-True stub replaced with the
+  documented fixed-window Redis limiter, enforced per attempt in the completion
+  path behind `PDLC_RATE_LIMIT_ENABLED` (default off); rejection raises a clear
+  `RateLimited` error and never triggers failover.
+- **Resilience telemetry** — OTel counters `pdlc.llm.fallbacks`,
+  `pdlc.llm.breaker_transitions`, `pdlc.llm.rate_limited`; `llm.failover` /
+  `llm.rate_limited` clickstream events; failed attempts get span
+  `record_exception` + `pdlc.llm.fallback_rank`; a new **Resilience** row on the
+  provisioned Grafana dashboard.
 - **`openai_compatible` provider** — point any org (or single agent) at an
   OpenAI-protocol gateway or server with a custom base_url: OpenRouter,
   DeepSeek, Kimi/Moonshot, GLM, SiliconFlow, LiteLLM, vLLM, Ollama's `/v1` —

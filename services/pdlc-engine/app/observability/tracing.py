@@ -152,6 +152,31 @@ def record_gate(kind: str, action: str) -> None:
         _M["gates"].add(1, {"kind": kind or "unknown", "action": action})
 
 
+# Resilience metrics (PRD-05). No org_id label — unbounded cardinality; the
+# org lives in span attributes + clickstream events, per convention.
+def record_fallback(from_provider: str, reason: str) -> None:
+    if not _ENABLED or not _M:
+        return
+    with contextlib.suppress(Exception):
+        _M["llm_fallbacks"].add(1, {"from_provider": from_provider, "reason": reason})
+
+
+def record_breaker(provider_key: str, transition: str) -> None:
+    """transition = open | reopen | close (provider_key may carry the gateway
+    endpoint host, e.g. 'openai_compatible:openrouter.ai')."""
+    if not _ENABLED or not _M:
+        return
+    with contextlib.suppress(Exception):
+        _M["llm_breaker"].add(1, {"provider": provider_key, "transition": transition})
+
+
+def record_rate_limited(provider: str, tier: str) -> None:
+    if not _ENABLED or not _M:
+        return
+    with contextlib.suppress(Exception):
+        _M["llm_rate_limited"].add(1, {"provider": provider, "tier": tier})
+
+
 # --------------------------------------------------------------------------- #
 # Boot wiring
 # --------------------------------------------------------------------------- #
@@ -167,6 +192,12 @@ def _init_metrics(meter: Any) -> None:
         "llm_duration": meter.create_histogram(
             "pdlc.llm.duration_ms", unit="ms", description="LLM completion latency"),
         "gates": meter.create_counter("pdlc.gates", description="Approval gates / question rounds"),
+        "llm_fallbacks": meter.create_counter(
+            "pdlc.llm.fallbacks", description="Failover attempts to the next chain candidate"),
+        "llm_breaker": meter.create_counter(
+            "pdlc.llm.breaker_transitions", description="Circuit-breaker state transitions"),
+        "llm_rate_limited": meter.create_counter(
+            "pdlc.llm.rate_limited", description="Completions rejected by the per-org RPM limit"),
     }
 
 

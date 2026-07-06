@@ -1,106 +1,411 @@
 {
-  "annotations": { "list": [] },
+  "annotations": {
+    "list": []
+  },
   "editable": true,
   "graphTooltip": 0,
-  "title": "pdlcflow — PDLC Workflow & Agents",
+  "title": "pdlcflow \u2014 PDLC Workflow & Agents",
   "uid": "pdlcflow-workflow",
-  "tags": ["pdlcflow"],
+  "tags": [
+    "pdlcflow"
+  ],
   "timezone": "browser",
   "schemaVersion": 39,
   "version": 1,
-  "time": { "from": "now-6h", "to": "now" },
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
   "refresh": "30s",
-  "templating": { "list": [] },
+  "templating": {
+    "list": []
+  },
   "panels": [
     {
       "type": "stat",
       "title": "Turns (rate/min)",
-      "gridPos": { "h": 5, "w": 6, "x": 0, "y": 0 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "fieldConfig": { "defaults": { "unit": "opm" }, "overrides": [] },
+      "gridPos": {
+        "h": 5,
+        "w": 6,
+        "x": 0,
+        "y": 0
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "opm"
+        },
+        "overrides": []
+      },
       "targets": [
-        { "refId": "A", "expr": "sum(rate(pdlc_turns_total[5m])) * 60", "datasource": { "type": "prometheus", "uid": "prometheus" } }
+        {
+          "refId": "A",
+          "expr": "sum(rate(pdlc_turns_total[5m])) * 60",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        }
       ]
     },
     {
       "type": "stat",
       "title": "LLM calls (total)",
-      "gridPos": { "h": 5, "w": 6, "x": 6, "y": 0 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "gridPos": {
+        "h": 5,
+        "w": 6,
+        "x": 6,
+        "y": 0
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
       "targets": [
-        { "refId": "A", "expr": "sum(pdlc_llm_calls_total)", "datasource": { "type": "prometheus", "uid": "prometheus" } }
+        {
+          "refId": "A",
+          "expr": "sum(pdlc_llm_calls_total)",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        }
       ]
     },
     {
       "type": "stat",
       "title": "Tokens (total)",
-      "gridPos": { "h": 5, "w": 6, "x": 12, "y": 0 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "gridPos": {
+        "h": 5,
+        "w": 6,
+        "x": 12,
+        "y": 0
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
       "targets": [
-        { "refId": "A", "expr": "sum(pdlc_llm_tokens_total)", "datasource": { "type": "prometheus", "uid": "prometheus" } }
+        {
+          "refId": "A",
+          "expr": "sum(pdlc_llm_tokens_total)",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        }
       ]
     },
     {
       "type": "stat",
       "title": "Estimated spend (USD)",
-      "gridPos": { "h": 5, "w": 6, "x": 18, "y": 0 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "fieldConfig": { "defaults": { "unit": "currencyUSD", "decimals": 4 }, "overrides": [] },
+      "gridPos": {
+        "h": 5,
+        "w": 6,
+        "x": 18,
+        "y": 0
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD",
+          "decimals": 4
+        },
+        "overrides": []
+      },
       "targets": [
-        { "refId": "A", "expr": "sum(pdlc_llm_cost_usd_total)", "datasource": { "type": "prometheus", "uid": "prometheus" } }
+        {
+          "refId": "A",
+          "expr": "sum(pdlc_llm_cost_usd_total)",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        }
       ]
     },
     {
       "type": "timeseries",
       "title": "LLM calls by persona (rate/s)",
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 5 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "fieldConfig": { "defaults": { "unit": "reqps" }, "overrides": [] },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 5
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps"
+        },
+        "overrides": []
+      },
       "targets": [
-        { "refId": "A", "expr": "sum by (persona) (rate(pdlc_llm_calls_total[5m]))", "legendFormat": "{{persona}}", "datasource": { "type": "prometheus", "uid": "prometheus" } }
+        {
+          "refId": "A",
+          "expr": "sum by (persona) (rate(pdlc_llm_calls_total[5m]))",
+          "legendFormat": "{{persona}}",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        }
       ]
     },
     {
       "type": "timeseries",
       "title": "Token throughput by direction (tokens/s)",
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 5 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 5
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
       "targets": [
-        { "refId": "A", "expr": "sum by (direction) (rate(pdlc_llm_tokens_total[5m]))", "legendFormat": "{{direction}}", "datasource": { "type": "prometheus", "uid": "prometheus" } }
+        {
+          "refId": "A",
+          "expr": "sum by (direction) (rate(pdlc_llm_tokens_total[5m]))",
+          "legendFormat": "{{direction}}",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        }
       ]
     },
     {
       "type": "timeseries",
       "title": "LLM latency p50 / p95 (ms)",
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 13 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "fieldConfig": { "defaults": { "unit": "ms" }, "overrides": [] },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 13
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms"
+        },
+        "overrides": []
+      },
       "targets": [
-        { "refId": "A", "expr": "histogram_quantile(0.50, sum by (le) (rate(pdlc_llm_duration_ms_bucket[5m])))", "legendFormat": "p50", "datasource": { "type": "prometheus", "uid": "prometheus" } },
-        { "refId": "B", "expr": "histogram_quantile(0.95, sum by (le) (rate(pdlc_llm_duration_ms_bucket[5m])))", "legendFormat": "p95", "datasource": { "type": "prometheus", "uid": "prometheus" } }
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.50, sum by (le) (rate(pdlc_llm_duration_ms_bucket[5m])))",
+          "legendFormat": "p50",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        },
+        {
+          "refId": "B",
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(pdlc_llm_duration_ms_bucket[5m])))",
+          "legendFormat": "p95",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        }
       ]
     },
     {
       "type": "timeseries",
       "title": "Turn outcomes (rate/s)",
-      "gridPos": { "h": 8, "w": 6, "x": 12, "y": 13 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "fieldConfig": { "defaults": { "unit": "reqps" }, "overrides": [] },
+      "gridPos": {
+        "h": 8,
+        "w": 6,
+        "x": 12,
+        "y": 13
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps"
+        },
+        "overrides": []
+      },
       "targets": [
-        { "refId": "A", "expr": "sum by (outcome) (rate(pdlc_turns_total[5m]))", "legendFormat": "{{outcome}}", "datasource": { "type": "prometheus", "uid": "prometheus" } }
+        {
+          "refId": "A",
+          "expr": "sum by (outcome) (rate(pdlc_turns_total[5m]))",
+          "legendFormat": "{{outcome}}",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        }
       ]
     },
     {
       "type": "timeseries",
       "title": "Approval gates opened by kind (rate/s)",
-      "gridPos": { "h": 8, "w": 6, "x": 18, "y": 13 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "fieldConfig": { "defaults": { "unit": "reqps" }, "overrides": [] },
+      "gridPos": {
+        "h": 8,
+        "w": 6,
+        "x": 18,
+        "y": 13
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps"
+        },
+        "overrides": []
+      },
       "targets": [
-        { "refId": "A", "expr": "sum by (kind) (rate(pdlc_gates_total{action=\"opened\"}[5m]))", "legendFormat": "{{kind}}", "datasource": { "type": "prometheus", "uid": "prometheus" } }
+        {
+          "refId": "A",
+          "expr": "sum by (kind) (rate(pdlc_gates_total{action=\"opened\"}[5m]))",
+          "legendFormat": "{{kind}}",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "Resilience (failover / breaker / rate limits)",
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 21
+      },
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "type": "timeseries",
+      "title": "LLM failovers (by from-provider / reason)",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 22
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 60
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "sum by (from_provider, reason) (increase(pdlc_llm_fallbacks_total[$__rate_interval]))",
+          "legendFormat": "{{from_provider}} ({{reason}})",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Circuit-breaker transitions",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 22
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 60
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "sum by (provider, transition) (increase(pdlc_llm_breaker_transitions_total[$__rate_interval]))",
+          "legendFormat": "{{provider}} {{transition}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Rate-limited completions",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 22
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 60
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "sum by (provider, tier) (increase(pdlc_llm_rate_limited_total[$__rate_interval]))",
+          "legendFormat": "{{provider}}/{{tier}}",
+          "refId": "A"
+        }
       ]
     }
   ]

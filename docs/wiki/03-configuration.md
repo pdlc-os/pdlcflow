@@ -234,6 +234,21 @@ Beyond the 7 first-party providers, the **`openai_compatible`** provider points 
 
 The **preset catalog** (`GET /v1/admin/models/presets`, or "Start from a preset…" on the console's Models page) ships curated entries — provider, endpoint, recommended tier map, docs link, key format hint — for one-minute onboarding: pick a preset, review the pre-filled form, paste your key, **Test**, Save. Presets are suggestions updated with each pdlcflow release; your saved org config is the truth.
 
+### Resilient routing — failover, circuit breaker, rate limits
+
+An org can declare an ordered **failover chain** (≤3 entries) on its model config (`failover_chain` on `PUT /v1/admin/models/org-default`): when the primary provider fails with a **retriable** error (429 / 5xx / timeout / connection), the engine retries the same persona+tier on the next candidate — a provider incident degrades to a logged fallback instead of a failed turn. Auth (401/403) and validation (4xx) errors never fail over: they're config bugs, and a doomed request must not burn the chain. Each chain entry carries its own provider/region/endpoint/tier_map and its **own API key** (write-only `api_key`; keyed providers *require* one so a fallback can't silently bill the operator's env key). For streaming, failover applies only until the first token is yielded — models are never spliced mid-answer.
+
+A Redis-backed **circuit breaker** per (org, provider[:gateway-host]) skips a repeatedly-failing fallback for a cooldown (open → half-open single probe → close), so a dead provider costs one timeout per cooldown, not one per call. The optional per-org **RPM limiter** (`PDLC_RATE_LIMIT_ENABLED`) enforces a fixed-window quota in Redis; rejection raises a clear rate-limit error and never triggers failover. Both **fail open** when Redis is unavailable. Every fallback/transition/rejection is an OTel metric (`pdlc.llm.fallbacks`, `pdlc.llm.breaker_transitions`, `pdlc.llm.rate_limited` — see the Grafana "Resilience" row) plus a clickstream event.
+
+| Variable | Default | Meaning |
+| --- | --- | --- |
+| `PDLC_LLM_FAILOVER_ENABLED` | `true` | Kill switch — `false` reverts to single-candidate resolution instantly. (Inert until an org configures a chain.) |
+| `PDLC_LLM_BREAKER_THRESHOLD` | `5` | Failures within the window that trip a breaker OPEN. |
+| `PDLC_LLM_BREAKER_WINDOW_S` | `60` | Failure-counting window. |
+| `PDLC_LLM_BREAKER_COOLDOWN_S` | `30` | How long an OPEN breaker skips the candidate before the half-open probe. |
+| `PDLC_RATE_LIMIT_ENABLED` | `false` | Enforce the per-org RPM quota. |
+| `PDLC_LLM_RPM_DEFAULT` | `60` | Calls/min per (org, provider, tier) bucket until per-org quotas ship. |
+
 ### Provider connectivity probes
 
 `POST /v1/admin/models/test` runs a minimal live completion against a **candidate** config (provider/model/region/endpoint + optional one-shot `api_key`) or the **saved** config for a scope (`{"scope": "org-default", "use_saved_key": true}` or `"agent:<persona>"`) — so a bad key, model id, or endpoint is caught **before** it breaks a turn. Responses are `{ok, latency_ms, error_class, tested_model, message}` with a stable error taxonomy (`auth_error`, `model_not_found`, `access_denied`, `endpoint_unreachable`, `rate_limited`, `timeout`, `bad_request`, …). The last result per scope is kept in `llm_provider_health` and served by `GET /v1/admin/models/health` for status chips. Probes are limited to 10/min per org.
