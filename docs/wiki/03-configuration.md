@@ -249,6 +249,31 @@ A Redis-backed **circuit breaker** per (org, provider[:gateway-host]) skips a re
 | `PDLC_RATE_LIMIT_ENABLED` | `false` | Enforce the per-org RPM quota. |
 | `PDLC_LLM_RPM_DEFAULT` | `60` | Calls/min per (org, provider, tier) bucket until per-org quotas ship. |
 
+### Egress & proxies
+
+Enterprise deployments route outbound HTTPS through a corporate proxy, often with a TLS-inspecting CA. pdlcflow's LLM egress is configured **explicitly** — never reliant on ambient `HTTPS_PROXY` env vars whose per-SDK behavior varies:
+
+| Variable | Default | Meaning |
+| --- | --- | --- |
+| `PDLC_EGRESS_PROXY_URL` | — | Outbound proxy for LLM calls, e.g. `http://proxy.corp:3128`. |
+| `PDLC_EGRESS_NO_PROXY` | — | Comma-separated host suffixes that bypass the proxy (in-cluster Ollama, local vLLM). |
+| `PDLC_EGRESS_CA_BUNDLE` | — | PEM bundle path for TLS-inspection CAs. Validated loudly at boot. |
+
+**Honest support matrix** (also logged at boot when egress is configured):
+
+| Providers | Proxy | CA bundle | Org extra headers |
+| --- | --- | --- | --- |
+| `anthropic`, `openai`, `azure`, `openai_compatible` | ✅ (httpx passthrough) | ✅ | ✅ |
+| `ollama` | ✅ (client_kwargs; `NO_PROXY` exemptions apply) | ✅ | ✅ |
+| `bedrock` | ✅ (botocore Config) | ⚠️ via `AWS_CA_BUNDLE` env | ❌ (signed requests) |
+| `gemini` | ⚠️ env fallback (set only if unset — operator env never overwritten) | ⚠️ `SSL_CERT_FILE` | ❌ |
+| `vertex` | ❌ (gRPC — use network-level egress) | ❌ | ❌ |
+| CLI providers | inherit process env | n/a | n/a |
+
+Connectivity probes (`POST /admin/models/test`) use the same egress path as real calls, so a probe fails exactly the way a turn would.
+
+**Org extra headers** (relay gateways often need routing hints like `X-Gateway-Key`): set `extra_headers` on the org model config (console or PUT). Guardrails: max 8 headers, name/value limits, and `Authorization`/`Host`/`Cookie`/`Content-*`/`Proxy-*` are rejected — headers are routing hints, never a second credential channel (BYOK owns auth).
+
 ### Pricing overrides & budgets
 
 Spend numbers on the dashboards are **estimates for visibility — never used for billing**. The price sheet is a versioned catalog shipped with each release (`pricing_catalog.json`), layered under per-org **pricing overrides** (`PUT /v1/admin/pricing/overrides`, or Settings → Models → Pricing & budget): resolution is *override → catalog → preset hint → provider wildcard → **unpriced***. Unknown models now report `usd_estimate: null` — visible as *unpriced*, not disguised as $0. Overrides are versioned like any other config change and travel with export/import.

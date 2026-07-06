@@ -6,9 +6,23 @@ All notable changes to pdlcflow are documented here. This project adheres to
 ## Unreleased
 
 Cost analytics — pricing overrides, versioned price catalog, budgets, and real
-spend events (Wave 3 of the cc-switch gap roadmap, PRD-07).
+spend events (Wave 3 of the cc-switch gap roadmap, PRD-07)
++ egress network controls: explicit proxy/CA/headers for LLM calls (PRD-08).
 
 ### Added
+- **Egress network controls** — `PDLC_EGRESS_PROXY_URL` / `PDLC_EGRESS_NO_PROXY`
+  / `PDLC_EGRESS_CA_BUNDLE` are threaded explicitly into every provider builder
+  (httpx passthrough for the OpenAI/Anthropic family + gateways, client_kwargs
+  for Ollama with in-cluster exemptions, botocore Config for Bedrock; gemini
+  falls back to env only when unset; vertex honestly unsupported). A boot-time
+  egress report states each provider's support level, and a misconfigured CA
+  path fails loudly. Probes use the same egress path as real calls.
+- **Org extra headers** — `extra_headers` on the org model config (migration
+  `0012`) for relay-gateway routing hints, merged into requests where the SDK
+  supports default headers. Guardrailed: max 8, name/value limits,
+  `Authorization`/`Host`/`Cookie`/`Content-*`/`Proxy-*` rejected (never a
+  second credential channel). Versioned, exported/imported with the provider
+  set.
 - **Per-org pricing overrides** — `org_llm_config.pricing_override` (the column
   `pricing.py` promised), editable via `PUT /v1/admin/pricing/overrides` and the
   console's new **Pricing & budget** panel (effective sheet with

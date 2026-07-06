@@ -16,6 +16,7 @@ so editing the provider/model never silently wipes credentials.
 from __future__ import annotations
 
 import json
+import re
 import uuid
 from typing import Literal
 
@@ -32,6 +33,7 @@ from ...llm.factory import (
     LLMProviderFactory,
     ProviderConfig,
     SecretResolutionError,
+    instance_network,
     invalidate_secret_cache,
 )
 from ...llm.tier_map import resolve_model_id
@@ -146,6 +148,8 @@ class OrgDefault(BaseModel):
     api_key: str | None = Field(None, min_length=1)
     # Ordered fallback candidates tried on retriable primary failures.
     failover_chain: list[FallbackEntry] = Field(default_factory=list, max_length=3)
+    # Relay-gateway routing headers (guardrailed; never credentials).
+    extra_headers: dict[str, str] | None = None
 
 
 class OrgDefaultOut(BaseModel):
@@ -157,6 +161,7 @@ class OrgDefaultOut(BaseModel):
     endpoint: str | None = None
     has_key: bool = False
     failover_chain: list[FallbackEntryOut] = Field(default_factory=list)
+    extra_headers: dict[str, str] | None = None
 
 
 class AgentOverride(BaseModel):
@@ -220,6 +225,28 @@ def _validate_provider_config(
 # (bedrock/vertex/ollama are keyless; openai_compatible has NO env fallback by
 # design, so keyless entries are safe there — local vLLM/LiteLLM.)
 _ENV_KEYED_PROVIDERS = {"anthropic", "openai", "gemini", "azure"}
+
+
+# Extra-header guardrails (PRD-08): routing hints only — never a second,
+# unencrypted credential channel (the BYOK path owns auth).
+_HEADER_NAME_RE = re.compile(r"^[A-Za-z0-9-]{1,64}$")
+_FORBIDDEN_HEADERS = {"authorization", "host", "cookie", "user-agent"}
+
+
+def _validate_extra_headers(headers: dict[str, str] | None) -> None:
+    if not headers:
+        return
+    if len(headers) > 8:
+        raise HTTPException(status_code=422, detail="at most 8 extra headers")
+    for name, value in headers.items():
+        low = name.lower()
+        if (not _HEADER_NAME_RE.match(name) or low in _FORBIDDEN_HEADERS
+                or low.startswith(("content-", "proxy-"))):
+            raise HTTPException(status_code=422,
+                                detail=f"extra header {name!r} is not allowed")
+        if not isinstance(value, str) or len(value) > 512:
+            raise HTTPException(status_code=422,
+                                detail=f"extra header {name!r}: value must be ≤512 chars")
 
 
 def _validate_chain(entries: list[FallbackEntry]) -> None:
@@ -322,7 +349,8 @@ def _read_current_config(conn, org_id: str, scope: str) -> dict | None:
     if scope == "org":
         row = conn.execute(
             text("select provider, region, endpoint, tier_map, secret_ref, "
-                 "failover_chain, pricing_override from org_llm_config where org_id = :o"),
+                 "failover_chain, pricing_override, extra_headers "
+                 "from org_llm_config where org_id = :o"),
             {"o": org_id},
         ).mappings().first()
     else:
@@ -386,7 +414,7 @@ def get_org_default(
         set_org_context(conn, org_id)
         row = conn.execute(
             text("select provider, tier_map, region, endpoint, "
-                 "secret_ref is not null as has_key, failover_chain "
+                 "secret_ref is not null as has_key, failover_chain, extra_headers "
                  "from org_llm_config where org_id = :o"),
             {"o": org_id},
         ).mappings().first()
@@ -405,6 +433,7 @@ def set_org_default(
 ) -> dict:
     _validate_provider_config(cfg.provider, cfg.endpoint, tier_map=cfg.tier_map)
     _validate_chain(cfg.failover_chain)
+    _validate_extra_headers(cfg.extra_headers)
     # Existing chain is needed for key carryover (only when a chain is sent).
     existing_chain: list = []
     if cfg.failover_chain:
@@ -416,31 +445,38 @@ def set_org_default(
             ).scalar() or [])
     chain = _build_chain(org_id, cfg.failover_chain, existing_chain)
     params = {"o": org_id, "p": cfg.provider, "r": cfg.region, "e": cfg.endpoint,
-              "t": json.dumps(cfg.tier_map), "fc": json.dumps(chain)}
+              "t": json.dumps(cfg.tier_map), "fc": json.dumps(chain),
+              "eh": json.dumps(cfg.extra_headers) if cfg.extra_headers else None}
     if cfg.api_key is not None:
         ref = _store_key(cfg.api_key, hint=f"llm/org/{org_id}")
         invalidate_secret_cache(ref)  # vault refs are stable paths — drop stale plaintext
         params["sr"] = ref
         sql = (
             "insert into org_llm_config "
-            "(org_id, provider, region, endpoint, tier_map, failover_chain, secret_ref) "
-            "values (:o, :p, :r, :e, cast(:t as jsonb), cast(:fc as jsonb), :sr) "
+            "(org_id, provider, region, endpoint, tier_map, failover_chain, "
+            "extra_headers, secret_ref) "
+            "values (:o, :p, :r, :e, cast(:t as jsonb), cast(:fc as jsonb), "
+            "cast(:eh as jsonb), :sr) "
             "on conflict (org_id) do update set "
             "provider = excluded.provider, region = excluded.region, "
             "endpoint = excluded.endpoint, tier_map = excluded.tier_map, "
             "failover_chain = excluded.failover_chain, "
+            "extra_headers = excluded.extra_headers, "
             "secret_ref = excluded.secret_ref"
         )
     else:
         # api_key omitted ⇒ leave secret_ref untouched (edits must not wipe keys).
         sql = (
             "insert into org_llm_config "
-            "(org_id, provider, region, endpoint, tier_map, failover_chain) "
-            "values (:o, :p, :r, :e, cast(:t as jsonb), cast(:fc as jsonb)) "
+            "(org_id, provider, region, endpoint, tier_map, failover_chain, "
+            "extra_headers) "
+            "values (:o, :p, :r, :e, cast(:t as jsonb), cast(:fc as jsonb), "
+            "cast(:eh as jsonb)) "
             "on conflict (org_id) do update set "
             "provider = excluded.provider, region = excluded.region, "
             "endpoint = excluded.endpoint, tier_map = excluded.tier_map, "
-            "failover_chain = excluded.failover_chain"
+            "failover_chain = excluded.failover_chain, "
+            "extra_headers = excluded.extra_headers"
         )
     with _engine().begin() as conn:
         set_org_context(conn, org_id)
@@ -619,6 +655,7 @@ def _load_scope_config(org_id: str, req: ProbeRequest) -> tuple[ProviderConfig, 
     return ProviderConfig(
         provider=row["provider"], region=row["region"], endpoint=row["endpoint"],
         secret_value=secret_value,
+        network=instance_network(),  # probes use the same egress path as real calls
     ), model_id
 
 
@@ -663,7 +700,8 @@ def test_provider(
             raise HTTPException(status_code=422,
                                 detail="provider is required for a candidate test")
         cfg = ProviderConfig(provider=req.provider, region=req.region,
-                             endpoint=req.endpoint, secret_value=req.api_key)
+                             endpoint=req.endpoint, secret_value=req.api_key,
+                             network=instance_network())
         model_id = req.model_id or resolve_model_id(req.provider, req.tier or "balanced")
 
     try:

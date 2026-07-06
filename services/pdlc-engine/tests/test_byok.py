@@ -149,7 +149,7 @@ class _FakeChat:
 def test_org_key_flows_into_builder(monkeypatch):
     monkeypatch.setattr("langchain_anthropic.ChatAnthropic", _FakeChat)
     org_row = {"provider": "anthropic", "region": None, "endpoint": None,
-               "tier_map": None, "secret_ref": "fake:org-key"}
+               "tier_map": None, "secret_ref": "fake:org-key", "extra_headers": None}
     f = LLMProviderFactory(
         db=_FakeEngine(agent_row=None, org_row=org_row),
         secrets=_FakeSecrets({"fake:org-key": "sk-tenant-A"}),
@@ -161,7 +161,7 @@ def test_org_key_flows_into_builder(monkeypatch):
 def test_dangling_org_ref_fails_the_call(monkeypatch):
     monkeypatch.setattr("langchain_anthropic.ChatAnthropic", _FakeChat)
     org_row = {"provider": "anthropic", "region": None, "endpoint": None,
-               "tier_map": None, "secret_ref": "fake:revoked"}
+               "tier_map": None, "secret_ref": "fake:revoked", "extra_headers": None}
     f = LLMProviderFactory(
         db=_FakeEngine(agent_row=None, org_row=org_row),
         secrets=_FakeSecrets({}),

@@ -34,6 +34,7 @@ from .models import (
     _engine,
     _read_current_config,
     _validate_chain,
+    _validate_extra_headers,
     _validate_provider_config,
     record_version,
 )
@@ -200,20 +201,23 @@ def rollback_version(
             conn.execute(
                 text("insert into org_llm_config "
                      "(org_id, provider, region, endpoint, tier_map, secret_ref, "
-                     "failover_chain, pricing_override) "
+                     "failover_chain, pricing_override, extra_headers) "
                      "values (:o, :p, :r, :e, cast(:t as jsonb), :sr, "
-                     "cast(:fc as jsonb), cast(:po as jsonb)) "
+                     "cast(:fc as jsonb), cast(:po as jsonb), cast(:eh as jsonb)) "
                      "on conflict (org_id) do update set provider = excluded.provider, "
                      "region = excluded.region, endpoint = excluded.endpoint, "
                      "tier_map = excluded.tier_map, secret_ref = excluded.secret_ref, "
                      "failover_chain = excluded.failover_chain, "
-                     "pricing_override = excluded.pricing_override"),
+                     "pricing_override = excluded.pricing_override, "
+                     "extra_headers = excluded.extra_headers"),
                 {"o": org_id, "p": snap["provider"], "r": snap.get("region"),
                  "e": snap.get("endpoint"), "t": json.dumps(snap.get("tier_map")),
                  "sr": snap.get("secret_ref"),
                  "fc": json.dumps(snap.get("failover_chain") or []),
                  "po": json.dumps(snap.get("pricing_override"))
-                       if snap.get("pricing_override") is not None else None},
+                       if snap.get("pricing_override") is not None else None,
+                 "eh": json.dumps(snap.get("extra_headers"))
+                       if snap.get("extra_headers") is not None else None},
             )
         else:
             conn.execute(
@@ -270,6 +274,7 @@ def export_models(
             "endpoint": org.get("endpoint"), "tier_map": org.get("tier_map"),
             "secret": secret_export(org.get("secret_ref"), org["provider"]),
             "pricing_override": org.get("pricing_override"),
+            "extra_headers": org.get("extra_headers"),
             "failover_chain": [
                 {"provider": e.get("provider"), "region": e.get("region"),
                  "endpoint": e.get("endpoint"), "tier_map": e.get("tier_map"),
@@ -318,6 +323,7 @@ class ImportOrgDefault(BaseModel):
     failover_chain: list[ImportChainEntry] = Field(default_factory=list, max_length=3)
     secret: ImportSecret | None = None
     pricing_override: dict[str, dict[str, float]] | None = None
+    extra_headers: dict[str, str] | None = None
 
 
 class ImportOverride(BaseModel):
@@ -376,8 +382,14 @@ def _plan_import(doc: ImportDoc, org_id: str) -> list[dict]:
 
     if doc.org_default is not None:
         d = doc.org_default
-        plan.append(_item("org", d.provider, d.endpoint, d.tier_map, d.secret,
-                          chain=d.failover_chain))
+        item = _item("org", d.provider, d.endpoint, d.tier_map, d.secret,
+                     chain=d.failover_chain)
+        try:
+            _validate_extra_headers(d.extra_headers)
+        except HTTPException as exc:
+            item["action"] = "error"
+            item["reasons"].append(str(exc.detail))
+        plan.append(item)
     for o in doc.agent_overrides:
         plan.append(_item(o.agent_persona, o.provider, o.endpoint, None, o.secret))
 
@@ -427,18 +439,21 @@ def import_models(
             conn.execute(
                 text("insert into org_llm_config "
                      "(org_id, provider, region, endpoint, tier_map, secret_ref, "
-                     "failover_chain, pricing_override) "
+                     "failover_chain, pricing_override, extra_headers) "
                      "values (:o, :p, :r, :e, cast(:t as jsonb), :sr, "
-                     "cast(:fc as jsonb), cast(:po as jsonb)) "
+                     "cast(:fc as jsonb), cast(:po as jsonb), cast(:eh as jsonb)) "
                      "on conflict (org_id) do update set provider = excluded.provider, "
                      "region = excluded.region, endpoint = excluded.endpoint, "
                      "tier_map = excluded.tier_map, secret_ref = excluded.secret_ref, "
                      "failover_chain = excluded.failover_chain, "
-                     "pricing_override = excluded.pricing_override"),
+                     "pricing_override = excluded.pricing_override, "
+                     "extra_headers = excluded.extra_headers"),
                 {"o": org_id, "p": d.provider, "r": d.region, "e": d.endpoint,
                  "t": json.dumps(d.tier_map), "sr": org_ref, "fc": json.dumps(chain),
                  "po": json.dumps(d.pricing_override)
-                       if d.pricing_override is not None else None},
+                       if d.pricing_override is not None else None,
+                 "eh": json.dumps(d.extra_headers)
+                       if d.extra_headers is not None else None},
             )
         elif strategy == "replace":
             if _read_current_config(conn, org_id, "org") is not None:

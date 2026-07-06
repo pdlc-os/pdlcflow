@@ -116,6 +116,32 @@ def invalidate_pricing_cache(org_id: str | None = None) -> None:
 
 
 @dataclass
+class NetworkConfig:
+    """Egress controls threaded into provider builders (PRD-08). proxy/CA are
+    instance-level (operator domain); extra_headers are org-level relay-gateway
+    routing hints (guardrailed at the API — never credentials)."""
+
+    proxy_url: str | None = None
+    no_proxy: tuple[str, ...] = ()
+    ca_bundle: str | None = None
+    extra_headers: dict[str, str] | None = None
+
+
+def instance_network(extra_headers: dict[str, str] | None = None) -> NetworkConfig | None:
+    """NetworkConfig from PDLC_EGRESS_* settings (+ optional org headers);
+    None when nothing is configured, so builders skip all egress plumbing."""
+    proxy = getattr(settings, "egress_proxy_url", None)
+    ca = getattr(settings, "egress_ca_bundle", None)
+    if not (proxy or ca or extra_headers):
+        return None
+    no_proxy = tuple(
+        s.strip() for s in getattr(settings, "egress_no_proxy", "").split(",") if s.strip()
+    )
+    return NetworkConfig(proxy_url=proxy, no_proxy=no_proxy, ca_bundle=ca,
+                         extra_headers=extra_headers or None)
+
+
+@dataclass
 class ProviderConfig:
     provider: Provider
     region: str | None = None
@@ -123,6 +149,7 @@ class ProviderConfig:
     secret_value: str | None = None
     tier_map_override: dict[str, str] | None = None
     model_id_override: str | None = None
+    network: NetworkConfig | None = None
 
 
 @dataclass
@@ -196,6 +223,7 @@ class LLMProviderFactory:
             row = conn.execute(
                 text(
                     "select a.provider, a.model_id, a.region, a.endpoint, "
+                    "o.extra_headers, "
                     "coalesce(a.secret_ref, case when o.provider = a.provider "
                     "then o.secret_ref end) as secret_ref "
                     "from agent_llm_config a "
@@ -212,6 +240,7 @@ class LLMProviderFactory:
             region=row["region"],
             endpoint=row["endpoint"],
             secret_value=self._resolve_secret(row["secret_ref"]),
+            network=instance_network(row["extra_headers"]),
         )
 
     def _org_default(self, org_id: str) -> ProviderConfig | None:
@@ -223,8 +252,8 @@ class LLMProviderFactory:
             set_org_context(conn, org_id)
             row = conn.execute(
                 text(
-                    "select provider, region, endpoint, tier_map, secret_ref "
-                    "from org_llm_config where org_id = :o"
+                    "select provider, region, endpoint, tier_map, secret_ref, "
+                    "extra_headers from org_llm_config where org_id = :o"
                 ),
                 {"o": org_id},
             ).mappings().first()
@@ -236,6 +265,7 @@ class LLMProviderFactory:
             endpoint=row["endpoint"],
             tier_map_override=row["tier_map"],
             secret_value=self._resolve_secret(row["secret_ref"]),
+            network=instance_network(row["extra_headers"]),
         )
 
     def pricing_overrides(self, org_id: str) -> dict | None:
@@ -268,18 +298,21 @@ class LLMProviderFactory:
     # — orgs without a chain pay no extra DB read on the hot path because the
     # backend only iterates past the primary after a retriable failure.
 
-    def _failover_entries(self, org_id: str) -> list[dict]:
+    def _failover_entries(self, org_id: str) -> tuple[list[dict], dict | None]:
         if self._db is None or not self._is_org_uuid(org_id):
-            return []
+            return [], None
         from ..db.rls import set_org_context
 
         with self._db.begin() as conn:
             set_org_context(conn, org_id)
             row = conn.execute(
-                text("select failover_chain from org_llm_config where org_id = :o"),
+                text("select failover_chain, extra_headers "
+                     "from org_llm_config where org_id = :o"),
                 {"o": org_id},
             ).mappings().first()
-        return list(row["failover_chain"]) if row and row["failover_chain"] else []
+        if not row:
+            return [], None
+        return list(row["failover_chain"] or []), row["extra_headers"]
 
     def failover_candidates(self, tier: Tier, tenant: TenantCtx) -> list:
         """Zero-arg builders, one per chain entry; each returns
@@ -287,7 +320,8 @@ class LLMProviderFactory:
         if not getattr(settings, "llm_failover_enabled", True):
             return []
         builders = []
-        for entry in self._failover_entries(tenant.org_id):
+        entries, org_headers = self._failover_entries(tenant.org_id)
+        for entry in entries:
             def _build(e=entry):
                 cfg = ProviderConfig(
                     provider=e["provider"],
@@ -295,6 +329,7 @@ class LLMProviderFactory:
                     endpoint=e.get("endpoint"),
                     tier_map_override=e.get("tier_map"),
                     secret_value=self._resolve_secret(e.get("secret_ref")),
+                    network=instance_network(org_headers),
                 )
                 self._guard_cli(cfg.provider)
                 model_id = resolve_model_id(cfg.provider, tier, cfg.tier_map_override)
@@ -347,7 +382,9 @@ class LLMProviderFactory:
             provider=p,
             region=settings.bedrock_region if p == "bedrock" else None,
             endpoint=settings.ollama_endpoint if p == "ollama" else None,
+            network=instance_network(),
         )
 
     def _fallback(self) -> ProviderConfig:
-        return ProviderConfig(provider="bedrock", region="us-east-1")
+        return ProviderConfig(provider="bedrock", region="us-east-1",
+                              network=instance_network())
