@@ -3,11 +3,12 @@
 All notable changes to pdlcflow are documented here. This project adheres to
 [Semantic Versioning](https://semver.org/).
 
-## Unreleased
+## v1.12.0 — 2026-07-06
 
-Provider presets & the open gateway ecosystem (Wave 2 of the cc-switch gap roadmap, PRD-04)
-+ resilient LLM routing: failover chains, circuit breaker, real rate limiting (PRD-05)
-+ config versioning, rollback, export/import (PRD-06 — Wave 2 complete).
+Provider resilience & the open ecosystem (Wave 2 of the cc-switch gap roadmap):
+preset catalog + OpenAI-compatible gateways (PRD-04), failover chains + circuit
+breaker + real rate limiting (PRD-05), and config versioning, rollback &
+export/import (PRD-06).
 
 ### Added
 - **Config history & rollback** — every org/agent model-config mutation
