@@ -17,8 +17,10 @@ from langgraph.types import interrupt
 
 from .state import PDLCState
 
-# The 8 canonical gate kinds (plan §2.4). Inception owns the first four.
+# The 9 canonical gate kinds (plan §2.4). Initialization owns the first;
+# Inception owns the next four.
 GATE_KINDS = (
+    "init_approve",
     "discover_summary",
     "prd_approve",
     "design_docs_approve",

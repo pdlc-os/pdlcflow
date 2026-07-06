@@ -95,6 +95,13 @@ class PDLCState(TypedDict, total=False):
     correlation_id: str | None
 
     # ── Inception (Phase B) working state ───────────────────────────────
+    # Initialization (genesis: constitution + intent + roadmap seed)
+    project_name: str | None
+    init_answers: dict  # {round_title: [answers]} gathered by the init flow
+    constitution_ref: str | None  # artifact uri of CONSTITUTION.md
+    intent_ref: str | None  # artifact uri of INTENT.md
+    roadmap_ref: str | None  # artifact uri of ROADMAP.md
+    init_approved: bool  # init_approve gate verdict (gate #1)
     # The brainstorm log accumulates one section per Discover/Design step.
     brainstorm_log: list[dict]  # [{"section": str, "body": str, "step": str}]
     discovery_summary: str | None

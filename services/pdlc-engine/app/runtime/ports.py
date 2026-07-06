@@ -8,7 +8,7 @@ in-process in tests. The engine injects production adapters at boot:
 - EventBus    in-memory  →  Redis Pub/Sub (WebSocket fan-out)
 
 A "pending interaction" is the unified record for both interrupt kinds the
-graph raises: `approval` (the 8 gates) and `user_input_required` (Socratic /
+graph raises: `approval` (the 9 gates) and `user_input_required` (Socratic /
 Sketch question rounds). The plan (§1.3) models both as approval_gates rows.
 """
 

@@ -29,7 +29,7 @@
 | T2-4 (partial ✅) | `PDLC_AUTH_MODE` boot-guard done (no longer inert); real OIDC still open | engine | 🟠 Operational | L |
 | ~~T2-5~~ ✅ | CDK image from context w/ GHCR default — **done** (quick-wins) | infra | 🟠 Operational | S |
 | ~~T3-1~~ ✅ | MCP stdio execution (stdio_client dispatch, double-gated) — **done** | engine | 🟡 Feature | M |
-| T3-2 | Initialization phase is a passthrough (no Constitution/Intent/Roadmap flow) | pdlc-graph | 🟡 Feature | L |
+| ~~T3-2~~ ✅ | Initialization phase built: interactive Constitution/Intent/Roadmap flow + `init_approve` (9th gate) — **done** | pdlc-graph | 🟡 Feature | L |
 | ~~T3-3~~ ✅ | Migrate entity resolution (names → UUIDs, idempotent, DB-gated) — **done** | migrate + engine | 🟡 Feature | M |
 | ~~T3-4~~ ✅ | MemoryFileViewer live (artifact list/read routes + real viewer) — **done** | studio | 🟡 Feature | M |
 | ~~T3-5~~ ✅ | Per-org RPM quotas (org_quotas + resolver + console control) — **done** | engine + studio | 🟡 Feature | M |

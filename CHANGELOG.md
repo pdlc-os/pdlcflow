@@ -11,6 +11,15 @@ simulations presented as results (from the
 [stub-gaps roadmap](docs/.research/stub-gaps-roadmap.md)).
 
 ### Added
+- **Initialization phase** (T3-2) — was a single passthrough node. It is now a
+  real interactive genesis flow: three `interaction.ask` rounds (product intent,
+  constitution choices, seed roadmap) → deterministic renderers assemble
+  **CONSTITUTION.md / INTENT.md / ROADMAP.md** → `put_artifact` → a new
+  **`init_approve` gate** (now the **9th** canonical gate, first in order),
+  which advances the phase to Inception on approval. Under night-shift it
+  auto-approves like the others. **The methodology is now "9 approval gates"** —
+  `GATE_KINDS`, the event registry, and the wiki/API/overview docs are updated
+  throughout. `/init` and `/setup` route to it.
 - **Project memory viewer** (T3-4) — the sidebar "Memory" panel was a static
   mockup. It now lists the project's stored artifacts (PRD, design docs,
   decisions, deployments, uploads, migrated memory) and shows their content on
